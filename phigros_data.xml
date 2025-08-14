@@ -316,7 +316,7 @@
       <简评>无</简评>
       <物量>1137</物量>
       <谱师>Affection &amp; memories\\//
-Salt &amp; Simon_Axis</谱师>
+        Salt &amp; Simon_Axis</谱师>
     </IN>
     <EZ>
       <定数>8.1</定数>
@@ -498,8 +498,8 @@ Salt &amp; Simon_Axis</谱师>
       <简评>无</简评>
       <物量>1060</物量>
       <谱师>{Demolition,
-Devastation,
-Destruction} </谱师>
+        Devastation,
+        Destruction} </谱师>
     </EZ>
     <HD>
       <定数>13.1</定数>
@@ -508,7 +508,7 @@ Destruction} </谱师>
       <简评>无</简评>
       <物量>1250</物量>
       <谱师>{Devastation,
-Destruction}</谱师>
+        Destruction}</谱师>
     </HD>
     <bpm>321.321</bpm>
     <时长>2.38</时长>
@@ -748,7 +748,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>785</物量>
       <谱师>Bσrbσriσn∑rmσn
-.∑x∑</谱师>
+        .∑x∑</谱师>
     </IN>
     <EZ>
       <定数>5.0</定数>
@@ -757,7 +757,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>352</物量>
       <谱师>Barbarianerman
-.exe</谱师>
+        .exe</谱师>
     </EZ>
     <HD>
       <定数>10.5</定数>
@@ -766,7 +766,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>516</物量>
       <谱师>Bσrbσriσnermσn
-.exe</谱师>
+        .exe</谱师>
     </HD>
     <bpm>200</bpm>
     <时长>2.1</时长>
@@ -1583,7 +1583,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>888</物量>
       <谱师>while(TangScend
-=TangScend);</谱师>
+        =TangScend);</谱师>
     </AT>
     <EZ>
       <定数>6.5</定数>
@@ -1592,7 +1592,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>333</物量>
       <谱师>while(TangScend
-&lt;=TangScend);</谱师>
+        &lt;=TangScend);</谱师>
     </EZ>
     <HD>
       <定数>12.3</定数>
@@ -1601,7 +1601,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>666</物量>
       <谱师>while(TangScend
-&gt;=TangScend);</谱师>
+        &gt;=TangScend);</谱师>
     </HD>
     <IN>
       <定数>14.8</定数>
@@ -1610,7 +1610,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>888</物量>
       <谱师>while(TangScend
-==TangScend);</谱师>
+        ==TangScend);</谱师>
     </IN>
     <bpm>180</bpm>
     <时长>1.57</时长>
@@ -1842,7 +1842,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>1262</物量>
       <谱师>StupiGGy
--The Startline-</谱师>
+        -The Startline-</谱师>
     </IN>
     <EZ>
       <定数>5.0</定数>
@@ -1859,7 +1859,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>842</物量>
       <谱师>reanimate_
-6k_nm.imd</谱师>
+        6k_nm.imd</谱师>
     </HD>
     <bpm>174</bpm>
     <时长>2.36</时长>
@@ -2923,7 +2923,7 @@ Destruction}</谱师>
       <简评>无</简评>
       <物量>554</物量>
       <谱师>CN_115+
-TangScend</谱师>
+        TangScend</谱师>
     </IN>
     <bpm>180</bpm>
     <时长>2.14</时长>
@@ -3493,8 +3493,8 @@ TangScend</谱师>
       <简评>无</简评>
       <物量>1300</物量>
       <谱师>RWND -p
-16493:62786:
-92551</谱师>
+        16493:62786:
+        92551</谱师>
     </AT>
     <bpm>190</bpm>
     <时长>2.12</时长>
@@ -3627,7 +3627,7 @@ TangScend</谱师>
       <简评>无</简评>
       <物量>450</物量>
       <谱师>Jαckψ feat. Βαρβαροςα
-ντρας</谱师>
+        ντρας</谱师>
     </IN>
     <AT>
       <定数>16.2</定数>
@@ -4073,7 +4073,7 @@ TangScend</谱师>
       <简评>无</简评>
       <物量>811</物量>
       <谱师>Luminous
-Gausbon</谱师>
+        Gausbon</谱师>
     </IN>
     <bpm>151</bpm>
     <时长>2.0</时长>
@@ -4812,7 +4812,15 @@ Gausbon</谱师>
     <bpm>210</bpm>
     <时长>2.46</时长>
     <画师>ZG</画师>
-  <AT><定数>11.0</定数><acc>11.0</acc><单曲rks>0</单曲rks><简评>无</简评><物量>无</物量><谱师>无</谱师></AT></song>
+    <AT>
+      <定数>11.0</定数>
+      <acc>11.0</acc>
+      <单曲rks>0</单曲rks>
+      <简评>无</简评>
+      <物量>无</物量>
+      <谱师>无</谱师>
+    </AT>
+  </song>
   <song id="139">
     <名称>Apocalypse</名称>
     <俗称>无</俗称>
@@ -5012,7 +5020,7 @@ Gausbon</谱师>
       <acc>99.5</acc>
       <单曲rks>14.7663</单曲rks>
       <简评>4k:密集楼梯 不会轮指是说是
-2k:热身 儿歌</简评>
+        2k:热身 儿歌</简评>
       <物量>1102</物量>
       <谱师>Hook vs._鉄</谱师>
     </IN>
@@ -5601,7 +5609,7 @@ Gausbon</谱师>
       <简评>无</简评>
       <物量>208</物量>
       <谱师>Where are Ctymax
-and 阿爽？</谱师>
+        and 阿爽？</谱师>
     </EZ>
     <HD>
       <定数>8.6</定数>
@@ -5610,7 +5618,7 @@ and 阿爽？</谱师>
       <简评>无</简评>
       <物量>390</物量>
       <谱师>Where are Ctymax
-and 阿爽？</谱师>
+        and 阿爽？</谱师>
     </HD>
     <IN>
       <定数>14.2</定数>
@@ -5644,7 +5652,7 @@ and 阿爽？</谱师>
       <简评>无</简评>
       <物量>408</物量>
       <谱师>Passport:
-Constructer</谱师>
+        Constructer</谱师>
     </HD>
     <IN>
       <定数>14.7</定数>
@@ -5653,7 +5661,7 @@ Constructer</谱师>
       <简评>无</简评>
       <物量>857</物量>
       <谱师>Passport:
-Governor</谱师>
+        Governor</谱师>
     </IN>
     <bpm>160</bpm>
     <时长>2.3</时长>
@@ -5687,7 +5695,7 @@ Governor</谱师>
       <简评>无</简评>
       <物量>1353</物量>
       <谱师>Spy-Simon_Axis｜
-Spy-騎士</谱师>
+        Spy-騎士</谱师>
     </IN>
     <bpm>160</bpm>
     <时长>2.26</时长>
@@ -6165,7 +6173,7 @@ Spy-騎士</谱师>
     <名称>Sein</名称>
     <俗称>无</俗称>
     <曲师>朔(Apo11o program vs.
-お月さま交響曲) ft. kuroa×荒巻</曲师>
+      お月さま交響曲) ft. kuroa×荒巻</曲师>
     <章节>单曲精选集</章节>
     <EZ>
       <定数>5.0</定数>
@@ -6718,7 +6726,7 @@ Spy-騎士</谱师>
       <简评>无</简评>
       <物量>852</物量>
       <谱师>Two skunks (Ctymax and 晨)
-in Africa shouting WAHHHHHH!</谱师>
+        in Africa shouting WAHHHHHH!</谱师>
     </IN>
     <bpm>200</bpm>
     <时长>2.0</时长>
@@ -7619,7 +7627,7 @@ in Africa shouting WAHHHHHH!</谱师>
     <名称>Brave Notes</名称>
     <俗称>无</俗称>
     <曲师>Turquoise
-(DRIVE.+Nota)</曲师>
+      (DRIVE.+Nota)</曲师>
     <章节>单曲精选集</章节>
     <EZ>
       <定数>5.5</定数>
@@ -7628,7 +7636,7 @@ in Africa shouting WAHHHHHH!</谱师>
       <简评>无</简评>
       <物量>299</物量>
       <谱师>Brave
-Eaimo</谱师>
+        Eaimo</谱师>
     </EZ>
     <HD>
       <定数>11.4</定数>
@@ -7637,7 +7645,7 @@ Eaimo</谱师>
       <简评>无</简评>
       <物量>442</物量>
       <谱师>Brave
-Eaimo</谱师>
+        Eaimo</谱师>
     </HD>
     <IN>
       <定数>14.6</定数>
@@ -7646,7 +7654,7 @@ Eaimo</谱师>
       <简评>无</简评>
       <物量>768</物量>
       <谱师>Brave
-Eaimo</谱师>
+        Eaimo</谱师>
     </IN>
     <bpm>192</bpm>
     <时长>1.58</时长>
