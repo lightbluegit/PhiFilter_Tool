@@ -214,10 +214,10 @@ class song_info_card(ElevatedCardWidget):
         chi_font_family = DEFAULT_CN_FONT
         if chi_font_id != -1:
             chi_font_family = QFontDatabase.applicationFontFamilies(chi_font_id)[0]
-
-        self.setToolTip(
-            f"""<span style="font-famliy: '{en_font_family}'; color: #3fe2ff; font-size: 20px;">NO.{index}</span>"""
-        )
+        if index:
+            self.setToolTip(
+                f"""<span style="font-famliy: '{en_font_family}'; color: #3fe2ff; font-size: 20px;">NO.{index}</span>"""
+            )
         self.installEventFilter(
             ToolTipFilter(self, showDelay=300, position=ToolTipPosition.TOP)
         )
@@ -509,10 +509,7 @@ class filter_obj(QWidget):
         self.limit_choose_cbb = combobox(self.filter_limit_list, "", cbb_style)
         self.limit_choose_cbb.setContentsMargins(0, 0, 0, 0)
         self.main_layout.addWidget(self.limit_choose_cbb)
-        # edit = QLineEdit()
-        # model = QStringListModel(["S", "上海", "广州"])
-        # completer = QCompleter(model)
-        # edit.setCompleter(completer)
+
         # -----------属性限制值输入部分-----------
         limit_val_cbb_style = {
             "max_width": 150,
@@ -524,22 +521,6 @@ class filter_obj(QWidget):
         self.limit_val_cbb = editable_combobox([], "", limit_val_cbb_style)
         self.limit_val_cbb.setContentsMargins(0, 0, 0, 0)
         self.main_layout.addWidget(self.limit_val_cbb)
-
-        # -----------逻辑链接部分 [&&, ||, 无] 选择------------
-        self.logical_cbb = combobox(
-            ["", "并且(与)", "或者(或)"],
-            "",
-            {
-                "max_width": "90",
-                "min_width": "90",
-                "min_height": 35,
-                "max_height": 35,
-                "font_size": 20,
-            },
-        )
-        self.logical_cbb.setContentsMargins(0, 0, 0, 0)
-        self.logical_cbb.bind_react_click_func(self.change_add_btn_status)
-        self.main_layout.addWidget(self.logical_cbb)
 
         # -----------清除该筛选项按钮-----------
         btn_style = {
@@ -556,18 +537,36 @@ class filter_obj(QWidget):
         self.main_layout.addWidget(self.delete_btn)
         self.delete_btn.clicked.connect(self.delete_filter_obj)
 
-    def change_add_btn_status(self):
-        if self.logical_cbb.get_content() != "" and self == self.filter_obj_list[-1]:
-            filter_elm = filter_obj(
-                len(self.filter_obj_list), self.filter_obj_list, self.flow_layout
-            )
-            self.filter_obj_list.append(filter_elm)
-            self.flow_layout.addWidget(filter_elm)
-            self.filter_obj_list[0].delete_btn.show()
+        # -----------增加一个选项按钮-----------
+        btn_style = {
+            "max_width": "50",
+            "min_width": "50",
+            "min_height": 35,
+            "max_height": 35,
+        }
+        self.add_btn = button("+", btn_style)
+        self.add_btn.setToolTip("新增筛选项")
+        self.add_btn.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.addWidget(self.add_btn)
+        self.add_btn.clicked.connect(self.add_filter_obj)
+
+    def add_filter_obj(self):
+        # print(self, self.filter_obj_list)
+        filter_elm = filter_obj(
+            len(self.filter_obj_list), self.filter_obj_list, self.flow_layout
+        )
+        self.filter_obj_list.append(filter_elm)
+        self.flow_layout.addWidget(filter_elm)
+        self.filter_obj_list[0].delete_btn.show()
+        self.add_btn.hide()
+        if len(self.filter_obj_list) > 1:
+            self.filter_obj_list[0].delete_btn.hide()  # 总不能全删完吧?
 
     def delete_filter_obj(self):
         self.filter_obj_list.remove(self)
         self.deleteLater()
+        # print(self.filter_obj_list)
+        self.filter_obj_list[-1].add_btn.show()
         if len(self.filter_obj_list) == 1:
             self.filter_obj_list[0].delete_btn.hide()  # 总不能全删完吧?
 
@@ -591,20 +590,24 @@ class filter_obj(QWidget):
 
         elif self.attribution_choose_cbb.get_content() == "曲名":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content()
+            self.limit_val_cbb.set_content(
+                SONG_NAME_LIST
+            )  # 曲名这里直接提供info.tsv里面的东西就好了 具体的区分(Another Me) 再加一个曲师就好了
+
         elif self.attribution_choose_cbb.get_content() == "曲师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content()
+            self.limit_val_cbb.set_content(COMPOSER_LIST)
+
         elif self.attribution_choose_cbb.get_content() == "谱师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content()
+            self.limit_val_cbb.set_content(CHARTER_LIST)
+
         elif self.attribution_choose_cbb.get_content() == "画师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content()
+            self.limit_val_cbb.set_content(DRAWER_NAME_LIST)
 
     def get_all_condition(self):  # 组合并返回当前的所有限制条件
         attribution = self.attribution_choose_cbb.get_content()
         limit = self.limit_choose_cbb.get_content()
         limit_val = self.limit_val_cbb.get_content()
-        logical_link = self.logical_cbb.get_content()
-        return ((attribution, limit, limit_val), logical_link)
+        return (attribution, limit, limit_val)

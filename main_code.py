@@ -1704,6 +1704,7 @@ from qfluentwidgets import (
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
+from collections import deque
 
 from dependences.classes import *
 from dependences.consts import *
@@ -1886,7 +1887,7 @@ class MainWindow(FramelessWindow):
         layout.addWidget(generate_b27_phi3_btn)
 
         # s1 = song_info_card(
-        #     IMAGES_PREPATH + "Illustration #237.png",  # 曲绘这个怎么搞我先想想
+        #     IMAGES_PREPATH + "Illustration #237.png",
         #     "Eltawiholu givyf kgtuc hblj;nkolm xc,olsac ascx",
         #     "11.1111",
         #     "22.222",
@@ -1899,7 +1900,7 @@ class MainWindow(FramelessWindow):
         # layout.addWidget(s1)
 
         # s2 = song_info_card(
-        #     IMAGES_PREPATH + "Illustration #237.png",  # 曲绘这个怎么搞我先想想
+        #     IMAGES_PREPATH + "Illustration #237.png",
         #     "Eltaw",
         #     "11.1111",
         #     "22.222",
@@ -2029,7 +2030,7 @@ class MainWindow(FramelessWindow):
             # score_level = self.get_score_level(int(score), is_fc)
             complex_name = song_name_raw + "." + composer_raw
             phi3_cardi = song_info_card(
-                ILLUSTRATION_PREPATH + complex_name + ".png",  # 曲绘这个怎么搞我先想想
+                ILLUSTRATION_PREPATH + complex_name + ".png",
                 self.cname_to_name[complex_name][0],
                 singal_rks,
                 acc,
@@ -2062,7 +2063,7 @@ class MainWindow(FramelessWindow):
             # score_level = self.get_score_level(int(score), is_fc)
 
             b27_cardi = song_info_card(
-                ILLUSTRATION_PREPATH + complex_name + ".png",  # 曲绘这个怎么搞我先想想
+                ILLUSTRATION_PREPATH + complex_name + ".png",
                 self.cname_to_name[song_name_raw + "." + composer_raw][0],
                 singal_rks,
                 acc,
@@ -2142,6 +2143,22 @@ class MainWindow(FramelessWindow):
         filter_obj_list: list[filter_obj] = []
         self.widgets["search_page"]["filter_obj_list"] = filter_obj_list
         filter_elm = filter_obj(0, filter_obj_list, flow_layout)
+        # 逻辑链接部分 [&&, ||, 无] 选择
+        filter_elm.logical_cbb = combobox(
+            ["", "并且(与)", "或者(或)"],
+            "",
+            {
+                "max_width": "90",
+                "min_width": "90",
+                "min_height": 35,
+                "max_height": 35,
+                "font_size": 20,
+            },
+        )
+        filter_elm.logical_cbb.setContentsMargins(0, 0, 0, 0)
+        # filter_elm.logical_cbb.setAlignment(Qt.AlignRight)
+        filter_elm.main_layout.addWidget(filter_elm.logical_cbb)
+
         filter_obj_list.append(filter_elm)
         filter_elm.setContentsMargins(0, 0, 0, 0)
         flow_layout.addWidget(filter_elm)
@@ -2175,7 +2192,7 @@ class MainWindow(FramelessWindow):
         self.widgets["search_page"][
             "filter_from_previous_song_btn"
         ] = filter_from_previous_song_btn
-        # filter_from_previous_song_btn.bind_click_func()
+        filter_from_previous_song_btn.bind_click_func(self.filter_from_previous_song)
         filter_confirm_layout.addWidget(filter_from_previous_song_btn)
 
         # ------------------- 筛选结果布局部分 ----------------
@@ -2215,10 +2232,33 @@ class MainWindow(FramelessWindow):
         group_header_layout.addWidget(group_by)  # 右侧控件
 
         # ----------------- 中层 歌曲布局 ----------------
-        result_display_header = QWidget()
-        result_layout.addWidget(result_display_header, 7)
-        result_display_layout = QHBoxLayout(result_display_header)
+        result_display_widget = QWidget()
+        self.widgets["search_page"]["result_display_widget"] = result_display_widget
+        result_layout.addWidget(result_display_widget, 7)
+        result_display_layout = QHBoxLayout(result_display_widget)
+        self.widgets["search_page"]["result_display_layout"] = result_display_layout
         result_display_layout.setContentsMargins(5, 5, 5, 5)
+        result_display_scroll_area = SmoothScrollArea()
+        result_display_scroll_area.setWidgetResizable(True)  # 关键设置
+        result_display_scroll_area.setStyleSheet(
+            "QScrollArea{background: transparent; border: none}"
+        )
+        # 必须给内部的视图也加上透明背景样式
+        result_display_widget.setStyleSheet("QWidget{background: transparent}")
+        result_display_layout.addWidget(result_display_scroll_area)
+        result_display_layout.setSpacing(0)
+        # 创建内容容器
+        scroll_content_widget = QWidget()
+        result_display_flow_layout = FlowLayout(scroll_content_widget)  # 使用流式布局
+        self.widgets["search_page"][
+            "result_display_flow_layout"
+        ] = result_display_flow_layout
+        result_display_flow_layout.setSpacing(0)
+        result_display_flow_layout.setContentsMargins(0, 0, 0, 0)
+        # 设置滚动区域的内容
+        result_display_scroll_area.setWidget(scroll_content_widget)
+
+        self.widgets["search_page"]["song_cards"] = []
         # ----------------- 下层 翻页 ----------------
         page_turning_header = QWidget()
         result_layout.addWidget(page_turning_header)
@@ -2232,6 +2272,10 @@ class MainWindow(FramelessWindow):
             "max_height": 40,
             "font_size": 30,
         }
+        reset_page_btn = button("重置", page_change_btn_style)
+        reset_page_btn.bind_click_func(self.reset_page)
+        page_turning_layout.addWidget(reset_page_btn)
+
         last_page_btn = button("上一页", page_change_btn_style)
         last_page_btn.bind_click_func(self.turn_last_page)
         page_turning_layout.addWidget(last_page_btn)
@@ -2302,19 +2346,47 @@ class MainWindow(FramelessWindow):
         filter_obj_list: list[filter_obj] = self.widgets["search_page"][
             "filter_obj_list"
         ]
+        logical_link = filter_obj_list[0].logical_cbb.get_content()
+        is_first = True
+        self.filter_result = set()
         for filter_obji in filter_obj_list:
-            (conditioni, logical_linki) = filter_obji.get_all_condition()
-            if not logical_linki and filter_obji != filter_obj_list[-1]:
-                print(f"逻辑链接不对啊!怎么{conditioni}这里就空了呢?")
+            conditioni = filter_obji.get_all_condition()
+            if not logical_link and len(filter_obj_list) > 1:
+                print(f"逻辑链接不对啊!有好多个控件但是怎么逻辑是空呢?")
                 return
-            self.filte_with_condition(all_song_info, conditioni)
+            if len(filter_obj_list) == 1:  # 强制置空
+                logical_link = ""
+            if logical_link == "并且(与)":  # 与 &&
+                if is_first:
+                    self.filter_result = set(all_song_info)
+                    is_first = False
+                result_list = self.filte_with_condition(self.filter_result, conditioni)
+                self.filter_result = set(
+                    result_list
+                )  # && 的参数传入的就是要被筛选的部分 会删除掉一些东西 直接覆盖就好
+            else:  # 空 或 ||
+                if is_first:
+                    is_first = False
+                result_list = self.filte_with_condition(all_song_info, conditioni)
+                for resulti in result_list:
+                    self.filter_result.add(resulti)  # || 运算只会加入其他东西
+        # for i in self.filter_result:
+        #     print(i[0], " ", i[1])
+        self.place_record()
 
     def filte_with_condition(self, data, condition):
         (attribution, limit, limit_val) = condition
         result = []
-        self.cname_to_name# {c_name:(正常名称, 曲师名称)}
-        if attribution in ('曲名', '曲师', '谱师', '画师'):
-            limit_val = limit_val.replace(" ", "").lower()
+        self.cname_to_name  # {c_name:(正常名称, 曲师名称)}
+        if attribution in (
+            "曲名",
+            "曲师",
+            "谱师",
+            "画师",
+        ):  # 名称相关的部分统一去掉空格并且小写(空格跟大写位置真记不清吧)
+            limit_val = limit_val.replace(
+                " ", ""
+            ).lower()  # 可能是自己输入的 也可能是直接选择的
         for songi in data:
             (c_name, diffi, score, acc, level, is_fc, singal_rks) = songi
             song_name, composer = self.cname_to_name[c_name]
@@ -2385,7 +2457,7 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in score_level:
                     result.append(songi)
 
-            elif attribution == "难度":  # ["AP", "FC", "V", "S", "A", "B", "C", "F"]
+            elif attribution == "难度":
                 if limit == "等于" and diffi == limit_val:
                     result.append(songi)
                 elif limit == "不等于" and diffi != limit_val:
@@ -2395,8 +2467,10 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in diffi:
                     result.append(songi)
 
-            elif attribution == "曲名":  # ["AP", "FC", "V", "S", "A", "B", "C", "F"]
-                song_name = song_name.replace(" ", "").lower()
+            elif attribution == "曲名":
+                song_name = song_name.replace(
+                    " ", ""
+                ).lower()  # 从c_name那找到的对应名称 小写方便匹配
                 if limit == "等于" and song_name == limit_val:
                     result.append(songi)
                 elif limit == "不等于" and song_name != limit_val:
@@ -2406,7 +2480,7 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in song_name:
                     result.append(songi)
 
-            elif attribution == "曲师":  # ["AP", "FC", "V", "S", "A", "B", "C", "F"]
+            elif attribution == "曲师":
                 if limit == "等于" and composer == limit_val:
                     result.append(songi)
                 elif limit == "不等于" and composer != limit_val:
@@ -2416,29 +2490,81 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in composer:
                     result.append(songi)
 
-            # elif attribution == "谱师":  # ["AP", "FC", "V", "S", "A", "B", "C", "F"]
-            #     if limit == "等于" and diffi == limit_val:
-            #         result.append(songi)
-            #     elif limit == "不等于" and diffi != limit_val:
-            #         result.append(songi)
-            #     elif limit == "包含" and limit_val in diffi:
-            #         result.append(songi)
-            #     elif limit == "不包含" and limit_val not in diffi:
-            #         result.append(songi)
+            elif attribution == "谱师":
+                if limit == "等于" and diffi == limit_val:
+                    result.append(songi)
+                elif limit == "不等于" and diffi != limit_val:
+                    result.append(songi)
+                elif limit == "包含" and limit_val in diffi:
+                    result.append(songi)
+                elif limit == "不包含" and limit_val not in diffi:
+                    result.append(songi)
 
-            # elif attribution == "画师":  # ["AP", "FC", "V", "S", "A", "B", "C", "F"]
-            #     if limit == "等于" and diffi == limit_val:
-            #         result.append(songi)
-            #     elif limit == "不等于" and diffi != limit_val:
-            #         result.append(songi)
-            #     elif limit == "包含" and limit_val in diffi:
-            #         result.append(songi)
-            #     elif limit == "不包含" and limit_val not in diffi:
-            #         result.append(songi)
+            elif attribution == "画师":
+                if limit == "等于" and diffi == limit_val:
+                    result.append(songi)
+                elif limit == "不等于" and diffi != limit_val:
+                    result.append(songi)
+                elif limit == "包含" and limit_val in diffi:
+                    result.append(songi)
+                elif limit == "不包含" and limit_val not in diffi:
+                    result.append(songi)
 
-        for i in result:
-            print(i[0] + i[1])
+        # for i in result:
+        #     print(i[0] + i[1])
         return result
+
+    def filter_from_previous_song(self):
+        if not hasattr(self, "filter_result"):
+            print("要先全局筛选一遍才可以从结果中继续筛选喵")
+            return
+        print("进入筛选喵")
+        filter_obj_list = self.widgets["search_page"]["filter_obj_list"]
+        logical_link = filter_obj_list[0].logical_cbb.get_content()
+        # self.filter_result
+        print(f"逻辑{logical_link}")
+        filter_result_copy = self.filter_result
+        is_first = True
+        for filter_obji in filter_obj_list:
+            conditioni = filter_obji.get_all_condition()
+            print(conditioni)
+            if not logical_link and len(filter_obj_list) > 1:
+                print(f"逻辑链接不对啊!有好多个控件但是怎么逻辑是空呢?")
+                return
+            if len(filter_obj_list) == 1:  # 强制置空
+                logical_link = ""
+            if logical_link == "并且(与)":  # 与 &&
+                self.filter_result = set(
+                    self.filte_with_condition(self.filter_result, conditioni)
+                )  # && 的参数传入的就是要被筛选的部分 会删除掉一些东西 直接覆盖就好
+            else:  # 空 或 ||
+                if is_first:
+                    self.filter_result = set()
+                    is_first = False
+                result_list = self.filte_with_condition(filter_result_copy, conditioni)
+                print("结果", result_list)
+                for resulti in result_list:
+                    self.filter_result.add(resulti)  # || 运算只会加入其他东西
+        # for i in self.filter_result:
+        #     print(i[0], " ", i[1])
+        self.place_record()
+
+    def reset_page(self):
+        filter_obj_list: list[filter_obj] = self.widgets["search_page"][
+            "filter_obj_list"
+        ]
+        filter_obj_list[0].add_btn.show()
+        for idx in range(1, len(filter_obj_list)):
+            filter_obj_list[idx].deleteLater()
+        filter_obj_list = [filter_obj_list[0]]
+        filter_obj_list[0].filter_obj_list = filter_obj_list
+        # print(filter_obj_list[0].filter_obj_list)
+        self.filter_result = set()
+        for song_cardi in self.widgets["search_page"][
+            "song_cards"
+        ]:  # 先清除掉上一次布局的所有东西
+            song_cardi.deleteLater()
+        self.widgets["search_page"]["song_cards"] = []
 
     def turn_last_page(self):
         pass
@@ -2446,8 +2572,40 @@ class MainWindow(FramelessWindow):
     def turn_next_page(self):
         pass
 
-    def filter_record(self):
-        pass
+    def place_record(self):
+        for song_cardi in self.widgets["search_page"][
+            "song_cards"
+        ]:  # 先清除掉上一次布局的所有东西
+            song_cardi.deleteLater()
+        self.widgets["search_page"]["song_cards"] = []
+
+        result_display_flow_layout = self.widgets["search_page"][
+            "result_display_flow_layout"
+        ]
+        for songi in self.filter_result:
+            # c_name, diffi, score, acc, level, is_fc, singal_rks
+            c_name, diffi, score, acc, level, is_fc, singal_rks = songi
+            special_record_type = special_type.EMPTY
+            if int(score) == 0:
+                special_record_type = special_type.NO_PLAY
+            if is_fc:
+                special_record_type = special_type.FC
+                if int(acc) == 100:
+                    special_record_type = special_type.AP
+            # score_level = self.get_score_level(int(score), is_fc)
+            song_cardi = song_info_card(
+                ILLUSTRATION_PREPATH + c_name + ".png",
+                self.cname_to_name[c_name][0],
+                singal_rks,
+                acc,
+                level,
+                diffi,
+                special_record_type,
+                int(score),
+                None,
+            )
+            result_display_flow_layout.addWidget(song_cardi)
+            self.widgets["search_page"]["song_cards"].append(song_cardi)
 
     # -- 账号页面 --
     def init_account_page(self) -> QWidget:
