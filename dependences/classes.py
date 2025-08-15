@@ -106,6 +106,11 @@ class editable_combobox(QWidget):
         self.cbb.setStyleSheet(get_comboBox_style(**cbb_style))
         self.editor_layout.addWidget(self.cbb)
         # print(style)
+        # 初始化补全模型QAbstractItemModel
+        self.song_name_completer = QStringListModel(SONG_NAME_LIST)
+        self.composer_completer = QStringListModel(COMPOSER_LIST)
+        self.charter_completer = QStringListModel(CHARTER_LIST)
+        self.drawer_completer = QStringListModel(DRAWER_NAME_LIST)
 
     def set_content(self, new_content):
         self.cbb.clear()
@@ -119,6 +124,18 @@ class editable_combobox(QWidget):
 
     def bind_react_click_func(self, func):
         self.cbb.currentTextChanged.connect(func)
+
+    def set_completer(self, model):
+        # print(model)
+        completer = QCompleter()
+        completer.setFilterMode(Qt.MatchContains)  # 包含匹配
+        completer.setCaseSensitivity(Qt.CaseInsensitive)  # 不区分大小写
+        completer.setCompletionMode(QCompleter.PopupCompletion)  # 弹窗模式
+        completer.setModel(model)
+        self.cbb.setCompleter(completer)
+
+    def clear_completer(self):
+        self.cbb.setCompleter(None)
 
 
 class button(PushButton):
@@ -401,12 +418,13 @@ class song_info_card(ElevatedCardWidget):
 
 
 class folder(QWidget):
-    def __init__(self, title="", parent=None):
+    def __init__(self, title="", parent=None, expend=False):
         super().__init__(parent)
-        self.is_expanded = False
+        self.is_expanded = expend
         self.widgets = []
         self.title = title
-        self.setMinimumHeight(250)
+        self.setMinimumHeight(265)
+        self.setMinimumWidth(420)
         # 主布局
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -424,7 +442,8 @@ class folder(QWidget):
         self.content_frame = QFrame()
         self.main_layout.addWidget(self.content_frame)
         self.content_frame.setContentsMargins(0, 0, 0, 0)
-        self.content_frame.hide()
+        if not self.is_expanded:
+            self.content_frame.hide()
         self.content_layout = QVBoxLayout(self.content_frame)
         self.content_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -437,7 +456,8 @@ class folder(QWidget):
         self.content_frame.setStyleSheet("QWidget{background: transparent}")
         self.content_layout.addWidget(self.scroll_area)
         self.content_layout.setSpacing(0)
-        self.scroll_area.hide()
+        if not self.is_expanded:
+            self.scroll_area.hide()
         # 创建内容容器
         self.scroll_content_widget = QWidget()
         self.flow_layout = FlowLayout(self.scroll_content_widget)  # 使用流式布局
@@ -446,12 +466,11 @@ class folder(QWidget):
 
         # 设置滚动区域的内容
         self.scroll_area.setWidget(self.scroll_content_widget)
-        self.scroll_content_widget.hide()
+        if not self.is_expanded:
+            self.scroll_content_widget.hide()
 
     def toggle_expand(self):
         """切换展开/折叠状态"""
-        # print('clicked!')
-        # print(len(self.widgets))
         self.is_expanded = not self.is_expanded
         if not self.is_expanded:
             for i in self.widgets:
@@ -579,32 +598,42 @@ class filter_obj(QWidget):
         ):
             self.limit_choose_cbb.set_content(NUMERIC_COMPARATORS)
             self.limit_val_cbb.clear_text()
+            self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "评级":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
             self.limit_val_cbb.set_content(["phi", "蓝V", "V", "S", "A", "B", "C", "F"])
+            self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "难度":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
             self.limit_val_cbb.set_content(["AT", "IN", "HD", "EZ"])
+            self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "曲名":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
             self.limit_val_cbb.set_content(
                 SONG_NAME_LIST
             )  # 曲名这里直接提供info.tsv里面的东西就好了 具体的区分(Another Me) 再加一个曲师就好了
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.song_name_completer)
+            # print(
+            #     "补全器模型:", self.limit_val_cbb.cbb.completer().model()
+            # )
 
         elif self.attribution_choose_cbb.get_content() == "曲师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
             self.limit_val_cbb.set_content(COMPOSER_LIST)
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.composer_completer)
 
         elif self.attribution_choose_cbb.get_content() == "谱师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
             self.limit_val_cbb.set_content(CHARTER_LIST)
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.charter_completer)
 
         elif self.attribution_choose_cbb.get_content() == "画师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
             self.limit_val_cbb.set_content(DRAWER_NAME_LIST)
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.drawer_completer)
 
     def get_all_condition(self):  # 组合并返回当前的所有限制条件
         attribution = self.attribution_choose_cbb.get_content()

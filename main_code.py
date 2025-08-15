@@ -2213,6 +2213,16 @@ class MainWindow(FramelessWindow):
         group_header_layout = QHBoxLayout(group_header)
         group_header_layout.setContentsMargins(0, 0, 20, 0)
         group_by_list = ["无", "曲名"]
+        page_change_btn_style = {
+            "max_width": 120,
+            "min_width": 120,
+            "min_height": 40,
+            "max_height": 40,
+            "font_size": 30,
+        }
+        reset_page_btn = button("重置", page_change_btn_style)
+        reset_page_btn.bind_click_func(self.reset_page)
+        group_header_layout.addWidget(reset_page_btn)
         group_by_style = {
             "min_height": 35,
             "max_height": 35,
@@ -2227,6 +2237,7 @@ class MainWindow(FramelessWindow):
         group_by = combobox(
             group_by_list, "分组依据", group_by_style, group_by_hint_style
         )
+        group_by.bind_react_click_func(self.group_record)
         self.widgets["search_page"]["group_by"] = group_by
         group_header_layout.addStretch(1)  # 左侧弹性空间
         group_header_layout.addWidget(group_by)  # 右侧控件
@@ -2260,33 +2271,22 @@ class MainWindow(FramelessWindow):
 
         self.widgets["search_page"]["song_cards"] = []
         # ----------------- 下层 翻页 ----------------
-        page_turning_header = QWidget()
-        result_layout.addWidget(page_turning_header)
-        page_turning_layout = QHBoxLayout(page_turning_header)
-        page_turning_layout.setContentsMargins(0, 0, 0, 0)
+        # page_turning_header = QWidget()
+        # result_layout.addWidget(page_turning_header)
+        # page_turning_layout = QHBoxLayout(page_turning_header)
+        # page_turning_layout.setContentsMargins(0, 0, 0, 0)
 
-        page_change_btn_style = {
-            "max_width": 120,
-            "min_width": 120,
-            "min_height": 40,
-            "max_height": 40,
-            "font_size": 30,
-        }
-        reset_page_btn = button("重置", page_change_btn_style)
-        reset_page_btn.bind_click_func(self.reset_page)
-        page_turning_layout.addWidget(reset_page_btn)
+        # last_page_btn = button("上一页", page_change_btn_style)
+        # last_page_btn.bind_click_func(self.turn_last_page)
+        # page_turning_layout.addWidget(last_page_btn)
 
-        last_page_btn = button("上一页", page_change_btn_style)
-        last_page_btn.bind_click_func(self.turn_last_page)
-        page_turning_layout.addWidget(last_page_btn)
+        # now_page_label_style = {"min_height": 40, "max_height": 40, "font_size": 28}
+        # now_page_label = label("1/?页", now_page_label_style)
+        # page_turning_layout.addWidget(now_page_label)
 
-        now_page_label_style = {"min_height": 40, "max_height": 40, "font_size": 28}
-        now_page_label = label("1/?页", now_page_label_style)
-        page_turning_layout.addWidget(now_page_label)
-
-        next_page_btn = button("下一页", page_change_btn_style)
-        next_page_btn.bind_click_func(self.turn_next_page)
-        page_turning_layout.addWidget(next_page_btn)
+        # next_page_btn = button("下一页", page_change_btn_style)
+        # next_page_btn.bind_click_func(self.turn_next_page)
+        # page_turning_layout.addWidget(next_page_btn)
 
         return widget
 
@@ -2522,7 +2522,7 @@ class MainWindow(FramelessWindow):
         filter_obj_list = self.widgets["search_page"]["filter_obj_list"]
         logical_link = filter_obj_list[0].logical_cbb.get_content()
         # self.filter_result
-        print(f"逻辑{logical_link}")
+        # print(f"逻辑{logical_link}")
         filter_result_copy = self.filter_result
         is_first = True
         for filter_obji in filter_obj_list:
@@ -2573,6 +2573,12 @@ class MainWindow(FramelessWindow):
         pass
 
     def place_record(self):
+        group_by = self.widgets["search_page"]["group_by"].get_content()
+        print(
+            f"前来布局{group_by}，清除{len(self.widgets["search_page"][
+            "song_cards"
+        ])}个控件"
+        )
         for song_cardi in self.widgets["search_page"][
             "song_cards"
         ]:  # 先清除掉上一次布局的所有东西
@@ -2582,9 +2588,18 @@ class MainWindow(FramelessWindow):
         result_display_flow_layout = self.widgets["search_page"][
             "result_display_flow_layout"
         ]
+        visited_folder: dict[str, folder] = {}
         for songi in self.filter_result:
             # c_name, diffi, score, acc, level, is_fc, singal_rks
             c_name, diffi, score, acc, level, is_fc, singal_rks = songi
+            if group_by == "曲名":  # 根据曲名进行包装
+                if visited_folder.get(c_name, None) is None:  # 还没有记录
+                    song_folderi = folder(self.cname_to_name[c_name][0], expend=True)
+                    self.widgets["search_page"]["song_cards"].append(song_folderi)
+                    visited_folder[c_name] = song_folderi
+                    result_display_flow_layout.addWidget(song_folderi)
+                else:
+                    song_folderi = visited_folder[c_name]
             special_record_type = special_type.EMPTY
             if int(score) == 0:
                 special_record_type = special_type.NO_PLAY
@@ -2604,8 +2619,14 @@ class MainWindow(FramelessWindow):
                 int(score),
                 None,
             )
-            result_display_flow_layout.addWidget(song_cardi)
+            if group_by == "无":
+                result_display_flow_layout.addWidget(song_cardi)
+            elif group_by == "曲名":
+                song_folderi.add_widget(song_cardi)
             self.widgets["search_page"]["song_cards"].append(song_cardi)
+
+    def group_record(self):
+        pass
 
     # -- 账号页面 --
     def init_account_page(self) -> QWidget:
