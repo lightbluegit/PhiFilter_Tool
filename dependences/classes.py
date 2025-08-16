@@ -219,7 +219,6 @@ class song_info_card(ElevatedCardWidget):
         parent=None,
     ):
         super().__init__(parent)
-
         self.setContentsMargins(0, 0, 0, 0)  # 不要边界
         self.imgpath = imgpath
         font_id = QFontDatabase.addApplicationFont(EN_FONT1)

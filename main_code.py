@@ -1701,6 +1701,7 @@ from qfluentwidgets import (
     ImageLabel,
     VerticalSeparator,
     SmoothScrollArea,
+    SwitchButton,
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
@@ -1734,7 +1735,14 @@ class MainWindow(FramelessWindow):
         self.cname_to_name: dict[str, tuple[str, str]] = (
             {}
         )  # {difficulty中的名称:(正常名称, 曲师名称)}
-
+        """
+        self.cname_to_name[complex_name] = (
+            song_name,
+            composer,
+            drawer,
+            {"EZ": EZchapter, "HD": HDchapter, "IN": INchapter},
+        )
+        """
         self.hBoxLayout = QHBoxLayout(self)
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
         self.stackWidget = QStackedWidget(self)
@@ -1792,7 +1800,20 @@ class MainWindow(FramelessWindow):
             complex_name = row.iloc[0]  # 使用iloc获取第一列（名称）
             song_name = row.iloc[1]
             composer = row.iloc[2]
-            self.cname_to_name[complex_name] = (song_name, composer)
+            drawer = row.iloc[3]
+            EZchapter = row.iloc[4]
+            HDchapter = row.iloc[5]
+            INchapter = row.iloc[6]
+            ATchapter = row.iloc[7]
+            Legendchapter = row.iloc[8]
+            self.cname_to_name[complex_name] = (
+                song_name,
+                composer,
+                drawer,
+                {"EZ": EZchapter, "HD": HDchapter, "IN": INchapter},
+            )
+            if ATchapter:
+                self.cname_to_name[complex_name][3]["AT"] = ATchapter
         # print(self.cname_to_name)
 
     def addSubInterface(
@@ -2212,7 +2233,6 @@ class MainWindow(FramelessWindow):
         result_layout.addWidget(group_header)
         group_header_layout = QHBoxLayout(group_header)
         group_header_layout.setContentsMargins(0, 0, 20, 0)
-        group_by_list = ["无", "曲名"]
         page_change_btn_style = {
             "max_width": 120,
             "min_width": 120,
@@ -2224,22 +2244,39 @@ class MainWindow(FramelessWindow):
         reset_page_btn.bind_click_func(self.reset_page)
         group_header_layout.addWidget(reset_page_btn)
         group_by_style = {
-            "min_height": 35,
+            "min_height": 24,
             "max_height": 35,
-            "max_width": 50,
-            "min_width": 50,
+            "max_width": 80,
+            "min_width": 80,
         }
         group_by_hint_style = {
             "font_size": 26,
             "min_width": 110,
             "max_width": 110,
         }
+        sort_result_reverse_btn = SwitchButton()
+        self.widgets["search_page"]["sort_result_reverse_btn"] = sort_result_reverse_btn
+        sort_result_reverse_btn.setOffText("当前规则:从小到大")
+        sort_result_reverse_btn.setOnText("当前规则:从大到小")
+        sort_result_reverse_btn.setChecked(True)
+        sort_result_reverse_btn.checkedChanged.connect(self.place_record)
+        group_header_layout.addStretch(1)  # 左侧弹性空间
+        group_header_layout.addWidget(sort_result_reverse_btn)  # 右侧控件
+
+        sort_by_list = ["无", "acc", "单曲rks", "得分", "定数"]
+        sort_by = combobox(
+            sort_by_list, "排序依据", group_by_style, group_by_hint_style
+        )
+        sort_by.bind_react_click_func(self.place_record)
+        self.widgets["search_page"]["sort_by"] = sort_by
+        group_header_layout.addWidget(sort_by)  # 右侧控件
+
+        group_by_list = ["无", "曲名", "曲师", "谱师", "画师", "难度", "评级"]
         group_by = combobox(
             group_by_list, "分组依据", group_by_style, group_by_hint_style
         )
-        group_by.bind_react_click_func(self.group_record)
+        group_by.bind_react_click_func(self.place_record)
         self.widgets["search_page"]["group_by"] = group_by
-        group_header_layout.addStretch(1)  # 左侧弹性空间
         group_header_layout.addWidget(group_by)  # 右侧控件
 
         # ----------------- 中层 歌曲布局 ----------------
@@ -2389,7 +2426,7 @@ class MainWindow(FramelessWindow):
             ).lower()  # 可能是自己输入的 也可能是直接选择的
         for songi in data:
             (c_name, diffi, score, acc, level, is_fc, singal_rks) = songi
-            song_name, composer = self.cname_to_name[c_name]
+            song_name, composer, *_ = self.cname_to_name[c_name]
             if attribution == "acc":
                 if limit == "大于" and acc > float(limit_val):  # 合法性判断
                     result.append(songi)
@@ -2566,16 +2603,15 @@ class MainWindow(FramelessWindow):
             song_cardi.deleteLater()
         self.widgets["search_page"]["song_cards"] = []
 
-    def turn_last_page(self):
-        pass
-
-    def turn_next_page(self):
-        pass
-
     def place_record(self):
+        if not hasattr(self, "filter_result"):
+            print("要先全局筛选一遍才可以布局喵")
+            return
         group_by = self.widgets["search_page"]["group_by"].get_content()
+        sort_by = self.widgets["search_page"]["sort_by"].get_content()
+        is_reversed = self.widgets["search_page"]["sort_result_reverse_btn"].isChecked()
         print(
-            f"前来布局{group_by}，清除{len(self.widgets["search_page"][
+            f"分组依据{group_by} 组内排序依据{sort_by}，清除{len(self.widgets["search_page"][
             "song_cards"
         ])}个控件"
         )
@@ -2588,18 +2624,11 @@ class MainWindow(FramelessWindow):
         result_display_flow_layout = self.widgets["search_page"][
             "result_display_flow_layout"
         ]
-        visited_folder: dict[str, folder] = {}
+        visited_folder: dict[str, list[folder, list[tuple[str, song_info_card]]]] = {}
+        empty_sort_list: list[tuple[str, song_info_card]] = []
         for songi in self.filter_result:
             # c_name, diffi, score, acc, level, is_fc, singal_rks
             c_name, diffi, score, acc, level, is_fc, singal_rks = songi
-            if group_by == "曲名":  # 根据曲名进行包装
-                if visited_folder.get(c_name, None) is None:  # 还没有记录
-                    song_folderi = folder(self.cname_to_name[c_name][0], expend=True)
-                    self.widgets["search_page"]["song_cards"].append(song_folderi)
-                    visited_folder[c_name] = song_folderi
-                    result_display_flow_layout.addWidget(song_folderi)
-                else:
-                    song_folderi = visited_folder[c_name]
             special_record_type = special_type.EMPTY
             if int(score) == 0:
                 special_record_type = special_type.NO_PLAY
@@ -2607,7 +2636,18 @@ class MainWindow(FramelessWindow):
                 special_record_type = special_type.FC
                 if int(acc) == 100:
                     special_record_type = special_type.AP
-            # score_level = self.get_score_level(int(score), is_fc)
+            score_level = get_score_level(int(score), is_fc)
+
+            sort_rely = None  # 默认无
+            if sort_by == "acc":
+                sort_rely = float(acc)
+            elif sort_by == "单曲rks":
+                sort_rely = float(singal_rks)
+            elif sort_by == "得分":
+                sort_rely = int(score)
+            elif sort_by == "定数":
+                sort_rely = float(level)
+
             song_cardi = song_info_card(
                 ILLUSTRATION_PREPATH + c_name + ".png",
                 self.cname_to_name[c_name][0],
@@ -2619,14 +2659,55 @@ class MainWindow(FramelessWindow):
                 int(score),
                 None,
             )
-            if group_by == "无":
-                result_display_flow_layout.addWidget(song_cardi)
-            elif group_by == "曲名":
-                song_folderi.add_widget(song_cardi)
             self.widgets["search_page"]["song_cards"].append(song_cardi)
 
-    def group_record(self):
-        pass
+            if group_by == "曲名":
+                title = self.cname_to_name[c_name][0]
+                key = c_name
+            elif group_by == "曲师":
+                title = self.cname_to_name[c_name][1]
+                key = title
+            elif group_by == "画师":
+                title = self.cname_to_name[c_name][2]
+                key = title
+            elif group_by == "谱师":
+                title = self.cname_to_name[c_name][3][diffi]
+                key = title
+            elif group_by == "难度":
+                title = diffi
+                key = title
+            elif group_by == "评级":
+                title = score_level.value
+                key = title
+
+            if group_by != "无":
+                if visited_folder.get(key, None) is None:  # 还没有记录
+                    song_folderi = folder(title, expend=True)
+                    self.widgets["search_page"]["song_cards"].append(song_folderi)
+                    visited_folder[key] = [song_folderi, []]  # 初始化
+                    result_display_flow_layout.addWidget(song_folderi)
+                visited_folder[key][1].append((sort_rely, song_cardi))
+                self.widgets["search_page"]["song_cards"].append(song_cardi)
+            else:
+                empty_sort_list.append((sort_rely, song_cardi))
+                self.widgets["search_page"]["song_cards"].append(
+                    song_cardi
+                )  # 直接加在song_cards里面
+
+        if group_by != "无":
+            for itemi in visited_folder.values():
+                folderi, cards = itemi
+                if cards[0][0]:
+                    cards = sorted(cards, key=lambda x: x[0], reverse=is_reversed)
+                for _, cardi in cards:
+                    folderi.add_widget(cardi)
+        else:
+            if empty_sort_list[0][0]:
+                empty_sort_list = sorted(
+                    empty_sort_list, key=lambda x: x[0], reverse=is_reversed
+                )
+            for _, cardi in empty_sort_list:
+                result_display_flow_layout.addWidget(cardi)
 
     # -- 账号页面 --
     def init_account_page(self) -> QWidget:
