@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QToolTip,
     QCompleter,
+    QListWidgetItem,
 )
 from qframelesswindow import FramelessWindow, StandardTitleBar
 from PyQt5.QtCore import Qt, QUrl, QTimer, QMargins, QStringListModel
@@ -20,6 +21,7 @@ from PyQt5.QtGui import (
     QPainter,
     QColor,
     QFontDatabase,
+    QTextOption,
 )
 from qfluentwidgets import (
     PushButton,
@@ -41,6 +43,10 @@ from qfluentwidgets import (
     ToolTipFilter,
     ToolTipPosition,
     SmoothScrollArea,
+    RoundMenu,
+    IndicatorMenuItemDelegate,
+    MenuAnimationType,
+    TextEdit,
 )
 from PyQt5.QtCore import Qt
 from dependences.consts import *
@@ -153,6 +159,7 @@ class label(QLabel):
     def __init__(self, text: str, style: dict[str, str] = {}):
         super().__init__()
         self.setText(text)  # 设置文本内容
+        self.setWordWrap(True)  # 启用自动换行
         self.setStyleSheet(get_label_style(**style))
 
     def set_text(self, text: str):
@@ -171,6 +178,35 @@ class body_label(QLabel):
 
     def set_text(self, text: str):
         self.setText(text)
+
+
+class multiline_text(TextEdit):
+    def __init__(self, text: str = "", parent: QWidget = None):
+        super().__init__(parent)
+
+        # 1. 基础设置（保持与QFluentBodyLabel一致）
+        self.setText(text)
+        self.setWordWrapMode(QTextOption.WordWrap)  # 启用自动换行
+        self.setAlignment(Qt.AlignVCenter)  # 默认垂直居中
+        # print(style)
+
+    def set_text(self, text: str):
+        self.setText(text)
+
+    def set_md_text(self, text):
+        self.setMarkdown(text)
+
+    def set_html_text(self, text):
+        self.setHtml(text)
+
+    def get_plain_text(self):
+        return self.toPlainText()
+
+    def get_md_text(self):
+        return self.toMarkdown()
+
+    def get_html_text(self):
+        return self.toHtml()
 
 
 class input_box(LineEdit):
@@ -203,7 +239,7 @@ def get_score_level(score: int, is_fc: bool = False) -> score_level_type:
         return score_level_type.F
 
 
-class song_info_card(ElevatedCardWidget):
+class main_info_card(ElevatedCardWidget):
 
     def __init__(
         self,
@@ -216,11 +252,13 @@ class song_info_card(ElevatedCardWidget):
         special_record_type: special_type = special_type.EMPTY,  # 决定标题要不要上色 是否ap/fc/没玩过
         score: int = None,  # 等级
         index: int = None,
-        parent=None,
+        expended: bool = False,
     ):
-        super().__init__(parent)
+        super().__init__()
         self.setContentsMargins(0, 0, 0, 0)  # 不要边界
+        self.left_func = None
         self.imgpath = imgpath
+        self.expended = expended
         font_id = QFontDatabase.addApplicationFont(EN_FONT1)
         en_font_family = DEFAULT_EN_FONT
         if font_id != -1:
@@ -393,12 +431,6 @@ class song_info_card(ElevatedCardWidget):
         self.setFixedSize(400, 198)
         self.setCursor(Qt.PointingHandCursor)  # 鼠标悬停时显示手型指针
 
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            print("此处应跳转到查找页面查找对应歌曲并展开对应难度")
-            self.clicked.emit()  # 需要先定义信号
-        super().mousePressEvent(event)
-
     def paintEvent(self, event):
         """绘制背景图片（如果有）"""
         super().paintEvent(event)
@@ -414,6 +446,154 @@ class song_info_card(ElevatedCardWidget):
             painter.drawPixmap(self.rect(), pixmap)
             painter.drawPixmap(self.rect(), pixmap1)
             painter.end()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            # print("左点击了!")
+            self.left_func()
+            self.clicked.emit()  # 需要先定义信号
+        super().mousePressEvent(event)
+
+
+class song_info_card(QWidget):
+
+    def __init__(
+        self,
+        imgpath: str,
+        name: str,
+        singal_rks: str,
+        acc: str,
+        level: str,
+        diff: str,
+        special_record_type: special_type = special_type.EMPTY,  # 决定标题要不要上色 是否ap/fc/没玩过
+        score: int = None,  # 等级
+        index: int = None,
+        composer: str = "",
+        chapter: str = "",
+        drawer: str = "",
+        is_expended: bool = False,
+        complex_name: str = "",
+    ):
+        super().__init__()
+        self.imgpath = imgpath
+        self.name = name
+        self.singal_rks = singal_rks
+        self.acc = acc
+        self.level = level
+        self.diff = diff
+        self.special_record_type = special_record_type
+        self.score = score
+        self.index = index
+        self.composer = composer
+        self.chapter = chapter
+        self.drawer = drawer
+        self.is_expended = is_expended
+        self.complex_name = complex_name
+        # print(self.complex_name)
+
+        self.right_func = None
+        self.setContentsMargins(0, 0, 0, 0)
+        self.is_expended = is_expended
+        self.mainlayout = QVBoxLayout(self)
+        self.mainlayout.setSpacing(0)
+        self.setMaximumHeight(405)
+        self.setMaximumWidth(405)
+        self.elevatedcard = main_info_card(
+            imgpath,
+            name,
+            singal_rks,
+            acc,
+            level,
+            diff,
+            special_record_type,
+            score,
+            index,
+        )
+        self.mainlayout.addWidget(self.elevatedcard)
+        self.elevatedcard.left_func = self.clicked_card
+
+        self.scroll_area = SmoothScrollArea()
+        self.mainlayout.addWidget(self.scroll_area)
+        self.scroll_area.setWidgetResizable(True)  # 关键设置
+        self.scroll_area.setStyleSheet(
+            """QScrollArea{background-color: #BBFFFF; border: none;max-width: 400px;
+    min-width: 400px;
+    min-height: 200px;
+    max-height: 200px;}"""
+        )
+        self.setStyleSheet("QWidget{background: transparent}")
+
+        if not self.is_expended:
+            self.scroll_area.hide()
+        # 创建内容容器
+        self.scroll_content_widget = QWidget()
+        self.flow_layout = FlowLayout(self.scroll_content_widget)  # 使用流式布局
+        self.flow_layout.setSpacing(0)
+        self.flow_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 设置滚动区域的内容
+        self.scroll_area.setWidget(self.scroll_content_widget)
+        if not self.is_expended:
+            self.scroll_content_widget.hide()
+
+        label_style = {"min_width": 370, "max_width": 370, "font_size": 24}
+        composer_label = label("曲师:" + composer, label_style)
+        self.flow_layout.addWidget(composer_label)
+
+        chapter_label = label("谱师:" + chapter, label_style)
+        self.flow_layout.addWidget(chapter_label)
+
+        drawer_label = label("画师:" + drawer, label_style)
+        self.flow_layout.addWidget(drawer_label)
+
+        self.group_label = label("分组:", label_style)
+        self.flow_layout.addWidget(self.group_label)
+
+        self.tag_label = label("标签:", label_style)
+        self.flow_layout.addWidget(self.tag_label)
+
+        self.comment_label = label("简评:", label_style)
+        self.flow_layout.addWidget(self.comment_label)
+
+    def clicked_card(self):
+        self.is_expended = not self.is_expended
+        if not self.is_expended:
+            self.scroll_content_widget.hide()
+            self.scroll_area.hide()
+        else:
+            self.scroll_area.show()
+            self.scroll_content_widget.show()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            if self.right_func:
+                self.right_func(self)
+                # print("运行函数")
+            # print("右键点击了!", self.name)
+        super().mousePressEvent(event)
+
+    def copy(self):
+        return song_info_card(
+            self.imgpath,
+            self.name,
+            self.singal_rks,
+            self.acc,
+            self.level,
+            self.diff,
+            self.special_record_type,
+            self.score,
+            self.index,
+            self.composer,
+            self.chapter,
+            self.drawer,
+            True,  # 默认展开相关信息
+            self.complex_name,
+        )
+
+    def set_edited_info(self, group: list[str], tag: list[str], comment):
+        self.group_label.setText("分组:" + "、".join(group))
+        self.tag_label.setText("标签:" + "#".join(tag))
+        self.comment_label.setText("简评:" + comment)
 
 
 class folder(QWidget):
@@ -639,3 +819,118 @@ class filter_obj(QWidget):
         limit = self.limit_choose_cbb.get_content()
         limit_val = self.limit_val_cbb.get_content()
         return (attribution, limit, limit_val)
+
+
+from PyQt5.QtCore import Qt, pyqtSignal
+from qfluentwidgets import EditableComboBox, CheckBox, ListWidget, RoundMenu, ScrollArea
+
+from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from qfluentwidgets import (
+    EditableComboBox,
+    CheckBox,
+    ListWidget,
+    RoundMenu,
+    ScrollArea,
+    MenuAnimationType,
+    Theme,
+    setTheme,
+)
+
+
+class CheckableComboBox(EditableComboBox):
+    selectionChanged = pyqtSignal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._selected_items = []
+        self.setMaximumWidth(300)
+        # 创建自定义下拉菜单
+        self.dropdown_menu = RoundMenu()
+        self.scroll_area = ScrollArea(self.dropdown_menu)
+        self.scroll_area.setWidgetResizable(True)  # 关键设置
+        self.scroll_area.setStyleSheet(
+            "QScrollArea{background: transparent; border: none}"
+        )
+        # 必须给内部的视图也加上透明背景样式
+        self.list_widget = ListWidget(self.scroll_area)
+
+        # 配置下拉菜单
+        self.list_widget.setObjectName("checkableListWidget")
+        self.list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setWidget(self.list_widget)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setMaximumHeight(300)
+        self.scroll_area.setMinimumHeight(200)
+        self.dropdown_menu.addWidget(self.scroll_area)
+
+        # 连接信号
+        # self.list_widget.itemClicked.connect(self._on_item_clicked)
+
+        # 替换默认下拉行为
+        # print(self.width())
+        self.dropdown_menu.setMinimumWidth(300 - 5)
+        self.scroll_area.setMinimumWidth(300 - 10)
+        self.list_widget.setMinimumWidth(300 - 25)  # 考虑滚动条宽度
+        self.dropButton.clicked.disconnect()
+        self.dropButton.clicked.connect(self._show_custom_menu)
+
+    def _show_custom_menu(self):
+        """显示自定义下拉菜单"""
+        # 计算位置
+        pos = self.mapToGlobal(self.rect().bottomLeft())
+
+        # 更新菜单尺寸
+        if self.dropdown_menu.view.width() < self.width():
+            self.dropdown_menu.view.setMinimumWidth(self.width())
+            self.dropdown_menu.adjustSize()
+        # 显示菜单
+        self.dropdown_menu.exec(pos, ani=True, aniType=MenuAnimationType.DROP_DOWN)
+
+    def addItems(self, items):
+        """添加可选项"""
+        for text in items:
+            item = QListWidgetItem()
+            self.list_widget.addItem(item)
+
+            # 创建带文本的复选框
+
+            # 文本过长时显示省略号
+            if len(text) > 35:
+                display_text = text[:32] + "..."
+            else:
+                display_text = text
+            checkbox = CheckBox(display_text)
+            checkbox.setObjectName("comboCheckBox")
+            # 设置工具提示显示完整文本
+            checkbox.setToolTip(display_text)
+
+            # 设置项控件
+            self.list_widget.setItemWidget(item, checkbox)
+            item.setSizeHint(checkbox.sizeHint())  # 确保正确的高度
+
+    def selectedItems(self):
+        """获取当前选中的项"""
+        selected = []
+        if self.text():
+            selected = [self.text()]
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            checkbox = self.list_widget.itemWidget(item)
+            if checkbox.isChecked():
+                selected.append(checkbox.text())
+        return selected
+
+    def setSelectedItems(self, items: list[str]):
+        """设置选中项"""
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            checkbox = self.list_widget.itemWidget(item)
+            checkbox.setChecked(checkbox.text() in items)
+
+        # self._update_selection()
+
+    def clear(self):
+        """清除所有选项"""
+        self.list_widget.clear()
+        self._selected_items = []
+        self.setText("")

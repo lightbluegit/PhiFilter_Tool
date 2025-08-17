@@ -1576,61 +1576,6 @@ else:
 
 # printB19(sessionToken)
 
-"""
-Poseidon.1112vsStar AT
-Ark.kanoryo AT
-SwingSkipDrop.ミハイル IN
-Resolver.Gomadare IN
-LuminousEntitiesLostHeart.NormalMfeatUsagiDenki IN
-KIZUNAResolution.TAG IN
-AbsoluTedisoRdeR.AcuteDisarray IN
-AbsoluTedisoRdeR.AcuteDisarray AT
-
-调用函数：getSummary()
-请求类型 ：GET
-请求URL ：https://rak3ffdi.cloud.tds1.tapapis.cn/1.1/classes/_GameSave?limit=1
-请求头 ：{'User-Agent': 'LeanCloud-CSharp-SDK/1.0.3', 'Accept-Encoding': 'gzip, deflate', 'Accept': 'application/json', 'Connection': 'keep-alive', 'X-LC-Id': 'rAK3FfdieFob2Nn8Am', 'X-LC-Key': 'Qr9AEqtuoSVS3zeD6iVbM4ZC0AtkJcQ89tywVyi0', 'X-LC-Session': 'ztl8rh36krtgro724jo83f3o5'}
-状态码 ：200
-请求数据 : *无请求数据*
-
-返回数据 : {"results":[{"createdAt":"2024-10-01T01:10:57.746Z","gameFile":{"__type":"File","bucket":"rAK3Ffdi","createdAt":"2025-04-08T13:30:58.171Z","key":"gamesaves/wmHKNDLAq2UiLNndEJhZDomecRECVzyU/.save","metaData":{"_checksum":"aeece5745228d3014dbbc0695507d0e2","prefix":"gamesaves","size":14370},"mime_type":"application/octet-stream","name":".save","objectId":"67f5251249588a9379075911","provider":"qiniu","updatedAt":"2025-04-08T13:30:58.171Z","url":"https://rak3ffdi.tds1.tapfiles.cn/gamesaves/wmHKNDLAq2UiLNndEJhZDomecRECVzyU/.save"},"modifiedAt":{"__type":"Date","iso":"2025-04-08T13:30:57.042Z"},"name":"save","objectId":"66fb4c2193b643a08a5c89da","summary":"BlwB9A90QX0G6aOO5bG/BAACAAEAMQAMAAYAxgAoAAgAIQABAAAA","updatedAt":"2025-04-08T13:30:59.093Z","user":{"__type":"Pointer","className":"_User","objectId":"66fb4c1d9e8085c9af1785f7"}}]}
-
-函数"getSummary()"返回：
-{
-'checksum': 'aeece5745228d3014dbbc0695507d0e2', 
-'updateAt': '2025-04-08T13:30:59.093Z', 
-'url': 'https://rak3ffdi.tds1.tapfiles.cn/gamesaves/wmHKNDLAq2UiLNndEJhZDomecRECVzyU/.save', 
-'saveVersion': 6, 
-'challenge': 348, 
-'rks': 15.253894805908203, 
-'gameVersion': 125, 
-'avatar': '风屿', 
-'EZ': (4, 2, 1), 
-'HD': (49, 12, 6), 
-'IN': (198, 40, 8), 
-'AT': (33, 1, 0)
-}
-而我所需要的 就是一个token 芜湖！
-
-'user':{
-'showPlayerId': 1, 'selfIntro': 'KRK', 'avatar': '风屿', 'background': '萤火虫の怨.闫东炜.0'}, 
-'gameProgress': {
-'isFirstRun': 1, 'legacyChapterFinished': 1, 'alreadyShowCollectionTip': 1, 'alreadyShowAutoUnlockINTip': 1, 'completed': '3.0', 'songUpdateInfo': 4, 'challengeModeRank': 348, 'money': [354, 74, 0, 0, 0], 'unlockFlagOfSpasmodic': '[0, 1, 1, 1]', 'unlockFlagOfIgallta': '[0, 1, 1, 1]', 'unlockFlagOfRrharil': '[0, 1, 1, 1]', 'flagOfSongRecordKey': '[1, 1, 1, 1, 1, 1, 1, 0]', 'randomVersionUnlocked': '[0, 0, 0, 0, 0, 0]', 'chapter8UnlockBegin': 1, 'chapter8UnlockSecondPhase': 1, 'chapter8Passed': 1, 'chapter8SongUnlocked': '[1, 1, 1, 1, 1, 1]', 'flagOfSongRecordKeyTakumi': '[1, 1, 1]'}, 
-'settings': {
-'chordSupport': 1, 'fcAPIndicator': 1, 'enableHitSound': 1, 'lowResolutionMode': 0, 'deviceName': '希沃白板', 'bright': 1.0, 'musicVolume': 1.0, 'effectVolume': 1.0, 'hitSoundVolume': 1.0, 'soundOffset': 0.009999999776482582, 'noteScale': 1.2483819723129272}, 
-
-'gameRecord': {
-'Glaciaxion.SunsetRay': {
-'HD': {'score': 1000000, 'acc': 100.0, 'fc': 1}, 
-'IN': {'score': 999568, 'acc': 99.95199584960938, 'fc': 1}
-}, 
-'EradicationCatastrophe.NceS': {
-'HD': {'score': 1000000, 'acc': 100.0, 'fc': 1}, 
-'IN': {'score': 940573, 'acc': 98.54974365234375, 'fc': 0}
-}}
-
-"""
-
 
 def get_token_by_qrcode():
     QRCode_info = TapTapLogin.RequestLoginQRCode()
@@ -1743,6 +1688,11 @@ class MainWindow(FramelessWindow):
             {"EZ": EZchapter, "HD": HDchapter, "IN": INchapter},
         )
         """
+        self.group_info = {}
+        self.used_group = []
+        self.tag_info = {}
+        self.used_tag = []
+        self.comment_info = {}
         self.hBoxLayout = QHBoxLayout(self)
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
         self.stackWidget = QStackedWidget(self)
@@ -1757,6 +1707,7 @@ class MainWindow(FramelessWindow):
         if chi_font_id != -1:
             self.chi_font_family = QFontDatabase.applicationFontFamilies(chi_font_id)[0]
         self.split_name()  # 把拆包拿到的名称和正式名称写进映射里
+        self.get_user_edit_info()  # 获取用户定义的 每首歌的分组 标签 简评
         self.initLayout()
         self.init_all_pages()
         self.init_navigation()  # 初始化左侧导航栏
@@ -1771,7 +1722,8 @@ class MainWindow(FramelessWindow):
             }
         """
         )
-        self.switchTo(self.search_page)
+        # self.switchTo(self.search_page)
+        self.switchTo(self.homepage)
 
     # difficulty难度中对应的名称是用'.'连接并去掉所有空格和括号的 用info.tsv的信息拆成一个映射
     def split_name(self):
@@ -1816,6 +1768,79 @@ class MainWindow(FramelessWindow):
                 self.cname_to_name[complex_name][3]["AT"] = ATchapter
         # print(self.cname_to_name)
 
+    # user_edit:  complex_name goup tag comment
+    def get_user_edit_info(self):
+        # ----- 获取分组信息 -----
+        df = pd.read_csv(
+            GROUP_PATH,
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=["c_name", "group"],  # 手动定义所有列名
+        )
+        df = df.fillna("")  # 将NaN替换为空字符串
+        df.set_index(df.columns[0], inplace=True)
+        # print(df)
+        used_group = set()
+        for idx, row in df.iterrows():
+            # print(idx)
+            # print(row["group"])
+            self.group_info[idx] = str(row["group"])
+            group_raw = str(row["group"]).strip()
+            for groupi in group_raw.split("`"):
+                used_group.add(groupi)
+        used_group.remove("")
+        self.used_group = list(used_group)
+
+        # ----- 获取标签信息 -----
+        df = pd.read_csv(
+            TAG_PATH,
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=["c_name", "tag"],  # 手动定义所有列名
+        )
+        df = df.fillna("")
+        df.set_index(df.columns[0], inplace=True)
+        # print(df)
+        used_tag = set()
+        for idx, row in df.iterrows():
+            self.tag_info[idx] = str(row["tag"])
+            tag_raw = str(row["tag"]).strip()
+            for tagi in tag_raw.split("`"):
+                used_tag.add(tagi)
+        # print(self.tag_info)
+        used_tag.remove("")
+        self.used_tag = list(used_tag)
+
+        # ----- 获取简评信息 -----
+        df = pd.read_csv(
+            COMMENT_PATH,
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=[
+                "c_name",
+                "EZ_comment",
+                "HD_comment",
+                "IN_comment",
+                "AT_comment",
+            ],  # 手动定义所有列名
+        )
+        df = df.fillna("")
+        df.set_index(df.columns[0], inplace=True)
+        # print(df)
+        for idx, row in df.iterrows():
+            # print(idx)
+            # print(row["group"])
+            self.comment_info[idx] = {
+                "EZ": str(row["EZ_comment"]),
+                "HD": str(row["HD_comment"]),
+                "IN": str(row["IN_comment"]),
+                "AT": str(row["AT_comment"]),
+            }
+        # print(list(self.group_info.items())[:3:])
+
     def addSubInterface(
         self,
         interface,
@@ -1853,12 +1878,18 @@ class MainWindow(FramelessWindow):
     def init_all_pages(self):
         self.homepage = self.init_homepage()
         self.homepage.setObjectName("homepage")
+
         self.account_page = self.init_account_page()
         self.account_page.setObjectName("account_page")
+
         self.place_b27_phi3_page = self.init_place_b27_phi3_page()
         self.place_b27_phi3_page.setObjectName("place_b27_phi3_page")
+
         self.search_page = self.init_search_page()
         self.search_page.setObjectName("search_page")
+
+        self.edit_info_page = self.init_edit_info_page()
+        self.edit_info_page.setObjectName("edit_info_page")
 
     def init_navigation(self):
         self.addSubInterface(
@@ -1884,6 +1915,13 @@ class MainWindow(FramelessWindow):
             self.search_page, search_icon, "搜索歌曲", NavigationItemPosition.TOP
         )
 
+        self.addSubInterface(
+            self.edit_info_page,
+            FIF.EDIT,
+            "编辑歌曲相关信息",
+            NavigationItemPosition.TOP,
+        )
+
         # 页面栈
         self.stackWidget.currentChanged.connect(self.onCurrentInterfaceChanged)
         self.stackWidget.setCurrentIndex(1)
@@ -1907,18 +1945,21 @@ class MainWindow(FramelessWindow):
         self.widgets["homepage"]["generate_b27_phi3_btn"] = generate_b27_phi3_btn
         layout.addWidget(generate_b27_phi3_btn)
 
-        # s1 = song_info_card(
-        #     IMAGES_PREPATH + "Illustration #237.png",
-        #     "Eltawiholu givyf kgtuc hblj;nkolm xc,olsac ascx",
-        #     "11.1111",
-        #     "22.222",
-        #     "33.3",
-        #     "EZ",
-        #     special_type.AP,
-        #     int("1000000"),
-        #     22,
-        # )
-        # layout.addWidget(s1)
+        s1 = song_info_card(
+            ILLUSTRATION_PREPATH + "Luminescence.米虾Fomiki初云CLoudie.png",
+            "Eltawiholu givyf kgtuc hblj;nkolm xc,olsac ascx",
+            "11.1111",
+            "22.222",
+            "33.3",
+            "EZ",
+            special_type.AP,
+            int("1000000"),
+            22,
+            "百九十八 越写越花",
+            complex_name="Luminescence.米虾Fomiki初云CLoudie",
+        )
+        s1.right_func = self.link_and_show  # 重要!
+        layout.addWidget(s1)
 
         # s2 = song_info_card(
         #     IMAGES_PREPATH + "Illustration #237.png",
@@ -2050,9 +2091,12 @@ class MainWindow(FramelessWindow):
                     special_record_type = special_type.AP
             # score_level = self.get_score_level(int(score), is_fc)
             complex_name = song_name_raw + "." + composer_raw
+            (song_name, composer, drawer, chapter_dic) = self.cname_to_name[
+                complex_name
+            ]
             phi3_cardi = song_info_card(
                 ILLUSTRATION_PREPATH + complex_name + ".png",
-                self.cname_to_name[complex_name][0],
+                song_name,
                 singal_rks,
                 acc,
                 level,
@@ -2060,7 +2104,13 @@ class MainWindow(FramelessWindow):
                 special_record_type,
                 int(score),
                 idx + 1,
+                composer,
+                chapter_dic[diff],
+                drawer,
+                False,
+                complex_name,
             )
+            phi3_cardi.right_func = self.link_and_show
             phi3_folder.add_widget(phi3_cardi)
         print("phi3已布局完成!")
 
@@ -2083,9 +2133,13 @@ class MainWindow(FramelessWindow):
                     special_record_type = special_type.AP
             # score_level = self.get_score_level(int(score), is_fc)
 
+            complex_name = song_name_raw + "." + composer_raw
+            (song_name, composer, drawer, chapter_dic) = self.cname_to_name[
+                complex_name
+            ]
             b27_cardi = song_info_card(
                 ILLUSTRATION_PREPATH + complex_name + ".png",
-                self.cname_to_name[song_name_raw + "." + composer_raw][0],
+                song_name,
                 singal_rks,
                 acc,
                 level,
@@ -2093,7 +2147,13 @@ class MainWindow(FramelessWindow):
                 special_record_type,
                 int(score),
                 idx + 1,
+                composer,
+                chapter_dic[diff],
+                drawer,
+                False,
+                complex_name,
             )
+            b27_cardi.right_func = self.link_and_show
             b27_folder.add_widget(b27_cardi)
         print("b27已布局完成!")
         self.switchTo(self.place_b27_phi3_page)
@@ -2112,8 +2172,170 @@ class MainWindow(FramelessWindow):
         return widget
 
     # -- 添加简评 tag 分组 --
-    def edit_info(self):
-        pass
+    def init_edit_info_page(self) -> QWidget:
+        self.widgets["edit_info_page"] = {}
+        widget = QWidget()
+        self.widgets["edit_info_page"]["widget"] = widget
+
+        main_layout = QHBoxLayout(widget)  # 横向布局
+        widget.setLayout(main_layout)
+        self.widgets["edit_info_page"]["main_layout"] = main_layout
+        self.widgets["edit_info_page"]["song_info_card"] = []
+
+        # ---------------------- 左侧 展示页面 --------------------
+        display_widget = QWidget()
+        self.widgets["edit_info_page"]["display_widget"] = display_widget
+        main_layout.addWidget(display_widget)
+
+        display_layout = QVBoxLayout(display_widget)  # 纵向布局
+        display_widget.setLayout(display_layout)
+        self.widgets["edit_info_page"]["display_layout"] = display_layout
+
+        # ---------------------- 右侧 编辑页面 --------------------
+        edit_widget = QWidget()
+        self.widgets["edit_info_page"]["edit_widget"] = edit_widget
+        main_layout.addWidget(edit_widget)
+
+        edit_layout = QVBoxLayout(edit_widget)  # 纵向布局
+        edit_widget.setLayout(edit_layout)
+        self.widgets["edit_info_page"]["edit_layout"] = edit_layout
+
+        #  加上补全 如果是新标签就添加进去 搜索的时候增加按 分组 标签 简评搜索并增加分组依据:分组 标签
+        # --- 分组控件布局 ---
+        group_widget = QWidget()
+        self.widgets["edit_info_page"]["group_widget"] = group_widget
+        edit_layout.addWidget(group_widget)
+
+        group_layout = QHBoxLayout(group_widget)
+        group_widget.setLayout(group_layout)
+        self.widgets["edit_info_page"]["group_layout"] = group_layout
+
+        group_label = label("分组:")
+        group_layout.addWidget(group_label)
+        group_ccb = CheckableComboBox()  # ccb!
+        self.widgets["edit_info_page"]["group_ccb"] = group_ccb
+        # print(self.used_group)
+        group_ccb.addItems(self.used_group)  # 放各种用户创建的分组
+        group_layout.addWidget(group_ccb)
+
+        # --- 标签控件布局 ---
+        tag_widget = QWidget()
+        self.widgets["edit_info_page"]["tag_widget"] = tag_widget
+        edit_layout.addWidget(tag_widget)
+
+        tag_layout = QHBoxLayout(tag_widget)
+        tag_widget.setLayout(tag_layout)
+        self.widgets["edit_info_page"]["tag_layout"] = tag_layout
+
+        tag_label = label("标签:")
+        tag_layout.addWidget(tag_label)
+        tag_ccb = CheckableComboBox()
+        self.widgets["edit_info_page"]["tag_ccb"] = tag_ccb
+        tag_ccb.addItems(self.used_tag)  # 放各种用户创建的标签
+        tag_layout.addWidget(tag_ccb)
+
+        comment_label = multiline_text()
+        self.widgets["edit_info_page"]["comment_label"] = comment_label
+        edit_layout.addWidget(comment_label)
+
+        # --- 确认按钮 ---
+        confirm_btn = button("保存更改")
+        self.widgets["edit_info_page"]["confirm_btn"] = confirm_btn
+        edit_layout.addWidget(confirm_btn)
+        confirm_btn.bind_click_func(self.save_user_edit)
+        return widget
+
+    def link_and_show(self, info_card: song_info_card):
+        info_card_copy = info_card.copy()
+        self.switchTo(self.edit_info_page)
+        layout = self.widgets["edit_info_page"]["display_layout"]
+        for i in self.widgets["edit_info_page"]["song_info_card"]:
+            i.deleteLater()
+        self.widgets["edit_info_page"]["song_info_card"] = []
+        layout.addWidget(info_card_copy)
+        self.widgets["edit_info_page"]["song_info_card"].append(info_card_copy)
+        # print("添加后", self.widgets["edit_info_page"]["song_info_card"])
+
+        group_ccb: CheckableComboBox = self.widgets["edit_info_page"]["group_ccb"]
+        selected_group = self.group_info[info_card_copy.complex_name].split("`")
+        # print(f'当前歌曲已经存在的分组是:{selected_group}')
+        group_ccb.setSelectedItems(selected_group)
+
+        tag_ccb: CheckableComboBox = self.widgets["edit_info_page"]["tag_ccb"]
+        # print(self.tag_info[info_card_copy.complex_name])
+        selected_tag = self.tag_info[info_card_copy.complex_name].split("`")
+        # print(f'当前歌曲已经存在的分组是:{selected_tag}')
+        tag_ccb.setSelectedItems(selected_tag)
+
+        comment_label: multiline_text = self.widgets["edit_info_page"]["comment_label"]
+        now_comment = self.comment_info[info_card_copy.complex_name][info_card.diff]
+        comment_label.set_text(now_comment)
+        info_card_copy.set_edited_info(selected_group, selected_tag, now_comment)
+
+    def save_user_edit(self):
+        song_info_card = self.widgets["edit_info_page"]["song_info_card"]
+        song_c_name = song_info_card[0].complex_name
+        diff = song_info_card[0].diff
+        # print(f'当前歌曲难度{diff}')
+        new_group = "`".join(
+            self.widgets["edit_info_page"]["group_ccb"].selectedItems()
+        )
+        new_tag = "`".join(self.widgets["edit_info_page"]["tag_ccb"].selectedItems())
+        new_comment = self.widgets["edit_info_page"]["comment_label"].get_plain_text()
+        # print(f"老分组{self.group_info[song_c_name]}新分组:{new_group}")
+        # print(f"老标签{self.tag_info[song_c_name]}新标签:{new_tag}")
+        # ----- 获取分组信息 -----
+        df = pd.read_csv(
+            GROUP_PATH,
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=["c_name", "group"],  # 手动定义所有列名
+            index_col=0,
+        )
+        df = df.fillna("")  # 将NaN替换为空字符串
+        df.at[song_c_name, "group"] = new_group  # 比 loc 更快且更明确
+        self.group_info[song_c_name] = new_group
+        df.to_csv(GROUP_PATH, header=False, encoding="utf-8", index=True)
+
+        # ----- 获取标签信息 -----
+        df = pd.read_csv(
+            TAG_PATH,
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=["c_name", "tag"],  # 手动定义所有列名
+            index_col=0,
+        )
+        df = df.fillna("")
+        # print(df)
+        df.at[song_c_name, "tag"] = new_tag  # 比 loc 更快且更明确
+        self.tag_info[song_c_name] = new_tag
+        df.to_csv(TAG_PATH, header=False, encoding="utf-8", index=True)
+
+        # ----- 获取简评信息 -----
+        df = pd.read_csv(
+            COMMENT_PATH,
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=[
+                'c_name',
+                "EZ_comment",
+                "HD_comment",
+                "IN_comment",
+                "AT_comment",
+            ],  # 手动定义所有列名
+            index_col=0,
+        )
+        df = df.fillna("")
+        # print(df)
+        # print(f"{diff}_comment")
+        df.at[song_c_name, f"{diff}_comment"] = new_comment  # 比 loc 更快且更明确
+        self.comment_info[song_c_name] = new_comment
+        df.to_csv(COMMENT_PATH, header=False, encoding="utf-8", index=True)
+
+        song_info_card[0].set_edited_info(new_group.split('`'), new_tag.split('`'), new_comment)
 
     # -- 数据筛选 -- 搜索 筛选数据
     def init_search_page(self) -> QWidget:
@@ -2259,6 +2481,11 @@ class MainWindow(FramelessWindow):
         sort_result_reverse_btn.setOffText("当前规则:从小到大")
         sort_result_reverse_btn.setOnText("当前规则:从大到小")
         sort_result_reverse_btn.setChecked(True)
+        sort_result_reverse_btn.setStyleSheet(get_switch_button_style())
+        sort_result_reverse_btn.label.setStyleSheet(
+            """QLabel{
+            font-size: 22px;}"""
+        )
         sort_result_reverse_btn.checkedChanged.connect(self.place_record)
         group_header_layout.addStretch(1)  # 左侧弹性空间
         group_header_layout.addWidget(sort_result_reverse_btn)  # 右侧控件
@@ -2648,9 +2875,10 @@ class MainWindow(FramelessWindow):
             elif sort_by == "定数":
                 sort_rely = float(level)
 
+            (song_name, composer, drawer, chapter_dic) = self.cname_to_name[c_name]
             song_cardi = song_info_card(
                 ILLUSTRATION_PREPATH + c_name + ".png",
-                self.cname_to_name[c_name][0],
+                song_name,
                 singal_rks,
                 acc,
                 level,
@@ -2658,7 +2886,13 @@ class MainWindow(FramelessWindow):
                 special_record_type,
                 int(score),
                 None,
+                composer,
+                chapter_dic[diffi],
+                drawer,
+                False,
+                c_name,
             )
+            song_cardi.right_func = self.link_and_show
             self.widgets["search_page"]["song_cards"].append(song_cardi)
 
             if group_by == "曲名":

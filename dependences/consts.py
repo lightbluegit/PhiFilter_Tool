@@ -44,6 +44,9 @@ CHI_FONT1 = FONT_PREPATH + "ZCOOLKuaiLe/ZCOOLKuaiLe-Regular.ttf"
 PLAYER_INFO_PREPATH = FILE_PATH + "player_info/"
 
 TOKEN_PATH = PLAYER_INFO_PREPATH + "session_token.txt"  # 玩家session_token存储路径
+GROUP_PATH = PLAYER_INFO_PREPATH + "group.csv"  # 玩家自定义分组信息存储路径
+COMMENT_PATH = PLAYER_INFO_PREPATH + "comment.csv"  # 玩家自定义简评信息存储路径
+TAG_PATH = PLAYER_INFO_PREPATH + "tag.csv"  # 玩家自定义标签信息存储路径
 
 # 图片素材(images)文件夹下文件的路径前缀
 IMAGES_PREPATH = FILE_PATH + "images/"
@@ -217,6 +220,31 @@ def get_input_box_style(
     """
 
     style += content + "\n}"
+    return style
+
+
+def get_switch_button_style(
+    max_width: str = 250,
+    min_width: str = 250,
+    min_height: str = 30,
+    max_height: str = 30,
+    font_family: str = "仿宋",
+    font_size: str = 28,
+    border_radius: str = 11,
+    # background_color: tuple[str, str, str, str] = (255, 248, 220, 1),
+    # color: tuple[str, str, str, str] = (0, 159, 170, 1), SwitchButton
+):
+    style = "SwitchButton {\n "
+    # r, g, b, a = background_color
+    content = f"""
+    max-width: {max_width}px;
+    min-width: {min_width}px;
+    min-height: {min_height}px;
+    max-height: {max_height}px;
+    """
+    # background-color: rgba({r},{g},{b},{a});
+    style += content + "\n}"
+    # print(style)
     return style
 
 
