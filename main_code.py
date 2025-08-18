@@ -389,15 +389,15 @@ class PhigrosCloud:
             "checksum": result["gameFile"]["metaData"]["_checksum"],
             "updateAt": result["updatedAt"],  # 这是存档更新时间喵
             "url": result["gameFile"]["url"],  # 这是存档直链喵
-            # "saveVersion": summary[0],  # 这是存档版本喵
-            # "challenge": summary[1],  # 课题分喵
-            # "rks": summary[2],  # 正如其名不多讲了喵
-            # "gameVersion": summary[3],  # 这是游戏版本喵
-            # "avatar": summary[4].decode(),  # 这是头像喵
-            # "EZ": summary[5:8],  # EZ难度的评级情况喵
-            # "HD": summary[8:11],  # HD难度的评级情况喵
-            # "IN": summary[11:14],  # IN难度的评级情况喵
-            # "AT": summary[14:17],  # AT难度的评级情况喵
+            "saveVersion": summary[0],  # 这是存档版本喵
+            "challenge": summary[1],  # 课题分喵
+            "rks": summary[2],  # 正如其名不多讲了喵
+            "gameVersion": summary[3],  # 这是游戏版本喵
+            "avatar": summary[4],  # 这是头像喵
+            "EZ": summary[5:8],  # EZ难度的评级情况喵
+            "HD": summary[8:11],  # HD难度的评级情况喵
+            "IN": summary[11:14],  # IN难度的评级情况喵
+            "AT": summary[14:17],  # AT难度的评级情况喵
         }
 
         print(f'函数"getSummary()"返回：{return_data}')
@@ -946,6 +946,8 @@ class Reader:
             print(
                 f'结构"{obj.__class__.__name__}"读取完毕喵！剩余{self.remaining()}字节喵！'
             )
+            if str(obj.__class__.__name__) == "user01":
+                print(self.read_dict)
 
         else:
             print(
@@ -1456,6 +1458,7 @@ def getStructure(file_head: dict[str, bytes]) -> dict[str, Any]:
     # user
     if file_head.get("user") == b"\x01":
         structure_list["user"] = user01
+        print("进入user页面", structure_list["user"])
 
     elif isinstance(file_head.get("user"), bytes):
         raise ValueError(
@@ -1498,7 +1501,7 @@ def formatSaveDict(save_dict: dict[str, dict]):
     for key in ["user", "gameProgress", "settings", "gameRecord", "gameKey"]:
         if save_dict.get(key) is not None:
             new_save_dict[key] = save_dict[key]
-
+    # print('存档文件是这个喵:', new_save_dict)
     return new_save_dict
 
 
@@ -1653,7 +1656,8 @@ import sys
 from collections import deque
 
 from dependences.classes import *
-from dependences.consts import *
+
+# from dependences.consts import *
 
 
 class MainWindow(FramelessWindow):
@@ -1688,11 +1692,6 @@ class MainWindow(FramelessWindow):
             {"EZ": EZchapter, "HD": HDchapter, "IN": INchapter},
         )
         """
-        self.group_info = {}
-        self.used_group = []
-        self.tag_info = {}
-        self.used_tag = []
-        self.comment_info = {}
         self.hBoxLayout = QHBoxLayout(self)
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
         self.stackWidget = QStackedWidget(self)
@@ -1707,7 +1706,7 @@ class MainWindow(FramelessWindow):
         if chi_font_id != -1:
             self.chi_font_family = QFontDatabase.applicationFontFamilies(chi_font_id)[0]
         self.split_name()  # 把拆包拿到的名称和正式名称写进映射里
-        self.get_user_edit_info()  # 获取用户定义的 每首歌的分组 标签 简评
+        # self.get_user_edit_info()  # 获取用户定义的 每首歌的分组 标签 简评
         self.initLayout()
         self.init_all_pages()
         self.init_navigation()  # 初始化左侧导航栏
@@ -1723,7 +1722,7 @@ class MainWindow(FramelessWindow):
         """
         )
         # self.switchTo(self.search_page)
-        self.switchTo(self.homepage)
+        self.switchTo(self.edit_info_page)
 
     # difficulty难度中对应的名称是用'.'连接并去掉所有空格和括号的 用info.tsv的信息拆成一个映射
     def split_name(self):
@@ -1767,79 +1766,6 @@ class MainWindow(FramelessWindow):
             if ATchapter:
                 self.cname_to_name[complex_name][3]["AT"] = ATchapter
         # print(self.cname_to_name)
-
-    # user_edit:  complex_name goup tag comment
-    def get_user_edit_info(self):
-        # ----- 获取分组信息 -----
-        df = pd.read_csv(
-            GROUP_PATH,
-            sep=",",
-            header=None,
-            encoding="utf-8",
-            names=["c_name", "group"],  # 手动定义所有列名
-        )
-        df = df.fillna("")  # 将NaN替换为空字符串
-        df.set_index(df.columns[0], inplace=True)
-        # print(df)
-        used_group = set()
-        for idx, row in df.iterrows():
-            # print(idx)
-            # print(row["group"])
-            self.group_info[idx] = str(row["group"])
-            group_raw = str(row["group"]).strip()
-            for groupi in group_raw.split("`"):
-                used_group.add(groupi)
-        used_group.remove("")
-        self.used_group = list(used_group)
-
-        # ----- 获取标签信息 -----
-        df = pd.read_csv(
-            TAG_PATH,
-            sep=",",
-            header=None,
-            encoding="utf-8",
-            names=["c_name", "tag"],  # 手动定义所有列名
-        )
-        df = df.fillna("")
-        df.set_index(df.columns[0], inplace=True)
-        # print(df)
-        used_tag = set()
-        for idx, row in df.iterrows():
-            self.tag_info[idx] = str(row["tag"])
-            tag_raw = str(row["tag"]).strip()
-            for tagi in tag_raw.split("`"):
-                used_tag.add(tagi)
-        # print(self.tag_info)
-        used_tag.remove("")
-        self.used_tag = list(used_tag)
-
-        # ----- 获取简评信息 -----
-        df = pd.read_csv(
-            COMMENT_PATH,
-            sep=",",
-            header=None,
-            encoding="utf-8",
-            names=[
-                "c_name",
-                "EZ_comment",
-                "HD_comment",
-                "IN_comment",
-                "AT_comment",
-            ],  # 手动定义所有列名
-        )
-        df = df.fillna("")
-        df.set_index(df.columns[0], inplace=True)
-        # print(df)
-        for idx, row in df.iterrows():
-            # print(idx)
-            # print(row["group"])
-            self.comment_info[idx] = {
-                "EZ": str(row["EZ_comment"]),
-                "HD": str(row["HD_comment"]),
-                "IN": str(row["IN_comment"]),
-                "AT": str(row["AT_comment"]),
-            }
-        # print(list(self.group_info.items())[:3:])
 
     def addSubInterface(
         self,
@@ -1896,7 +1822,7 @@ class MainWindow(FramelessWindow):
             self.homepage, FIF.HOME, "主页", NavigationItemPosition.TOP
         )
         self.addSubInterface(
-            self.place_b27_phi3_page, FIF.ALBUM, "Album 1", parent=self.homepage
+            self.place_b27_phi3_page, FIF.ALBUM, "rks组成页", parent=self.homepage
         )
         self.navigationInterface.setExpandWidth(200)
         self.navigationInterface.addSeparator()
@@ -1930,7 +1856,7 @@ class MainWindow(FramelessWindow):
         github_url = QUrl("https://github.com/lightbluegit/rhythmgame_database")
         QDesktopServices.openUrl(github_url)
 
-    # -- 主页/快捷工具 --
+    # -------------- 主页/快捷工具 ----------------
     def init_homepage(self) -> QWidget:
         self.widgets["homepage"] = {}
         widget = QWidget()
@@ -1940,26 +1866,28 @@ class MainWindow(FramelessWindow):
         widget.setLayout(layout)
         self.widgets["homepage"]["layout"] = layout
 
-        generate_b27_phi3_btn = button("生成b27+phi3组成")
+        generate_b27_phi3_btn = button("生成rks组成", iconpath=GENERATE_RKS_ICON_PATH)
+        generate_b27_phi3_btn.set_icon_size(32, 32)
         generate_b27_phi3_btn.bind_click_func(self.generate_b27_phi3)
         self.widgets["homepage"]["generate_b27_phi3_btn"] = generate_b27_phi3_btn
         layout.addWidget(generate_b27_phi3_btn)
+        layout.addStretch(1)
 
-        s1 = song_info_card(
-            ILLUSTRATION_PREPATH + "Luminescence.米虾Fomiki初云CLoudie.png",
-            "Eltawiholu givyf kgtuc hblj;nkolm xc,olsac ascx",
-            "11.1111",
-            "22.222",
-            "33.3",
-            "EZ",
-            special_type.AP,
-            int("1000000"),
-            22,
-            "百九十八 越写越花",
-            complex_name="Luminescence.米虾Fomiki初云CLoudie",
-        )
-        s1.right_func = self.link_and_show  # 重要!
-        layout.addWidget(s1)
+        # s1 = song_info_card(
+        #     ILLUSTRATION_PREPATH + "Luminescence.米虾Fomiki初云CLoudie.png",
+        #     "Eltawiholu givyf kgtuc hblj;nkolm xc,olsac ascx",
+        #     "11.1111",
+        #     "22.222",
+        #     "33.3",
+        #     "EZ",
+        #     special_type.AP,
+        #     int("1000000"),
+        #     22,
+        #     "百九十八 越写越花",
+        #     complex_name="Luminescence.米虾Fomiki初云CLoudie",
+        # )
+        # s1.right_func = self.link_and_show  # 重要!
+        # layout.addWidget(s1)
 
         # s2 = song_info_card(
         #     IMAGES_PREPATH + "Illustration #237.png",
@@ -1975,37 +1903,19 @@ class MainWindow(FramelessWindow):
         # layout.addWidget(s2)
         return widget
 
-    # def get_score_level(self, score: int, is_fc: bool = False) -> score_level_type:
-    #     if score == 1000000:
-    #         return score_level_type.phi
-    #     elif is_fc:
-    #         return score_level_type.VFC
-    #     elif score >= 960000:
-    #         return score_level_type.V
-    #     elif score >= 920000:
-    #         return score_level_type.S
-    #     elif score >= 880000:
-    #         return score_level_type.A
-    #     elif score >= 820000:
-    #         return score_level_type.B
-    #     elif score >= 600000:
-    #         return score_level_type.C
-    #     else:
-    #         return score_level_type.F
-
     def generate_b27_phi3(self):
         with PhigrosCloud(self.token) as cloud:
             # 获取玩家summary喵
             summary = cloud.getSummary()
-            # print(summary)
+            # print('summary是',summary)
             # 获取并解析存档喵
             save_data = cloud.getSave(summary["url"], summary["checksum"])
             save_dict = unzipSave(save_data)
-            # print("最后得到的是这个东西喵",save_dict)
+            # print("save_dict是这个",save_dict)
             save_dict = decryptSave(save_dict)
             # print("最后得到的是这个东西喵",save_dict)
             save_dict = formatSaveDict(save_dict)
-            # print("最后得到的是这个东西喵", save_dict)
+            # print("save_dict是这个", save_dict)
 
             df = pd.read_csv(
                 DIFFICULTY_PATH,
@@ -2074,7 +1984,7 @@ class MainWindow(FramelessWindow):
         self.widgets["place_b27_phi3_page"]["b27_widgets"] = []
         layout = self.widgets["place_b27_phi3_page"]["main_layout"]
 
-        phi3_folder = folder("phi3:")
+        phi3_folder = folder("phi3:", expend=True)
         layout.addWidget(phi3_folder, 1)
         self.widgets["place_b27_phi3_page"]["phi3_folder"] = phi3_folder
         # tuple[float, tuple[str, str, float, float, str]]
@@ -2111,10 +2021,18 @@ class MainWindow(FramelessWindow):
                 complex_name,
             )
             phi3_cardi.right_func = self.link_and_show
+            selected_group = GROUP_INFO[complex_name].split("`")
+            # print(f'当前歌曲已经存在的分组是:{selected_group}')
+
+            selected_tag = TAG_INFO[complex_name].split("`")
+            # print(f'当前歌曲已经存在的分组是:{selected_tag}')
+
+            now_comment = COMMENT_INFO[complex_name][diff]
+            phi3_cardi.set_edited_info(selected_group, selected_tag, now_comment)
             phi3_folder.add_widget(phi3_cardi)
         print("phi3已布局完成!")
 
-        b27_folder = folder("b27:")
+        b27_folder = folder("b27:", expend=True)
         layout.addWidget(b27_folder, 3)
         self.widgets["place_b27_phi3_page"]["b27_folder"] = b27_folder
         for idx, bi in enumerate(
@@ -2154,6 +2072,14 @@ class MainWindow(FramelessWindow):
                 complex_name,
             )
             b27_cardi.right_func = self.link_and_show
+            selected_group = GROUP_INFO[complex_name].split("`")
+            # print(f'当前歌曲已经存在的分组是:{selected_group}')
+
+            selected_tag = TAG_INFO[complex_name].split("`")
+            # print(f'当前歌曲已经存在的分组是:{selected_tag}')
+
+            now_comment = COMMENT_INFO[complex_name][diff]
+            b27_cardi.set_edited_info(selected_group, selected_tag, now_comment)
             b27_folder.add_widget(b27_cardi)
         print("b27已布局完成!")
         self.switchTo(self.place_b27_phi3_page)
@@ -2171,7 +2097,7 @@ class MainWindow(FramelessWindow):
 
         return widget
 
-    # -- 添加简评 tag 分组 --
+    # ---------------- 添加简评 tag 分组 -----------------
     def init_edit_info_page(self) -> QWidget:
         self.widgets["edit_info_page"] = {}
         widget = QWidget()
@@ -2180,7 +2106,24 @@ class MainWindow(FramelessWindow):
         main_layout = QHBoxLayout(widget)  # 横向布局
         widget.setLayout(main_layout)
         self.widgets["edit_info_page"]["main_layout"] = main_layout
-        self.widgets["edit_info_page"]["song_info_card"] = []
+
+        example_song = song_info_card(
+            ILLUSTRATION_PREPATH + "introduction.png",
+            "introduction",
+            "00.0000",
+            "00.000%",
+            "00.0",
+            "EZ",
+            special_type.EMPTY,
+            1000000,
+            0,
+            "曲师名称",
+            "谱师名称",
+            "画师名称",
+            True,
+            "introduction",
+        )
+        self.widgets["edit_info_page"]["song_info_card"] = [example_song]
 
         # ---------------------- 左侧 展示页面 --------------------
         display_widget = QWidget()
@@ -2190,6 +2133,9 @@ class MainWindow(FramelessWindow):
         display_layout = QVBoxLayout(display_widget)  # 纵向布局
         display_widget.setLayout(display_layout)
         self.widgets["edit_info_page"]["display_layout"] = display_layout
+        display_layout.addWidget(example_song)
+        example_song.set_edited_info(["分组1、分组2"], ["此处为标签"], "此处为简评内容")
+        # display_layout.addStretch(1)
 
         # ---------------------- 右侧 编辑页面 --------------------
         edit_widget = QWidget()
@@ -2200,7 +2146,6 @@ class MainWindow(FramelessWindow):
         edit_widget.setLayout(edit_layout)
         self.widgets["edit_info_page"]["edit_layout"] = edit_layout
 
-        #  加上补全 如果是新标签就添加进去 搜索的时候增加按 分组 标签 简评搜索并增加分组依据:分组 标签
         # --- 分组控件布局 ---
         group_widget = QWidget()
         self.widgets["edit_info_page"]["group_widget"] = group_widget
@@ -2214,8 +2159,8 @@ class MainWindow(FramelessWindow):
         group_layout.addWidget(group_label)
         group_ccb = CheckableComboBox()  # ccb!
         self.widgets["edit_info_page"]["group_ccb"] = group_ccb
-        # print(self.used_group)
-        group_ccb.addItems(self.used_group)  # 放各种用户创建的分组
+        # print(used_group)
+        group_ccb.addItems(used_group)  # 放各种用户创建的分组
         group_layout.addWidget(group_ccb)
 
         # --- 标签控件布局 ---
@@ -2231,15 +2176,22 @@ class MainWindow(FramelessWindow):
         tag_layout.addWidget(tag_label)
         tag_ccb = CheckableComboBox()
         self.widgets["edit_info_page"]["tag_ccb"] = tag_ccb
-        tag_ccb.addItems(self.used_tag)  # 放各种用户创建的标签
+        tag_ccb.addItems(used_tag)  # 放各种用户创建的标签
         tag_layout.addWidget(tag_ccb)
 
         comment_label = multiline_text()
+        comment_label.setStyleSheet(
+            """
+        {
+        font-size: 28px;
+        }"""
+        )
         self.widgets["edit_info_page"]["comment_label"] = comment_label
         edit_layout.addWidget(comment_label)
 
         # --- 确认按钮 ---
-        confirm_btn = button("保存更改")
+        confirm_btn = button("保存更改", iconpath=SAVE_ICON_PATH)
+        confirm_btn.set_icon_size(30, 30)
         self.widgets["edit_info_page"]["confirm_btn"] = confirm_btn
         edit_layout.addWidget(confirm_btn)
         confirm_btn.bind_click_func(self.save_user_edit)
@@ -2257,18 +2209,19 @@ class MainWindow(FramelessWindow):
         # print("添加后", self.widgets["edit_info_page"]["song_info_card"])
 
         group_ccb: CheckableComboBox = self.widgets["edit_info_page"]["group_ccb"]
-        selected_group = self.group_info[info_card_copy.complex_name].split("`")
+        # print(info_card_copy.complex_name)
+        selected_group = GROUP_INFO[info_card_copy.complex_name].split("`")
         # print(f'当前歌曲已经存在的分组是:{selected_group}')
         group_ccb.setSelectedItems(selected_group)
 
         tag_ccb: CheckableComboBox = self.widgets["edit_info_page"]["tag_ccb"]
-        # print(self.tag_info[info_card_copy.complex_name])
-        selected_tag = self.tag_info[info_card_copy.complex_name].split("`")
+        # print(TAG_INFO[info_card_copy.complex_name])
+        selected_tag = TAG_INFO[info_card_copy.complex_name].split("`")
         # print(f'当前歌曲已经存在的分组是:{selected_tag}')
         tag_ccb.setSelectedItems(selected_tag)
 
         comment_label: multiline_text = self.widgets["edit_info_page"]["comment_label"]
-        now_comment = self.comment_info[info_card_copy.complex_name][info_card.diff]
+        now_comment = COMMENT_INFO[info_card_copy.complex_name][info_card.diff]
         comment_label.set_text(now_comment)
         info_card_copy.set_edited_info(selected_group, selected_tag, now_comment)
 
@@ -2282,8 +2235,8 @@ class MainWindow(FramelessWindow):
         )
         new_tag = "`".join(self.widgets["edit_info_page"]["tag_ccb"].selectedItems())
         new_comment = self.widgets["edit_info_page"]["comment_label"].get_plain_text()
-        # print(f"老分组{self.group_info[song_c_name]}新分组:{new_group}")
-        # print(f"老标签{self.tag_info[song_c_name]}新标签:{new_tag}")
+        # print(f"老分组{GROUP_INFO[song_c_name]}新分组:{new_group}")
+        # print(f"老标签{TAG_INFO[song_c_name]}新标签:{new_tag}")
         # ----- 获取分组信息 -----
         df = pd.read_csv(
             GROUP_PATH,
@@ -2295,7 +2248,7 @@ class MainWindow(FramelessWindow):
         )
         df = df.fillna("")  # 将NaN替换为空字符串
         df.at[song_c_name, "group"] = new_group  # 比 loc 更快且更明确
-        self.group_info[song_c_name] = new_group
+        GROUP_INFO[song_c_name] = new_group
         df.to_csv(GROUP_PATH, header=False, encoding="utf-8", index=True)
 
         # ----- 获取标签信息 -----
@@ -2310,7 +2263,7 @@ class MainWindow(FramelessWindow):
         df = df.fillna("")
         # print(df)
         df.at[song_c_name, "tag"] = new_tag  # 比 loc 更快且更明确
-        self.tag_info[song_c_name] = new_tag
+        TAG_INFO[song_c_name] = new_tag
         df.to_csv(TAG_PATH, header=False, encoding="utf-8", index=True)
 
         # ----- 获取简评信息 -----
@@ -2320,7 +2273,7 @@ class MainWindow(FramelessWindow):
             header=None,
             encoding="utf-8",
             names=[
-                'c_name',
+                "c_name",
                 "EZ_comment",
                 "HD_comment",
                 "IN_comment",
@@ -2332,12 +2285,14 @@ class MainWindow(FramelessWindow):
         # print(df)
         # print(f"{diff}_comment")
         df.at[song_c_name, f"{diff}_comment"] = new_comment  # 比 loc 更快且更明确
-        self.comment_info[song_c_name] = new_comment
+        COMMENT_INFO[song_c_name] = new_comment
         df.to_csv(COMMENT_PATH, header=False, encoding="utf-8", index=True)
 
-        song_info_card[0].set_edited_info(new_group.split('`'), new_tag.split('`'), new_comment)
+        song_info_card[0].set_edited_info(
+            new_group.split("`"), new_tag.split("`"), new_comment
+        )
 
-    # -- 数据筛选 -- 搜索 筛选数据
+    # ----------------- 数据筛选 -------------------------- 搜索 筛选数据
     def init_search_page(self) -> QWidget:
         # 创建主容器
         self.widgets["search_page"] = {}
@@ -2419,10 +2374,11 @@ class MainWindow(FramelessWindow):
         filter_confirm_layout.setContentsMargins(0, 0, 0, 0)
         filter_confirm_layout.setSpacing(10)
 
-        filter_confirm_btn_style = {"min_height": 40, "max_height": 40, "font_size": 30}
+        filter_confirm_btn_style = {"min_height": 45, "max_height": 45, "font_size": 28}
         filter_from_all_song_btn = button(
-            "从所有歌曲中筛一遍", filter_confirm_btn_style
+            "从所有歌曲中筛一遍", filter_confirm_btn_style, FILTER_ICON_PATH
         )
+        filter_from_all_song_btn.set_icon_size(30, 30)
         self.widgets["search_page"][
             "filter_from_all_song_btn"
         ] = filter_from_all_song_btn
@@ -2430,8 +2386,9 @@ class MainWindow(FramelessWindow):
         filter_confirm_layout.addWidget(filter_from_all_song_btn)
 
         filter_from_previous_song_btn = button(
-            "在之前的结果中继续筛选", filter_confirm_btn_style
+            "从结果中继续筛选", filter_confirm_btn_style, FILTER_AGAIN_ICON_PATH
         )
+        filter_from_previous_song_btn.set_icon_size(30, 30)
         self.widgets["search_page"][
             "filter_from_previous_song_btn"
         ] = filter_from_previous_song_btn
@@ -2462,7 +2419,7 @@ class MainWindow(FramelessWindow):
             "max_height": 40,
             "font_size": 30,
         }
-        reset_page_btn = button("重置", page_change_btn_style)
+        reset_page_btn = button("重置", page_change_btn_style, RESET_PATH)
         reset_page_btn.bind_click_func(self.reset_page)
         group_header_layout.addWidget(reset_page_btn)
         group_by_style = {
@@ -2478,16 +2435,18 @@ class MainWindow(FramelessWindow):
         }
         sort_result_reverse_btn = SwitchButton()
         self.widgets["search_page"]["sort_result_reverse_btn"] = sort_result_reverse_btn
-        sort_result_reverse_btn.setOffText("当前规则:从小到大")
-        sort_result_reverse_btn.setOnText("当前规则:从大到小")
+        sort_result_reverse_btn.setOffText("当前:从小到大")
+        sort_result_reverse_btn.setOnText("当前:从大到小")
         sort_result_reverse_btn.setChecked(True)
         sort_result_reverse_btn.setStyleSheet(get_switch_button_style())
         sort_result_reverse_btn.label.setStyleSheet(
             """QLabel{
-            font-size: 22px;}"""
+            font-size: 26px;
+            font-family: "楷体";
+            }"""
         )
         sort_result_reverse_btn.checkedChanged.connect(self.place_record)
-        group_header_layout.addStretch(1)  # 左侧弹性空间
+        group_header_layout.addStretch(1)
         group_header_layout.addWidget(sort_result_reverse_btn)  # 右侧控件
 
         sort_by_list = ["无", "acc", "单曲rks", "得分", "定数"]
@@ -2498,7 +2457,17 @@ class MainWindow(FramelessWindow):
         self.widgets["search_page"]["sort_by"] = sort_by
         group_header_layout.addWidget(sort_by)  # 右侧控件
 
-        group_by_list = ["无", "曲名", "曲师", "谱师", "画师", "难度", "评级"]
+        group_by_list = [
+            "无",
+            "曲名",
+            "曲师",
+            "谱师",
+            "画师",
+            "难度",
+            "评级",
+            "分组",
+            "标签",
+        ]
         group_by = combobox(
             group_by_list, "分组依据", group_by_style, group_by_hint_style
         )
@@ -2534,24 +2503,6 @@ class MainWindow(FramelessWindow):
         result_display_scroll_area.setWidget(scroll_content_widget)
 
         self.widgets["search_page"]["song_cards"] = []
-        # ----------------- 下层 翻页 ----------------
-        # page_turning_header = QWidget()
-        # result_layout.addWidget(page_turning_header)
-        # page_turning_layout = QHBoxLayout(page_turning_header)
-        # page_turning_layout.setContentsMargins(0, 0, 0, 0)
-
-        # last_page_btn = button("上一页", page_change_btn_style)
-        # last_page_btn.bind_click_func(self.turn_last_page)
-        # page_turning_layout.addWidget(last_page_btn)
-
-        # now_page_label_style = {"min_height": 40, "max_height": 40, "font_size": 28}
-        # now_page_label = label("1/?页", now_page_label_style)
-        # page_turning_layout.addWidget(now_page_label)
-
-        # next_page_btn = button("下一页", page_change_btn_style)
-        # next_page_btn.bind_click_func(self.turn_next_page)
-        # page_turning_layout.addWidget(next_page_btn)
-
         return widget
 
     def filter_from_all_song(self):
@@ -2615,11 +2566,15 @@ class MainWindow(FramelessWindow):
         self.filter_result = set()
         for filter_obji in filter_obj_list:
             conditioni = filter_obji.get_all_condition()
+            # print(conditioni)
+            if conditioni is None:
+                return
             if not logical_link and len(filter_obj_list) > 1:
                 print(f"逻辑链接不对啊!有好多个控件但是怎么逻辑是空呢?")
                 return
             if len(filter_obj_list) == 1:  # 强制置空
                 logical_link = ""
+
             if logical_link == "并且(与)":  # 与 &&
                 if is_first:
                     self.filter_result = set(all_song_info)
@@ -2640,6 +2595,7 @@ class MainWindow(FramelessWindow):
 
     def filte_with_condition(self, data, condition):
         (attribution, limit, limit_val) = condition
+        print(f"筛选条件:{condition}")
         result = []
         self.cname_to_name  # {c_name:(正常名称, 曲师名称)}
         if attribution in (
@@ -2647,6 +2603,9 @@ class MainWindow(FramelessWindow):
             "曲师",
             "谱师",
             "画师",
+            "标签",
+            "分组",
+            "简评",
         ):  # 名称相关的部分统一去掉空格并且小写(空格跟大写位置真记不清吧)
             limit_val = limit_val.replace(
                 " ", ""
@@ -2654,6 +2613,9 @@ class MainWindow(FramelessWindow):
         for songi in data:
             (c_name, diffi, score, acc, level, is_fc, singal_rks) = songi
             song_name, composer, *_ = self.cname_to_name[c_name]
+            groups: list[str] = GROUP_INFO[c_name].split("`")
+            tags: list[str] = TAG_INFO[c_name].split("`")
+            comments: str = COMMENT_INFO[c_name][diffi]
             if attribution == "acc":
                 if limit == "大于" and acc > float(limit_val):  # 合法性判断
                     result.append(songi)
@@ -2774,6 +2736,24 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in diffi:
                     result.append(songi)
 
+            elif attribution == "分组":
+                if limit == "包含" and limit_val in groups:
+                    result.append(songi)
+                elif limit == "不包含" and limit_val not in groups:
+                    result.append(songi)
+
+            elif attribution == "标签":
+                if limit == "包含" and limit_val in tags:
+                    result.append(songi)
+                elif limit == "不包含" and limit_val not in tags:
+                    result.append(songi)
+
+            elif attribution == "简评":
+                if limit == "包含" and limit_val in comments:
+                    result.append(songi)
+                elif limit == "不包含" and limit_val not in comments:
+                    result.append(songi)
+
         # for i in result:
         #     print(i[0] + i[1])
         return result
@@ -2834,6 +2814,9 @@ class MainWindow(FramelessWindow):
         if not hasattr(self, "filter_result"):
             print("要先全局筛选一遍才可以布局喵")
             return
+        if not self.filter_result:
+            print("无匹配的歌曲喵")
+            return
         group_by = self.widgets["search_page"]["group_by"].get_content()
         sort_by = self.widgets["search_page"]["sort_by"].get_content()
         is_reversed = self.widgets["search_page"]["sort_result_reverse_btn"].isChecked()
@@ -2893,10 +2876,19 @@ class MainWindow(FramelessWindow):
                 c_name,
             )
             song_cardi.right_func = self.link_and_show
+            selected_group = GROUP_INFO[c_name].split("`")
+            # print(f'当前歌曲已经存在的分组是:{selected_group}')
+
+            selected_tag = TAG_INFO[c_name].split("`")
+            # print(f'当前歌曲已经存在的分组是:{selected_tag}')
+
+            now_comment = COMMENT_INFO[c_name][diffi]
+            song_cardi.set_edited_info(selected_group, selected_tag, now_comment)
             self.widgets["search_page"]["song_cards"].append(song_cardi)
 
             if group_by == "曲名":
                 title = self.cname_to_name[c_name][0]
+                # print(f'title={title}, {type(title)}')
                 key = c_name
             elif group_by == "曲师":
                 title = self.cname_to_name[c_name][1]
@@ -2913,15 +2905,36 @@ class MainWindow(FramelessWindow):
             elif group_by == "评级":
                 title = score_level.value
                 key = title
+            elif group_by == "分组":
+                title = GROUP_INFO[c_name].split("`")
+                key = title
+            elif group_by == "标签":
+                title = TAG_INFO[c_name].split("`")
+                key = title
 
             if group_by != "无":
-                if visited_folder.get(key, None) is None:  # 还没有记录
-                    song_folderi = folder(title, expend=True)
-                    self.widgets["search_page"]["song_cards"].append(song_folderi)
-                    visited_folder[key] = [song_folderi, []]  # 初始化
-                    result_display_flow_layout.addWidget(song_folderi)
-                visited_folder[key][1].append((sort_rely, song_cardi))
-                self.widgets["search_page"]["song_cards"].append(song_cardi)
+                if group_by in ("分组", "标签"):
+                    for index in range(len(title)):
+                        # print('title[index]=',title[index])
+                        if (
+                            visited_folder.get(key[index], None) is None
+                        ):  # 还没有记录[index]
+                            song_folderi = folder(title[index], expend=True)
+                            self.widgets["search_page"]["song_cards"].append(
+                                song_folderi
+                            )
+                            visited_folder[key[index]] = [song_folderi, []]  # 初始化
+                            result_display_flow_layout.addWidget(song_folderi)
+                        visited_folder[key[index]][1].append((sort_rely, song_cardi))
+                        self.widgets["search_page"]["song_cards"].append(song_cardi)
+                else:
+                    if visited_folder.get(key, None) is None:  # 还没有记录
+                        song_folderi = folder(title, expend=True)
+                        self.widgets["search_page"]["song_cards"].append(song_folderi)
+                        visited_folder[key] = [song_folderi, []]  # 初始化
+                        result_display_flow_layout.addWidget(song_folderi)
+                    visited_folder[key][1].append((sort_rely, song_cardi))
+                    self.widgets["search_page"]["song_cards"].append(song_cardi)
             else:
                 empty_sort_list.append((sort_rely, song_cardi))
                 self.widgets["search_page"]["song_cards"].append(
@@ -2943,7 +2956,7 @@ class MainWindow(FramelessWindow):
             for _, cardi in empty_sort_list:
                 result_display_flow_layout.addWidget(cardi)
 
-    # -- 账号页面 --
+    # --------------- 账号页面 -------------------
     def init_account_page(self) -> QWidget:
         self.widgets["account_page"] = {}
         widget = QWidget()

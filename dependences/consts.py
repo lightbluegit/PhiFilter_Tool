@@ -1,4 +1,5 @@
 from enum import Enum
+import pandas as pd
 
 
 # ------------------------- 这里写自定义的枚举量 -------------------------
@@ -54,7 +55,11 @@ IMAGES_PREPATH = FILE_PATH + "images/"
 # 各种小图标
 ICON_PREPATH = IMAGES_PREPATH + "icons/"
 
-INDEX_TAG_PATH = ICON_PREPATH + "index_tag.png"  # b27 phi3序号图像底部图形
+RESET_PATH = ICON_PREPATH + "reset.png"
+SAVE_ICON_PATH = ICON_PREPATH + "save.png"
+GENERATE_RKS_ICON_PATH = ICON_PREPATH + "generate_rks_compose.png"
+FILTER_ICON_PATH = ICON_PREPATH + "filter.png"
+FILTER_AGAIN_ICON_PATH = ICON_PREPATH + "filter_again.png"
 
 SCORE_LEVEL_ICONS_PREPATH = ICON_PREPATH + "score_level_icons/"
 
@@ -135,6 +140,7 @@ def get_button_style(
     font_size: str = 34,
     border_radius: str = 7,
     background_color: tuple[str, str, str, str] = (0, 159, 170, 1),
+    color: str = "white",
     # color: tuple[str, str, str, str] = (0, 159, 170, 1),
 ):
     style = """PushButton {\n """
@@ -149,7 +155,7 @@ def get_button_style(
     max-height: {max_height}px;
     border-radius: {border_radius}px;
     background-color: rgba({r},{g},{b},{a});
-    color: white;
+    color: {color};
     """
 
     style += (
@@ -162,7 +168,7 @@ def get_button_style(
     
     /* 按下状态 */
     PushButton:pressed {
-        background-color: #7FFFD4;
+        background-color: #00FFFF;
     }"""
     )
 
@@ -264,6 +270,9 @@ FILTER_ATTRIBUTION_LIST: list[str] = [
     "曲师",
     "谱师",
     "画师",
+    "分组",
+    "标签",
+    "简评",
 ]
 # 数值类比较
 NUMERIC_COMPARATORS: list[str] = [
@@ -1349,7 +1358,7 @@ CHARTER_LIST: list[str] = [
     """Ctymax vs. 阿爽  fixed by B B M pow""",
     """StR-1""",
     """Pcat『Scatter』""",
-    """Blessing beyond myself.""",
+    """Blessing beyond my""",
     """iv""",
     """TimiTini →\"X\"← 阿爽""",
     """NerSAN vs. 阿爽""",
@@ -1418,3 +1427,80 @@ CHARTER_LIST: list[str] = [
     """NerSANN""",
     """奇跡の希""",
 ]
+
+MAX_LEVEL: float = 17.6
+# user_edit:  complex_name goup tag comment
+
+# ----- 获取分组信息 -----
+GROUP_INFO = {}
+TAG_INFO = {}
+COMMENT_INFO = {}
+df = pd.read_csv(
+    GROUP_PATH,
+    sep=",",
+    header=None,
+    encoding="utf-8",
+    names=["c_name", "group"],  # 手动定义所有列名
+)
+df = df.fillna("")  # 将NaN替换为空字符串
+df.set_index(df.columns[0], inplace=True)
+# print(df)
+used_group = set()
+for idx, row in df.iterrows():
+    # print(idx)
+    # print(row["group"])
+    GROUP_INFO[idx] = str(row["group"])
+    group_raw = str(row["group"]).strip()
+    for groupi in group_raw.split("`"):
+        used_group.add(groupi)
+used_group.remove("")
+used_group = list(used_group)
+
+# ----- 获取标签信息 -----
+df = pd.read_csv(
+    TAG_PATH,
+    sep=",",
+    header=None,
+    encoding="utf-8",
+    names=["c_name", "tag"],  # 手动定义所有列名
+)
+df = df.fillna("")
+df.set_index(df.columns[0], inplace=True)
+# print(df)
+used_tag = set()
+for idx, row in df.iterrows():
+    TAG_INFO[idx] = str(row["tag"])
+    tag_raw = str(row["tag"]).strip()
+    for tagi in tag_raw.split("`"):
+        used_tag.add(tagi)
+# print(tag_info)
+used_tag.remove("")
+used_tag = list(used_tag)
+
+# ----- 获取简评信息 -----
+df = pd.read_csv(
+    COMMENT_PATH,
+    sep=",",
+    header=None,
+    encoding="utf-8",
+    names=[
+        "c_name",
+        "EZ_comment",
+        "HD_comment",
+        "IN_comment",
+        "AT_comment",
+    ],  # 手动定义所有列名
+)
+df = df.fillna("")
+df.set_index(df.columns[0], inplace=True)
+# print(df)
+for idx, row in df.iterrows():
+    # print(idx)
+    # print(row["group"])
+    COMMENT_INFO[idx] = {
+        "EZ": str(row["EZ_comment"]),
+        "HD": str(row["HD_comment"]),
+        "IN": str(row["IN_comment"]),
+        "AT": str(row["AT_comment"]),
+    }
+# print(list(group_info.items())[:3:])

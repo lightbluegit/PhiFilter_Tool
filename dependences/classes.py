@@ -12,7 +12,15 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
 )
 from qframelesswindow import FramelessWindow, StandardTitleBar
-from PyQt5.QtCore import Qt, QUrl, QTimer, QMargins, QStringListModel
+from PyQt5.QtCore import (
+    Qt,
+    QUrl,
+    QTimer,
+    QMargins,
+    QStringListModel,
+    QPropertyAnimation,
+    QEasingCurve,
+)
 from PyQt5.QtGui import (
     QGuiApplication,
     QDesktopServices,
@@ -24,7 +32,7 @@ from PyQt5.QtGui import (
     QTextOption,
 )
 from qfluentwidgets import (
-    PushButton,
+    PrimaryPushButton,
     LineEdit,
     ComboBox,
     EditableComboBox,
@@ -50,7 +58,7 @@ from qfluentwidgets import (
 )
 from PyQt5.QtCore import Qt
 from dependences.consts import *
-
+import re
 
 # ------------------------- 这里是重写的控件 -------------------------
 
@@ -113,10 +121,21 @@ class editable_combobox(QWidget):
         self.editor_layout.addWidget(self.cbb)
         # print(style)
         # 初始化补全模型QAbstractItemModel
+        self.groups = set(GROUP_INFO.values())
+        self.tags = set(TAG_INFO.values())
+        self.comments = set()
+        for i in COMMENT_INFO.values():
+            # print(f'i={i}')
+            for key, val in i.items():
+                self.comments.add(val)
+                # print('val=',val)
         self.song_name_completer = QStringListModel(SONG_NAME_LIST)
         self.composer_completer = QStringListModel(COMPOSER_LIST)
         self.charter_completer = QStringListModel(CHARTER_LIST)
         self.drawer_completer = QStringListModel(DRAWER_NAME_LIST)
+        self.group_info_completer = QStringListModel(self.groups)
+        self.tag_info_completer = QStringListModel(self.tags)
+        self.comment_info_completer = QStringListModel(self.comments)
 
     def set_content(self, new_content):
         self.cbb.clear()
@@ -144,15 +163,20 @@ class editable_combobox(QWidget):
         self.cbb.setCompleter(None)
 
 
-class button(PushButton):
+class button(PrimaryPushButton):
 
-    def __init__(self, text: str, style: dict[str, str] = {}):
+    def __init__(self, text: str, style: dict[str, str] = {}, iconpath=None):
         super().__init__()
         self.setText(text)  # 设置按钮文本
         self.setStyleSheet(get_button_style(**style))
+        if iconpath:
+            self.setIcon(QIcon(iconpath))
 
     def bind_click_func(self, func):  # 绑定按钮对应功能
         self.clicked.connect(func)
+
+    def set_icon_size(self, w, h):
+        self.setIconSize(QSize(w, h))
 
 
 class label(QLabel):
@@ -455,6 +479,71 @@ class main_info_card(ElevatedCardWidget):
         super().mousePressEvent(event)
 
 
+class HorizontalInfoCard(QFrame):  # 改用QFrame作为基础控件
+    def __init__(self, title: str, content: str):
+        super().__init__()
+
+        # ================= 底层背景卡片 =================
+        self.setStyleSheet(
+            """
+            HorizontalInfoCard {
+                background-color: rgba(255, 255, 255, 0.65);
+                border-radius: 8px;
+                margin: 4px 0;
+                padding: 0;
+                max-width: 380px;
+            }
+        """
+        )
+        self.setContentsMargins(0, 0, 0, 0)
+
+        # ================= 上层内容容器 =================
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background: transparent;")  # 透明背景
+        layout = QHBoxLayout(content_widget)
+        layout.setContentsMargins(8, 8, 8, 8)  # 内边距
+        layout.setSpacing(12)
+
+        # 标题部分
+        self.title_label = CaptionLabel(title)
+        self.title_label.setStyleSheet(
+            """
+            min-width: 60px;
+            font-size: 26px;
+            font-family:"楷体";
+            color: #666;
+            padding-right: 8px;
+            border-radius: 8px;
+            border-right: 1px solid #EEE;
+            background-color: rgba(255, 255, 255, 0.85);
+        """
+        )
+
+        # 内容部分
+        self.content_label = BodyLabel(content)
+        self.content_label.setStyleSheet(
+            """
+            font-size: 24px;
+            font-family:"楷体";
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        """
+        )
+        self.content_label.setWordWrap(True)
+
+        # 添加到布局
+        layout.addWidget(self.title_label)
+        layout.addWidget(self.content_label)
+        layout.setStretch(1, 1)
+
+        # ================= 整体布局 =================
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(content_widget)
+
+
 class song_info_card(QWidget):
 
     def __init__(
@@ -516,10 +605,10 @@ class song_info_card(QWidget):
         self.mainlayout.addWidget(self.scroll_area)
         self.scroll_area.setWidgetResizable(True)  # 关键设置
         self.scroll_area.setStyleSheet(
-            """QScrollArea{background-color: #BBFFFF; border: none;max-width: 400px;
-    min-width: 400px;
-    min-height: 200px;
-    max-height: 200px;}"""
+            """QScrollArea{background-color: rgba(187, 255, 255, 0.6); border: none;max-width: 400px;
+            min-width: 400px;
+            min-height: 200px;
+            max-height: 200px;}"""
         )
         self.setStyleSheet("QWidget{background: transparent}")
 
@@ -527,7 +616,7 @@ class song_info_card(QWidget):
             self.scroll_area.hide()
         # 创建内容容器
         self.scroll_content_widget = QWidget()
-        self.flow_layout = FlowLayout(self.scroll_content_widget)  # 使用流式布局
+        self.flow_layout = QVBoxLayout(self.scroll_content_widget)  # 使用流式布局
         self.flow_layout.setSpacing(0)
         self.flow_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -536,23 +625,22 @@ class song_info_card(QWidget):
         if not self.is_expended:
             self.scroll_content_widget.hide()
 
-        label_style = {"min_width": 370, "max_width": 370, "font_size": 24}
-        composer_label = label("曲师:" + composer, label_style)
+        composer_label = HorizontalInfoCard("曲师:", composer)
         self.flow_layout.addWidget(composer_label)
 
-        chapter_label = label("谱师:" + chapter, label_style)
+        chapter_label = HorizontalInfoCard("谱师:", chapter)
         self.flow_layout.addWidget(chapter_label)
 
-        drawer_label = label("画师:" + drawer, label_style)
+        drawer_label = HorizontalInfoCard("画师:", drawer)
         self.flow_layout.addWidget(drawer_label)
 
-        self.group_label = label("分组:", label_style)
+        self.group_label = HorizontalInfoCard("分组:", "")
         self.flow_layout.addWidget(self.group_label)
 
-        self.tag_label = label("标签:", label_style)
+        self.tag_label = HorizontalInfoCard("标签:", "")
         self.flow_layout.addWidget(self.tag_label)
 
-        self.comment_label = label("简评:", label_style)
+        self.comment_label = HorizontalInfoCard("简评:", "")
         self.flow_layout.addWidget(self.comment_label)
 
     def clicked_card(self):
@@ -590,10 +678,46 @@ class song_info_card(QWidget):
             self.complex_name,
         )
 
-    def set_edited_info(self, group: list[str], tag: list[str], comment):
-        self.group_label.setText("分组:" + "、".join(group))
-        self.tag_label.setText("标签:" + "#".join(tag))
-        self.comment_label.setText("简评:" + comment)
+    def create_info_card(self, title: str, content: str):
+        card = QWidget()
+        card.setStyleSheet(
+            """
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 8px;
+            padding: 8px;
+            margin: 4px 0;
+        """
+        )
+        layout = QHBoxLayout(card)
+
+        # 标题（带下划线）
+        title_label = CaptionLabel(title)
+        title_label.setStyleSheet(
+            """
+            font-size: 14px;
+            color: #666;
+            border-bottom: 1px solid #EEE;
+            padding-bottom: 4px;
+            margin-bottom: 6px;
+        """
+        )
+
+        # 内容（自适应高度）
+        self.content_label = BodyLabel(content)
+        self.content_label.setWordWrap(True)
+
+        layout.addWidget(title_label)
+        layout.addWidget(self.content_label)
+        return card
+
+    def set_edited_info(
+        self, group: list[str], tag: list[str], comment
+    ):  # 布局/更新 分组标签简评信息
+        if tag:
+            tag[0] = "#" + tag[0]
+        self.group_label.content_label.setText("、".join(group))
+        self.tag_label.content_label.setText(" #".join(tag))
+        self.comment_label.content_label.setText(comment)
 
 
 class folder(QWidget):
@@ -610,10 +734,12 @@ class folder(QWidget):
         self.main_layout.setSpacing(0)
 
         # 标题栏 (可点击)
-        self.title_btn = button(title)
+        btn_style = {
+            "background_color": (152, 245, 255, 1),
+        }
+        self.title_btn = button(title, btn_style)
         # self.title_btn.setIcon(FluentIcon.CHEVRON_RIGHT)  # 默认向右箭头
         self.title_btn.bind_click_func(self.toggle_expand)
-        self.title_btn.setObjectName("folder")
         self.title_btn.setContentsMargins(0, 0, 0, 0)
         self.main_layout.addWidget(self.title_btn)
 
@@ -668,6 +794,8 @@ class folder(QWidget):
         """向内容区域添加控件"""
         self.widgets.append(widget)
         self.flow_layout.addWidget(widget)
+        self.title_btn.setMinimumWidth(self.scroll_content_widget.width())
+        self.title_btn.setMaximumWidth(self.scroll_content_widget.width())
         if not self.is_expanded:
             widget.hide()
 
@@ -814,10 +942,111 @@ class filter_obj(QWidget):
             self.limit_val_cbb.set_content(DRAWER_NAME_LIST)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.drawer_completer)
 
+        elif self.attribution_choose_cbb.get_content() == "分组":
+            self.limit_choose_cbb.set_content(["包含", "不包含"])
+            self.limit_val_cbb.set_content(self.limit_val_cbb.groups)
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.group_info_completer)
+
+        elif self.attribution_choose_cbb.get_content() == "标签":
+            self.limit_choose_cbb.set_content(["包含", "不包含"])
+            self.limit_val_cbb.set_content(self.limit_val_cbb.tags)
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.tag_info_completer)
+
+        elif self.attribution_choose_cbb.get_content() == "简评":
+            self.limit_choose_cbb.set_content(["包含", "不包含"])
+            self.limit_val_cbb.set_content(self.limit_val_cbb.comments)
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.comment_info_completer)
+
+    def input_val_check(self, attribution, limit, value) -> bool:
+        if attribution == "acc":
+            if not value:
+                return False
+            pattern = r"\d+\.?\d+"
+            if (
+                value[0] == "."
+            ):  # 如果输入为省略的格式(10. -> 10.0; .33 -> 0.33) 则补齐省略的0
+                value = "0" + value
+            if value[-1] == ".":
+                value += "0"
+            match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
+            if match_results is None:
+                print("无法匹配")
+                return False
+            match_results = match_results.group()  # 获取匹配后的值
+            # print(match_results)
+            acc = float(value)
+            if acc > 100:  # 范围限定
+                print("acc不可能大于100喵")
+                return False
+            if acc < 0:
+                print("acc不可能小于0喵")
+                return False
+            return True
+
+        elif attribution in ("单曲rks", "定数"):
+            if not value:
+                return False
+            pattern = r"\d+\.?\d+"
+            if (
+                value[0] == "."
+            ):  # 如果输入为省略的格式(10. -> 10.0; .33 -> 0.33) 则补齐省略的0
+                value = "0" + value
+            if value[-1] == ".":
+                value += "0"
+            match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
+            if match_results is None:
+                print("无法匹配")
+                return False
+            match_results = match_results.group()  # 获取匹配后的值
+            # print(match_results)
+            singal_rks = float(value)
+            if singal_rks > MAX_LEVEL:  # 范围限定
+                print(
+                    f"当前最高定数为{MAX_LEVEL}喵 {attribution}不可能高于{MAX_LEVEL}喵"
+                )
+                return False
+            if singal_rks < 0:
+                print(f"{attribution}不可能小于0喵")
+                return False
+            return True
+
+        elif attribution == "得分":
+            if not value:
+                return False
+            pattern = r"\d+"
+            match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
+            if match_results is None:
+                print("无法匹配")
+                return False
+            match_results = match_results.group()  # 获取匹配后的值
+            # print(match_results)
+            score = int(value)
+            if score > 1000000:  # 范围限定
+                print("最高分只有100w喵 太高了啦")
+                return False
+            if score < 0:
+                print("得分不可能小于0喵")
+                return False
+            return True
+
+        elif attribution == "评级":
+            if value not in ("F", "C", "B", "A", "S", "V", "蓝V", "phi"):
+                print(f"评级不可能是{value}喵")
+                return False
+            return True
+
+        elif attribution in ("分组", "标签"):
+            if "`" in value:
+                return False
+
+        return True
+
     def get_all_condition(self):  # 组合并返回当前的所有限制条件
         attribution = self.attribution_choose_cbb.get_content()
         limit = self.limit_choose_cbb.get_content()
         limit_val = self.limit_val_cbb.get_content()
+        if self.input_val_check(attribution, limit, limit_val) == False:
+            return None
         return (attribution, limit, limit_val)
 
 
