@@ -23,7 +23,7 @@ class special_type(Enum):
 
 # 默认路径
 # 整个文件的相对路径前缀
-FILE_PATH = "projects/phi_tool/"
+FILE_PATH = "projects/PhiFilter Tool/"
 
 # 主文件夹下的文件可以直接写
 CODE_PATH = FILE_PATH + "main_code.py"
@@ -91,16 +91,6 @@ SONG_CARD_BACKGROUND: dict[str, str] = {
 
 # 插图
 ILLUSTRATION_PREPATH = IMAGES_PREPATH + "illustration/"
-
-# 特殊状态下歌曲卡片的标题颜色SPECIAL_TITLE_COLOR
-
-
-SPECIAL_TITLE_COLOR = {
-    special_type.AP: "rgb(254,254,67)",  # phi的黄色
-    special_type.FC: "rgb(25,125,255)",  # V的蓝色
-    special_type.NO_PLAY: "black",
-    special_type.EMPTY: "white",
-}
 
 
 # 默认样式表

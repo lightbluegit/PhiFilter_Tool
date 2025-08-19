@@ -273,7 +273,7 @@ class main_info_card(ElevatedCardWidget):
         acc: str,
         level: str,
         diff: str,
-        special_record_type: special_type = special_type.EMPTY,  # 决定标题要不要上色 是否ap/fc/没玩过
+        is_fc: bool,
         score: int = None,  # 等级
         index: int = None,
         expended: bool = False,
@@ -327,12 +327,6 @@ class main_info_card(ElevatedCardWidget):
         )  # 居中对齐 否则与评级图片高度不一致很难看
 
         # 评级图片
-        is_fc = False
-        if (
-            special_record_type == special_type.FC
-            or special_record_type == special_type.AP
-        ):
-            is_fc = True
         self.level_img = ImageLabel(
             SCORE_LEVEL_PATH[get_score_level(score, is_fc)], self.top_widget
         )
@@ -554,14 +548,14 @@ class song_info_card(QWidget):
         acc: str,
         level: str,
         diff: str,
-        special_record_type: special_type = special_type.EMPTY,  # 决定标题要不要上色 是否ap/fc/没玩过
-        score: int = None,  # 等级
+        is_fc: bool,
+        score: int = None,
         index: int = None,
         composer: str = "",
         chapter: str = "",
         drawer: str = "",
         is_expended: bool = False,
-        complex_name: str = "",
+        combine_name: str = "",
     ):
         super().__init__()
         self.imgpath = imgpath
@@ -570,15 +564,15 @@ class song_info_card(QWidget):
         self.acc = acc
         self.level = level
         self.diff = diff
-        self.special_record_type = special_record_type
+        self.is_fc = is_fc
         self.score = score
         self.index = index
         self.composer = composer
         self.chapter = chapter
         self.drawer = drawer
         self.is_expended = is_expended
-        self.complex_name = complex_name
-        # print(self.complex_name)
+        self.combine_name = combine_name
+        # print(self.combine_name)
 
         self.right_func = None
         self.setContentsMargins(0, 0, 0, 0)
@@ -594,7 +588,7 @@ class song_info_card(QWidget):
             acc,
             level,
             diff,
-            special_record_type,
+            is_fc,
             score,
             index,
         )
@@ -668,14 +662,14 @@ class song_info_card(QWidget):
             self.acc,
             self.level,
             self.diff,
-            self.special_record_type,
+            self.is_fc,
             self.score,
             self.index,
             self.composer,
             self.chapter,
             self.drawer,
             True,  # 默认展开相关信息
-            self.complex_name,
+            self.combine_name,
         )
 
     def create_info_card(self, title: str, content: str):
@@ -721,8 +715,8 @@ class song_info_card(QWidget):
 
 
 class folder(QWidget):
-    def __init__(self, title="", parent=None, expend=False):
-        super().__init__(parent)
+    def __init__(self, title="", expend=False):
+        super().__init__()
         self.is_expanded = expend
         self.widgets = []
         self.title = title
