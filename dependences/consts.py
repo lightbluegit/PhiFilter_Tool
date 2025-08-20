@@ -33,6 +33,7 @@ DEPENDENCES_PREPATH = FILE_PATH + "dependences/"
 
 DIFFICULTY_PATH = DEPENDENCES_PREPATH + "difficulty.tsv"  # 各个歌曲难度文件
 INFO_PATH = DEPENDENCES_PREPATH + "info.tsv"  # 组合名称与拆分名称对应关系文件
+AVATAR_PATH = DEPENDENCES_PREPATH + "avatar.txt"  # 头像名称
 
 # 字体文件
 FONT_PREPATH = DEPENDENCES_PREPATH + "font/"
@@ -51,6 +52,9 @@ TAG_PATH = PLAYER_INFO_PREPATH + "tag.csv"  # 玩家自定义标签信息存储�
 
 # 图片素材(images)文件夹下文件的路径前缀
 IMAGES_PREPATH = FILE_PATH + "images/"
+
+# 头像图片路径前缀
+AVATER_IMG_PREPATH = IMAGES_PREPATH + "avatar/"
 
 # 各种小图标
 ICON_PREPATH = IMAGES_PREPATH + "icons/"
@@ -77,7 +81,7 @@ SCORE_LEVEL_PATH: dict[score_level_type:str] = {
 QRCODE_IMG_PREPATH = IMAGES_PREPATH + "QRcode/"
 
 QRCODE_IMG_PATH = QRCODE_IMG_PREPATH + "QRcode.png"
-QRCODE_EMPTY_IMG_PATH = QRCODE_IMG_PREPATH + "QRcode_empty.png"
+QRCODE_EMPTY_IMG_PATH = QRCODE_IMG_PREPATH + "QRcode_empty.jpg"
 
 # 各种背景
 BACKGROUND_IMG_PREPATH = IMAGES_PREPATH + "background/"

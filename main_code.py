@@ -13,9 +13,8 @@ from random import randint
 from time import *
 from uuid import uuid4
 from qrcode import make
-from time import sleep
 from Crypto.Cipher.AES import new, MODE_CBC, block_size
-from Crypto.Util.Padding import unpad, pad
+from Crypto.Util.Padding import unpad
 import pandas as pd
 
 
@@ -946,8 +945,8 @@ class Reader:
             print(
                 f'结构"{obj.__class__.__name__}"读取完毕喵！剩余{self.remaining()}字节喵！'
             )
-            if str(obj.__class__.__name__) == "user01":
-                print(self.read_dict)
+            # if str(obj.__class__.__name__) == "user01":
+            #     print(self.read_dict)
 
         else:
             print(
@@ -1514,7 +1513,7 @@ from PyQt5.QtWidgets import (
     QDesktopWidget,
 )
 from qframelesswindow import FramelessWindow, StandardTitleBar
-from PyQt5.QtCore import Qt, QUrl, QTimer, QMargins
+from PyQt5.QtCore import Qt, QUrl, QTimer
 from PyQt5.QtGui import (
     QGuiApplication,
     QDesktopServices,
@@ -1528,6 +1527,10 @@ from qfluentwidgets import (
     ImageLabel,
     SmoothScrollArea,
     SwitchButton,
+    InfoBar,
+    InfoBarPosition,
+    AvatarWidget,
+    NavigationTreeWidget,
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
@@ -1540,6 +1543,7 @@ class MainWindow(FramelessWindow):
     def __init__(self):
         super().__init__()
 
+        self.avatar = ""
         self.token = ""  # 玩家的token
         self.widgets: dict[str : dict[str:Any]] = {}  # 管理每个页面的控件
         """self.widgets[页面名称][页面控件名称]=控件"""
@@ -1596,9 +1600,13 @@ class MainWindow(FramelessWindow):
 
         self.init_font()
         self.generate_cname_to_name_info()
+        self.widgets["basepage"]["sub_interface"] = []
         self.init_all_pages()
         self.init_navigation()
-        self.switch_to(self.home_page)
+        if self.token:
+            self.switch_to(self.home_page)
+        else:
+            self.switch_to(self.account_page)
 
     def init_font(self):
         """初始化中英文对应字体"""
@@ -1673,7 +1681,7 @@ class MainWindow(FramelessWindow):
         navigation_interface: NavigationInterface = self.widgets["basepage"][
             "navigation_interface"
         ]
-        navigation_interface.addItem(
+        itemi = navigation_interface.addItem(
             routeKey=interface.objectName(),
             icon=icon,
             text=text,
@@ -1682,6 +1690,8 @@ class MainWindow(FramelessWindow):
             tooltip=text,
             parentRouteKey=parent.objectName() if parent else None,
         )
+        self.widgets["basepage"]["sub_interface"].append((itemi, text))
+        # content_widget.count()
 
     def switch_to(self, widget):
         content_widget: QStackedWidget = self.widgets["basepage"]["content_widget"]
@@ -1717,7 +1727,6 @@ class MainWindow(FramelessWindow):
         navigation_interface: NavigationInterface = self.widgets["basepage"][
             "navigation_interface"
         ]
-
         self.add_sub_interface(
             self.home_page, FIF.HOME, "主页", NavigationItemPosition.TOP
         )
@@ -1797,18 +1806,40 @@ class MainWindow(FramelessWindow):
     def generate_b27_phi3(self):
         """计算rks组成"""
         # 暂时略过
+        if not self.token:
+            InfoBar.warning(
+                title="用户未登录",
+                content="请先回到账号页面进行授权喵！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            self.switch_to(self.account_page)
+            return
         with PhigrosCloud(self.token) as cloud:
             # 获取玩家summary喵
             summary = cloud.getSummary()
             # print('summary是',summary)
             # 获取并解析存档喵
             save_data = cloud.getSave(summary["url"], summary["checksum"])
-            save_dict = unzipSave(save_data)
-            # print("save_dict是这个",save_dict)
-            save_dict = decryptSave(save_dict)
-            # print("最后得到的是这个东西喵",save_dict)
-            save_dict = formatSaveDict(save_dict)
-            # print("save_dict是这个", save_dict)
+            self.save_dict = unzipSave(save_data)
+            # print("save_dict是这个",self.save_dict)
+            self.save_dict = decryptSave(self.save_dict)
+            # print("最后得到的是这个东西喵",self.save_dict)
+            self.save_dict = formatSaveDict(self.save_dict)
+            # print("save_dict是这个", self.save_dict)
+
+            self.avatar = self.save_dict["user"]["avatar"]
+            original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
+            # 使用QFluentWidgets的AvatarWidget显示
+            avatar = AvatarWidget(
+                original_pixmap, self.widgets["account_page"]["widget"]
+            )
+            avatar.setFixedSize(100, 100)
+            avatar.show()
+            # self.save_dict
 
             df = pd.read_csv(
                 DIFFICULTY_PATH,
@@ -1844,7 +1875,7 @@ class MainWindow(FramelessWindow):
 
             self.phi3 = []
             heapq.heapify(self.phi3)
-            for combine_name, all_diff_dic in save_dict["gameRecord"].items():
+            for combine_name, all_diff_dic in self.save_dict["gameRecord"].items():
                 for diffi, items in all_diff_dic.items():
                     if diffi == "Legacy":
                         continue
@@ -1890,6 +1921,9 @@ class MainWindow(FramelessWindow):
                                 ),
                             )
 
+            # 不对啊 这不还要重新排一道吗??? 拿时间换空间是吧()
+            self.b27 = sorted(self.b27, key=lambda x: x[0], reverse=True)
+            self.phi3 = sorted(self.phi3, key=lambda x: x[0], reverse=True)
             self.place_b27_phi3()
 
     def place_b27_phi3(self):
@@ -1975,6 +2009,16 @@ class MainWindow(FramelessWindow):
             b27_cardi.set_edited_info(selected_group, selected_tag, now_comment)
             b27_folder.add_widget(b27_cardi)
         # print("b27已布局完成!")
+        InfoBar.success(
+            title="生成成功",
+            content="rks组成布局成功！",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=window,
+        )
+
         self.switch_to(self.place_b27_phi3_page)
 
     def init_place_b27_phi3_page(self) -> QWidget:
@@ -2122,6 +2166,18 @@ class MainWindow(FramelessWindow):
         info_card_copy.set_edited_info(selected_group, selected_tag, now_comment)
 
     def save_user_edit(self):
+        if not self.token:
+            InfoBar.warning(
+                title="用户未登录",
+                content="请先回到账号页面进行授权喵！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            self.switch_to(self.account_page)
+            return
         now_song_info_card: song_info_card = self.widgets["edit_info_page"][
             "song_info_card"
         ]
@@ -2187,6 +2243,15 @@ class MainWindow(FramelessWindow):
         now_song_info_card.set_edited_info(
             new_group.split("`"), new_tag.split("`"), new_comment
         )  # 同步更新展示部分的信息
+        InfoBar.success(
+            title="更改信息成功",
+            content="歌曲信息已成功更改",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=window,
+        )
 
     # ----------------- 数据筛选 --------------------------
     def init_search_page(self) -> QWidget:
@@ -2319,7 +2384,7 @@ class MainWindow(FramelessWindow):
         }
         reset_page_btn = button("重置", page_change_btn_style, RESET_PATH)
         self.widgets["search_page"]["reset_page_btn"] = reset_page_btn
-        reset_page_btn.bind_click_func(self.reset_page)
+        reset_page_btn.bind_click_func(self.reset_filter_result)
         group_widget_layout.addWidget(reset_page_btn)
 
         sort_result_reverse_btn = SwitchButton()
@@ -2411,6 +2476,19 @@ class MainWindow(FramelessWindow):
         return widget
 
     def filter_from_all_song(self):
+
+        if not self.token:
+            InfoBar.warning(
+                title="用户未登录",
+                content="请先回到账号页面进行授权喵！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            self.switch_to(self.account_page)
+            return
         with PhigrosCloud(self.token) as cloud:
             # 获取玩家summary喵
             summary = cloud.getSummary()
@@ -2466,42 +2544,51 @@ class MainWindow(FramelessWindow):
             "filter_obj_list"
         ]
         logical_link = filter_obj_list[0].logical_cbb.get_content()
-        is_first = True
+        if not logical_link and len(filter_obj_list) > 1:
+            InfoBar.warning(
+                title="连接逻辑有误",
+                content="有多个筛选条件但未选择连接逻辑",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            return
+        if len(filter_obj_list) == 1:  # 只有一个筛选项的时候连接逻辑无效
+            logical_link = ""
+
         self.filter_result = set()
+        if (
+            logical_link == "并且(与)"
+        ):  # 与 逻辑相当于是从整个数据库里不断筛选符合条件的东西 只减不增 复用前面筛选的结果继续筛选
+            self.filter_result = set(all_song_info)
+
         for filter_obji in filter_obj_list:
             conditioni = filter_obji.get_all_condition()
             # print(conditioni)
             if conditioni is None:
+                # print("非法条件")
                 return
-            if not logical_link and len(filter_obj_list) > 1:
-                print(f"逻辑链接不对啊!有好多个控件但是怎么逻辑是空呢?")
-                return
-            if len(filter_obj_list) == 1:  # 强制置空
-                logical_link = ""
 
-            if logical_link == "并且(与)":  # 与 &&
-                if is_first:
-                    self.filter_result = set(all_song_info)
-                    is_first = False
+            if logical_link == "并且(与)":  # '与'
                 result_list = self.filte_with_condition(self.filter_result, conditioni)
-                self.filter_result = set(
-                    result_list
-                )  # && 的参数传入的就是要被筛选的部分 会删除掉一些东西 直接覆盖就好
-            else:  # 空 或 ||
-                if is_first:
-                    is_first = False
+                self.filter_result = set(result_list)
+            else:  # '空'/'或者'
                 result_list = self.filte_with_condition(all_song_info, conditioni)
                 for resulti in result_list:
-                    self.filter_result.add(resulti)  # || 运算只会加入其他东西
+                    self.filter_result.add(
+                        resulti
+                    )  # || 运算只会加入其他东西 不会消除已有的东西
         # for i in self.filter_result:
-        #     print(i[0], " ", i[1])
+        #     print(i[0], " ", i[1])(combine_name, diffi, score, acc, level, is_fc, singal_rks)
         self.place_record()
 
-    def filte_with_condition(self, data, condition):
+    def filte_with_condition(self, song_info, condition: tuple[str, str, str]):
         (attribution, limit, limit_val) = condition
-        print(f"筛选条件:{condition}")
+        # print(f"筛选条件:{condition}")
         result = []
-        self.cname_to_name  # {combine_name:(正常名称, 曲师名称)}
+
         if attribution in (
             "曲名",
             "曲师",
@@ -2514,14 +2601,16 @@ class MainWindow(FramelessWindow):
             limit_val = limit_val.replace(
                 " ", ""
             ).lower()  # 可能是自己输入的 也可能是直接选择的
-        for songi in data:
+        for songi in song_info:
             (combine_name, diffi, score, acc, level, is_fc, singal_rks) = songi
             song_name, composer, *_ = self.cname_to_name[combine_name]
             groups: list[str] = GROUP_INFO[combine_name].split("`")
             tags: list[str] = TAG_INFO[combine_name].split("`")
             comments: str = COMMENT_INFO[combine_name][diffi]
             if attribution == "acc":
-                if limit == "大于" and acc > float(limit_val):  # 合法性判断
+                if limit == "大于" and acc > float(
+                    limit_val
+                ):  # 输入值能来到这里一定是check过合法的
                     result.append(songi)
                 elif limit == "大于等于" and acc >= float(limit_val):
                     result.append(songi)
@@ -2535,7 +2624,7 @@ class MainWindow(FramelessWindow):
                     result.append(songi)
 
             elif attribution == "单曲rks":
-                if limit == "大于" and singal_rks > float(limit_val):  # 合法性判断
+                if limit == "大于" and singal_rks > float(limit_val):
                     result.append(songi)
                 elif limit == "大于等于" and singal_rks >= float(limit_val):
                     result.append(songi)
@@ -2549,7 +2638,7 @@ class MainWindow(FramelessWindow):
                     result.append(songi)
 
             elif attribution == "得分":
-                if limit == "大于" and score > int(limit_val):  # 合法性判断
+                if limit == "大于" and score > int(limit_val):
                     result.append(songi)
                 elif limit == "大于等于" and score >= int(limit_val):
                     result.append(songi)
@@ -2563,7 +2652,7 @@ class MainWindow(FramelessWindow):
                     result.append(songi)
 
             elif attribution == "定数":
-                if limit == "大于" and level > float(limit_val):  # 合法性判断
+                if limit == "大于" and level > float(limit_val):
                     result.append(songi)
                 elif limit == "大于等于" and level >= float(limit_val):
                     result.append(songi)
@@ -2576,13 +2665,14 @@ class MainWindow(FramelessWindow):
                 elif limit == "不等于" and level != float(limit_val):
                     result.append(songi)
 
-            elif attribution == "评级":  # ["AP", "FC", "V", "S", "A", "B", "C", "F"]
+            elif attribution == "评级":  # ["phi", "蓝V", "V", "S", "A", "B", "C", "F"]
                 score_level = get_score_level(int(score), is_fc).value
+                # print(f'score_level={score_level}, 输入={limit_val}')
                 if limit == "等于" and score_level == limit_val:
                     result.append(songi)
                 elif limit == "不等于" and score_level != limit_val:
                     result.append(songi)
-                elif limit == "包含" and limit_val in score_level:
+                elif limit == "包含" and limit_val in score_level:  # 蓝V和V
                     result.append(songi)
                 elif limit == "不包含" and limit_val not in score_level:
                     result.append(songi)
@@ -2658,55 +2748,85 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in comments:
                     result.append(songi)
 
-        # for i in result:
-        #     print(i[0] + i[1])
         return result
 
     def filter_from_previous_song(self):
-        if not hasattr(self, "filter_result"):
-            print("要先全局筛选一遍才可以从结果中继续筛选喵")
+        if not self.token:
+            InfoBar.warning(
+                title="用户未登录",
+                content="请先回到账号页面进行授权喵！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            self.switch_to(self.account_page)
             return
-        print("进入筛选喵")
+        if not hasattr(self, "filter_result"):
+            InfoBar.warning(
+                title="筛选流程错误",
+                content="要先全局筛选一遍才可以从结果中继续筛选喵",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            return
         filter_obj_list = self.widgets["search_page"]["filter_obj_list"]
         logical_link = filter_obj_list[0].logical_cbb.get_content()
-        # self.filter_result
-        # print(f"逻辑{logical_link}")
-        filter_result_copy = self.filter_result
-        is_first = True
+        filter_result_copy = self.filter_result.copy()
+        if logical_link != "并且(与)":
+            self.filter_result = set()
+        if not logical_link and len(filter_obj_list) > 1:
+            InfoBar.warning(
+                title="连接逻辑有误",
+                content="有多个筛选条件但未选择连接逻辑",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            return
+        if len(filter_obj_list) == 1:  # 强制置空
+            logical_link = ""
         for filter_obji in filter_obj_list:
             conditioni = filter_obji.get_all_condition()
-            print(conditioni)
-            if not logical_link and len(filter_obj_list) > 1:
-                print(f"逻辑链接不对啊!有好多个控件但是怎么逻辑是空呢?")
-                return
-            if len(filter_obj_list) == 1:  # 强制置空
-                logical_link = ""
-            if logical_link == "并且(与)":  # 与 &&
+            # print(conditioni)
+            if logical_link == "并且(与)":
                 self.filter_result = set(
                     self.filte_with_condition(self.filter_result, conditioni)
-                )  # && 的参数传入的就是要被筛选的部分 会删除掉一些东西 直接覆盖就好
-            else:  # 空 或 ||
-                if is_first:
-                    self.filter_result = set()
-                    is_first = False
+                )
+            else:
                 result_list = self.filte_with_condition(filter_result_copy, conditioni)
-                print("结果", result_list)
+                # print("结果", result_list)
                 for resulti in result_list:
                     self.filter_result.add(resulti)  # || 运算只会加入其他东西
-        # for i in self.filter_result:
-        #     print(i[0], " ", i[1])
+
         self.place_record()
 
-    def reset_page(self):
+    def reset_filter_result(self):
         filter_obj_list: list[filter_obj] = self.widgets["search_page"][
             "filter_obj_list"
         ]
-        filter_obj_list[0].add_btn.show()
-        for idx in range(1, len(filter_obj_list)):
+        # print(filter_obj_list)
+        for idx in range(1, len(filter_obj_list)):  # 下标为0的留着
             filter_obj_list[idx].deleteLater()
-        filter_obj_list = [filter_obj_list[0]]
-        filter_obj_list[0].filter_obj_list = filter_obj_list
-        # print(filter_obj_list[0].filter_obj_list)
+            # print('delete')
+        filter_obj_list = filter_obj_list[:1:]  # 只留第一个 还原
+        basic_filter_obj = filter_obj_list[0]
+        self.widgets["search_page"]["filter_obj_list"] = filter_obj_list
+        basic_filter_obj.filter_obj_list = filter_obj_list  # filter_obj类需要这个数据来判断增删条件的时候是否需要隐藏删除按钮
+        basic_filter_obj.add_btn.show()  # 条件筛选部分加上添加条件的按钮
+        basic_filter_obj.attribution_choose_cbb.set_current_choose(0)
+        basic_filter_obj.limit_choose_cbb.set_current_choose(0)
+        basic_filter_obj.limit_choose_cbb.set_content(NUMERIC_COMPARATORS)
+        basic_filter_obj.limit_val_cbb.clear_text()
+        basic_filter_obj.limit_val_cbb.clear_completer()
+        basic_filter_obj.logical_cbb.set_current_choose(0)
+
         self.filter_result = set()
         for song_cardi in self.widgets["search_page"][
             "song_cards"
@@ -2716,19 +2836,37 @@ class MainWindow(FramelessWindow):
 
     def place_record(self):
         if not hasattr(self, "filter_result"):
-            print("要先全局筛选一遍才可以布局喵")
+            InfoBar.warning(
+                title="筛选流程错误",
+                content="要先全局筛选一遍才可以从开始布局喵",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
             return
         if not self.filter_result:
-            print("无匹配的歌曲喵")
+            InfoBar.info(
+                title="筛选结果提示",
+                content="没有符合要求的歌曲喵 换个条件试试吧",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=window,
+            )
             return
-        group_by = self.widgets["search_page"]["group_by"].get_content()
-        sort_by = self.widgets["search_page"]["sort_by"].get_content()
-        is_reversed = self.widgets["search_page"]["sort_result_reverse_btn"].isChecked()
-        print(
-            f"分组依据{group_by} 组内排序依据{sort_by}，清除{len(self.widgets["search_page"][
-            "song_cards"
-        ])}个控件"
-        )
+        group_by: str = self.widgets["search_page"]["group_by"].get_content()
+        sort_by: str = self.widgets["search_page"]["sort_by"].get_content()
+        is_reversed: bool = self.widgets["search_page"][
+            "sort_result_reverse_btn"
+        ].isChecked()
+        # print(
+        #     f"分组依据{group_by} 组内排序依据{sort_by}，清除{len(self.widgets["search_page"][
+        #     "song_cards"
+        # ])}个控件"
+        # )
         for song_cardi in self.widgets["search_page"][
             "song_cards"
         ]:  # 先清除掉上一次布局的所有东西
@@ -2739,15 +2877,15 @@ class MainWindow(FramelessWindow):
             "result_display_flow_layout"
         ]
         visited_folder: dict[str, list[folder, list[tuple[str, song_info_card]]]] = {}
+        # visited_folder[分组依据值][folder控件, [(排序依据值, 歌曲卡片控件), ()...]]
         empty_sort_list: list[tuple[str, song_info_card]] = []
         for songi in self.filter_result:
-            # combine_name, diffi, score, acc, level, is_fc, singal_rks
             combine_name, diffi, score, acc, level, is_fc, singal_rks = songi
             score_level = get_score_level(int(score), is_fc)
 
             sort_rely = None  # 默认无
-            if sort_by == "acc":
-                sort_rely = float(acc)
+            if sort_by == "acc":  # 排序依据说明
+                sort_rely = float(acc)  # 排序依据值
             elif sort_by == "单曲rks":
                 sort_rely = float(singal_rks)
             elif sort_by == "得分":
@@ -2775,75 +2913,82 @@ class MainWindow(FramelessWindow):
                 combine_name,
             )
             song_cardi.right_func = self.link_and_show
-            selected_group = GROUP_INFO[combine_name].split("`")
+            selected_group: list[str] = GROUP_INFO[combine_name].split("`")
             # print(f'当前歌曲已经存在的分组是:{selected_group}')
 
-            selected_tag = TAG_INFO[combine_name].split("`")
+            selected_tag: list[str] = TAG_INFO[combine_name].split("`")
             # print(f'当前歌曲已经存在的分组是:{selected_tag}')
 
-            now_comment = COMMENT_INFO[combine_name][diffi]
+            now_comment: str = COMMENT_INFO[combine_name][diffi]
             song_cardi.set_edited_info(selected_group, selected_tag, now_comment)
             self.widgets["search_page"]["song_cards"].append(song_cardi)
 
-            if group_by == "曲名":
-                title = self.cname_to_name[combine_name][0]
-                # print(f'title={title}, {type(title)}')
-                key = combine_name
+            if group_by == "曲名":  # 分组依据说明
+                title = self.cname_to_name[combine_name][0]  # 分组标题 (正常名称)
+                group_rely = combine_name  # 分组依据值 (组合名称)
             elif group_by == "曲师":
                 title = self.cname_to_name[combine_name][1]
-                key = title
+                group_rely = title
             elif group_by == "画师":
                 title = self.cname_to_name[combine_name][2]
-                key = title
+                group_rely = title
             elif group_by == "谱师":
                 title = self.cname_to_name[combine_name][3][diffi]
-                key = title
+                group_rely = title
             elif group_by == "难度":
                 title = diffi
-                key = title
+                group_rely = title
             elif group_by == "评级":
                 title = score_level.value
-                key = title
+                group_rely = title
             elif group_by == "分组":
                 title = GROUP_INFO[combine_name].split("`")
-                key = title
+                group_rely = title
             elif group_by == "标签":
                 title = TAG_INFO[combine_name].split("`")
-                key = title
+                group_rely = title
 
-            if group_by != "无":
-                if group_by in ("分组", "标签"):
+            if group_by != "无":  # 需要分组 必须要用字典才能存
+                if group_by in (
+                    "分组",
+                    "标签",
+                ):  # 分组 标签是很多值 每个部分都要独立筛一遍
                     for index in range(len(title)):
                         # print('title[index]=',title[index])
                         if (
-                            visited_folder.get(key[index], None) is None
+                            visited_folder.get(group_rely[index], None) is None
                         ):  # 还没有记录[index]
                             song_folderi = folder(title[index], expend=True)
                             self.widgets["search_page"]["song_cards"].append(
                                 song_folderi
                             )
-                            visited_folder[key[index]] = [song_folderi, []]  # 初始化
+                            visited_folder[group_rely[index]] = [
+                                song_folderi,
+                                [],
+                            ]  # 初始化
                             result_display_flow_layout.addWidget(song_folderi)
-                        visited_folder[key[index]][1].append((sort_rely, song_cardi))
+                        visited_folder[group_rely[index]][1].append(
+                            (sort_rely, song_cardi)
+                        )
                         self.widgets["search_page"]["song_cards"].append(song_cardi)
                 else:
-                    if visited_folder.get(key, None) is None:  # 还没有记录
+                    if visited_folder.get(group_rely, None) is None:  # 还没有记录
                         song_folderi = folder(title, expend=True)
                         self.widgets["search_page"]["song_cards"].append(song_folderi)
-                        visited_folder[key] = [song_folderi, []]  # 初始化
+                        visited_folder[group_rely] = [song_folderi, []]  # 初始化
                         result_display_flow_layout.addWidget(song_folderi)
-                    visited_folder[key][1].append((sort_rely, song_cardi))
+                    visited_folder[group_rely][1].append((sort_rely, song_cardi))
                     self.widgets["search_page"]["song_cards"].append(song_cardi)
-            else:
+            else:  # 不需要分组 list存就够了
                 empty_sort_list.append((sort_rely, song_cardi))
-                self.widgets["search_page"]["song_cards"].append(
-                    song_cardi
-                )  # 直接加在song_cards里面
-
-        if group_by != "无":
+                self.widgets["search_page"]["song_cards"].append(song_cardi)
+        # visited_folder[分组依据值][folder控件, [(排序依据值, 歌曲卡片控件), ()...]]
+        if (
+            group_by != "无"
+        ):  # 无匹配歌曲的情况一进函数就判断了 能进来必然是有匹配的 无需特判
             for itemi in visited_folder.values():
                 folderi, cards = itemi
-                if cards[0][0]:
+                if cards[0][0]:  # 有排序依据才排序
                     cards = sorted(cards, key=lambda x: x[0], reverse=is_reversed)
                 for _, cardi in cards:
                     folderi.add_widget(cardi)
@@ -2855,21 +3000,49 @@ class MainWindow(FramelessWindow):
             for _, cardi in empty_sort_list:
                 result_display_flow_layout.addWidget(cardi)
 
+        InfoBar.success(
+            title="筛选结果提示",
+            content=f"{len(self.widgets["search_page"]["song_cards"])}条筛选结果布局完成!",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=window,
+        )
+
     # --------------- 账号页面 -------------------
     def init_account_page(self) -> QWidget:
         self.widgets["account_page"] = {}
         widget = QWidget()
         self.widgets["account_page"]["widget"] = widget
 
-        layout = QVBoxLayout(widget)  # 纵向布局
-        widget.setLayout(layout)
+        layout = QVBoxLayout(widget)
         self.widgets["account_page"]["layout"] = layout
-
+        widget.setLayout(layout)
+        if self.avatar:
+            original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
+            # 使用QFluentWidgets的AvatarWidget显示
+            avatar = AvatarWidget(original_pixmap, widget)
+            avatar.setFixedSize(110, 110)
+            avatar.show()
         QRcode_img = ImageLabel(QRCODE_EMPTY_IMG_PATH)  # 空二维码
+        QRcode_img.setFixedSize(410, 410)
+        # 2. 保持长宽比缩放图片
+        pixmap = QPixmap(QRCODE_EMPTY_IMG_PATH)
+        pixmap = pixmap.scaled(
+            410,
+            410,
+            Qt.KeepAspectRatioByExpanding,  # 保持长宽比（扩展填充）
+            Qt.SmoothTransformation,  # 平滑缩放
+        )
+
+        # 3. 居中显示（避免拉伸变形）
+        QRcode_img.setAlignment(Qt.AlignCenter)
+        QRcode_img.setPixmap(pixmap)
         self.widgets["account_page"]["QRcode_img"] = QRcode_img
         self.widgets["account_page"]["layout"].addWidget(QRcode_img)
 
-        login_confirm_btn = button("点击这里进行授权")
+        login_confirm_btn = button("点击这里开始授权")
         login_confirm_btn.bind_click_func(self.check_login_status)
         self.widgets["account_page"]["login_confirm_btn"] = login_confirm_btn
         layout.addWidget(login_confirm_btn)
@@ -2921,11 +3094,19 @@ class MainWindow(FramelessWindow):
                 file.write(Token["sessionToken"])
             print(f"已输出.userdata文件到当前目录！")
             print(f'你的sessionToken为：{Token["sessionToken"]}')
+            self.avatar = self.save_dict["user"]["avatar"]
+            original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
+            # 使用QFluentWidgets的AvatarWidget显示
+            avatar = AvatarWidget(
+                original_pixmap, self.widgets["account_page"]["widget"]
+            )
+            avatar.setFixedSize(100, 100)
+            avatar.show()
             self.token = Token["sessionToken"]
             self.widgets["account_page"]["QRcode_img"].hide()
             self.widgets["account_page"]["login_confirm_btn"].hide()
             self.widgets["account_page"]["log_out_btn"].show()
-            # self.switch_to(self.home_page)
+            self.switch_to(self.home_page)
         else:
             print("二维码登录未授权...")
 
@@ -2939,11 +3120,13 @@ class MainWindow(FramelessWindow):
 
 
 if __name__ == "__main__":
+    # 确保在所有DPI设置的显示器上 界面比例协调
     QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )  # 等比缩放窗口 保证图标大小合适
+    )
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

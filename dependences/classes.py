@@ -91,11 +91,14 @@ class combobox(QWidget):  # 重写combobox控件
         self.cbb.clear()
         self.cbb.addItems(new_content)
 
-    def get_content(self):
+    def get_content(self) -> str:
         return self.cbb.currentText()
 
     def bind_react_click_func(self, func):
         self.cbb.currentTextChanged.connect(func)
+
+    def set_current_choose(self, index: int):
+        self.cbb.setCurrentIndex(index)
 
 
 class editable_combobox(QWidget):
@@ -705,12 +708,14 @@ class song_info_card(QWidget):
         return card
 
     def set_edited_info(
-        self, group: list[str], tag: list[str], comment
+        self, group: list[str], tag: list[str], comment: str
     ):  # 布局/更新 分组标签简评信息
+        if "" in tag:
+            tag = tag.remove("")
         if tag:
             tag[0] = "#" + tag[0]
         self.group_label.content_label.setText("、".join(group))
-        self.tag_label.content_label.setText(" #".join(tag))
+        self.tag_label.content_label.setText(" #".join(tag) if tag else "")
         self.comment_label.content_label.setText(comment)
 
 
@@ -1035,7 +1040,7 @@ class filter_obj(QWidget):
 
         return True
 
-    def get_all_condition(self):  # 组合并返回当前的所有限制条件
+    def get_all_condition(self) -> tuple[str, str, str]:  # 组合并返回当前的所有限制条件
         attribution = self.attribution_choose_cbb.get_content()
         limit = self.limit_choose_cbb.get_content()
         limit_val = self.limit_val_cbb.get_content()
@@ -1045,7 +1050,14 @@ class filter_obj(QWidget):
 
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from qfluentwidgets import EditableComboBox, CheckBox, ListWidget, RoundMenu, ScrollArea
+from qfluentwidgets import (
+    EditableComboBox,
+    CheckBox,
+    ListWidget,
+    RoundMenu,
+    ScrollArea,
+    FlyoutAnimationType,
+)
 
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from qfluentwidgets import (
