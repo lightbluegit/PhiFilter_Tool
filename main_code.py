@@ -1530,20 +1530,27 @@ from qfluentwidgets import (
     InfoBar,
     InfoBarPosition,
     AvatarWidget,
-    NavigationTreeWidget,
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
-import heapq  # 大根堆算b27
+import heapq  # 算rks组成
+import time
 
+
+QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+)
+QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
+QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+app = QApplication(sys.argv)
 from dependences.classes import *
-
 
 class MainWindow(FramelessWindow):
     def __init__(self):
         super().__init__()
 
         self.avatar = ""
+        self.save_dict = {}
         self.token = ""  # 玩家的token
         self.widgets: dict[str : dict[str:Any]] = {}  # 管理每个页面的控件
         """self.widgets[页面名称][页面控件名称]=控件"""
@@ -1560,6 +1567,8 @@ class MainWindow(FramelessWindow):
             {"EZ": EZ难度谱师, "HD": HD难度谱师, "IN": IN难度谱师}
         )
         """
+        self.all_song_card: dict[str, dict[str, song_info_card]] = {}
+        """self.all_song_card[组合曲名][难度]=歌曲卡片控件"""
 
         # 设置窗口标题
         self.setTitleBar(StandardTitleBar(self))
@@ -1598,27 +1607,121 @@ class MainWindow(FramelessWindow):
         self.widgets["basepage"]["content_widget"] = content_widget
         main_layout.addWidget(content_widget, 1)
 
-        self.init_font()
+        with open(TOKEN_PATH, "r") as token_file:
+            self.token = token_file.readline()
+
+        # self.init_font()
         self.generate_cname_to_name_info()
         self.widgets["basepage"]["sub_interface"] = []
         self.init_all_pages()
+
+        if self.token:
+            self.get_save_data()
+            self.avatar = self.save_dict["user"]["avatar"]
+            # print(self.avatar)
+            original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
+            avatar = AvatarWidget(
+                original_pixmap, self.widgets["account_page"]["widget"]
+            )
+            self.widgets["account_page"]["avatar"] = avatar
+            avatar.setFixedSize(100, 100)
+            avatar.show()
+
         self.init_navigation()
         if self.token:
             self.switch_to(self.home_page)
         else:
             self.switch_to(self.account_page)
 
-    def init_font(self):
-        """初始化中英文对应字体"""
-        en_font_id = QFontDatabase.addApplicationFont(EN_FONT1)
-        self.en_font_family = DEFAULT_EN_FONT
-        if en_font_id != -1:
-            self.en_font_family = QFontDatabase.applicationFontFamilies(en_font_id)[0]
+    def get_save_data(self):
+        """获取玩家的存档信息并缓存好所有的歌曲卡片"""
+        times = time.time()
+        with PhigrosCloud(self.token) as cloud:
+            # 获取玩家summary喵
+            summary = cloud.getSummary()
+            # print('summary是',summary)
+            # 获取并解析存档喵
+            save_data = cloud.getSave(summary["url"], summary["checksum"])
+            # print('save数据是:', save_data)
+            self.save_dict = unzipSave(save_data)
+            # print("unzipSavesave_dict是这个",self.save_dict)
+            self.save_dict = decryptSave(self.save_dict)
+            # print("decryptSave得到的是这个东西喵",self.save_dict)
+            self.save_dict = formatSaveDict(self.save_dict)
+            # print("save_dict是这个", self.save_dict)
 
-        chi_font_id = QFontDatabase.addApplicationFont(EN_FONT1)
-        self.chi_font_family = DEFAULT_CN_FONT
-        if chi_font_id != -1:
-            self.chi_font_family = QFontDatabase.applicationFontFamilies(chi_font_id)[0]
+        df = pd.read_csv(
+            DIFFICULTY_PATH,
+            sep="\t",
+            header=None,
+            encoding="utf-8",
+            names=["song_name", "EZ", "HD", "IN", "AT"],  # 手动定义所有列名
+        )
+        # 处理缺失值（如果某些行不足5列）
+        df = df.fillna("")  # 将NaN替换为空字符串+
+        # 转换为目标字典格式
+        result: dict[str, dict[str, str]] = {}
+        """result[组合名称]={'EZ':EZ定数, 'HD':HD定数, 'IN':IN定数, 'AT':AT定数}"""
+
+        for _, row in df.iterrows():
+            name = row["song_name"]  # 使用iloc获取第一列（名称）
+            diff_map: dict[str, str] = {
+                "EZ": row["EZ"],
+                "HD": row["HD"],
+                "IN": row["IN"],
+            }
+            diff_AT = row["AT"]
+            if diff_AT:
+                diff_map["AT"] = row["AT"]
+
+            result[name] = diff_map
+        self.all_song_card = {}  # 清除上一次的所有记录
+        idx = 1
+        for combine_name, all_diff_dic in self.save_dict["gameRecord"].items():
+            for diffi, items in all_diff_dic.items():
+                if diffi == "Legacy":
+                    continue
+                score = items["score"]
+                acc = items["acc"]
+                is_fc = items["fc"]
+                level = float(result[combine_name][diffi])
+                singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
+                acc = round(float(items["acc"]), 3)
+                (song_name, composer, drawer, chapter_dic) = self.cname_to_name[
+                    combine_name
+                ]
+
+                song_cardi = song_info_card(
+                    ILLUSTRATION_PREPATH + combine_name + ".png",
+                    song_name,
+                    singal_rks,
+                    acc,
+                    level,
+                    diffi,
+                    is_fc,
+                    int(score),
+                    0,
+                    composer,
+                    chapter_dic[diffi],
+                    drawer,
+                    False,
+                    combine_name,
+                )
+                song_cardi.right_func = self.link_and_show
+                selected_group = GROUP_INFO[combine_name].split("`")
+                # print(f'当前歌曲已经存在的分组是:{selected_group}')
+
+                selected_tag = TAG_INFO[combine_name].split("`")
+                # print(f'当前歌曲已经存在的标签是:{selected_tag}')
+
+                now_comment = COMMENT_INFO[combine_name][diffi]
+                song_cardi.set_edited_info(selected_group, selected_tag, now_comment)
+                if self.all_song_card.get(combine_name) is None:
+                    self.all_song_card[combine_name] = {}
+                self.all_song_card[combine_name][diffi] = song_cardi
+                print(idx)
+                idx += 1
+        print("用时", time.time() - times)
 
     def generate_cname_to_name_info(self):
         """生成self.cname_to_name信息\n
@@ -1805,7 +1908,6 @@ class MainWindow(FramelessWindow):
 
     def generate_b27_phi3(self):
         """计算rks组成"""
-        # 暂时略过
         if not self.token:
             InfoBar.warning(
                 title="用户未登录",
@@ -1818,118 +1920,100 @@ class MainWindow(FramelessWindow):
             )
             self.switch_to(self.account_page)
             return
-        with PhigrosCloud(self.token) as cloud:
-            # 获取玩家summary喵
-            summary = cloud.getSummary()
-            # print('summary是',summary)
-            # 获取并解析存档喵
-            save_data = cloud.getSave(summary["url"], summary["checksum"])
-            self.save_dict = unzipSave(save_data)
-            # print("save_dict是这个",self.save_dict)
-            self.save_dict = decryptSave(self.save_dict)
-            # print("最后得到的是这个东西喵",self.save_dict)
-            self.save_dict = formatSaveDict(self.save_dict)
-            # print("save_dict是这个", self.save_dict)
+        # self.get_save_data()
 
-            self.avatar = self.save_dict["user"]["avatar"]
-            original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
-            # 使用QFluentWidgets的AvatarWidget显示
-            avatar = AvatarWidget(
-                original_pixmap, self.widgets["account_page"]["widget"]
-            )
-            avatar.setFixedSize(100, 100)
-            avatar.show()
-            # self.save_dict
+        df = pd.read_csv(
+            DIFFICULTY_PATH,
+            sep="\t",
+            header=None,
+            encoding="utf-8",
+            names=["song_name", "EZ", "HD", "IN", "AT"],  # 手动定义所有列名
+        )
+        # 处理缺失值（如果某些行不足5列）
+        df = df.fillna("")  # 将NaN替换为空字符串+
+        # 转换为目标字典格式
+        result: dict[str, dict[str, str]] = {}
+        """result[组合名称]={'EZ':EZ定数, 'HD':HD定数, 'IN':IN定数, 'AT':AT定数}"""
 
-            df = pd.read_csv(
-                DIFFICULTY_PATH,
-                sep="\t",
-                header=None,
-                encoding="utf-8",
-                names=["song_name", "EZ", "HD", "IN", "AT"],  # 手动定义所有列名
-            )
+        for _, row in df.iterrows():
+            name = row["song_name"]  # 使用iloc获取第一列（名称）
+            diff_map: dict[str, str] = {
+                "EZ": row["EZ"],
+                "HD": row["HD"],
+                "IN": row["IN"],
+            }
+            diff_AT = row["AT"]
+            if diff_AT:
+                diff_map["AT"] = row["AT"]
 
-            # 处理缺失值（如果某些行不足5列）
-            df = df.fillna("")  # 将NaN替换为空字符串+
-            # 转换为目标字典格式
+            result[name] = diff_map
+        # print(result)
 
-            result: dict[str, dict[str, str]] = {}
-            """result[组合名称]={'EZ':EZ定数, 'HD':HD定数, 'IN':IN定数, 'AT':AT定数}"""
+        self.b27 = []
+        heapq.heapify(self.b27)  # 维护大根堆 只需要固定数量的格子 省空间
 
-            for _, row in df.iterrows():
-                name = row["song_name"]  # 使用iloc获取第一列（名称）
-                diff_map: dict[str, str] = {
-                    "EZ": row["EZ"],
-                    "HD": row["HD"],
-                    "IN": row["IN"],
-                }
-                diff_AT = row["AT"]
-                if diff_AT:
-                    diff_map["AT"] = row["AT"]
+        self.phi3 = []
+        heapq.heapify(self.phi3)
+        for combine_namei, diff_dic in self.all_song_card.items():
+            for diffi, song_cardi in diff_dic.items():
+                diffi = song_cardi.diff
+                if diffi == "Legacy":
+                    continue
+                score = song_cardi.score
+                is_fc = song_cardi.is_fc
+                acc = float(song_cardi.acc)
+                level = float(song_cardi.level)
+                singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
+                acc = round(float(acc), 3)
 
-                result[name] = diff_map
-            # print(result)
+                if len(self.b27) < 27:
+                    heapq.heappush(
+                        self.b27,
+                        (
+                            singal_rks,
+                            (combine_namei, acc, level, diffi, score, is_fc),
+                        ),
+                    )
+                else:
+                    heapq.heappushpop(
+                        self.b27,
+                        (
+                            singal_rks,
+                            (combine_namei, acc, level, diffi, score, is_fc),
+                        ),
+                    )
 
-            self.b27 = []
-            heapq.heapify(self.b27)  # 维护大根堆 只需要固定数量的格子 省空间
-
-            self.phi3 = []
-            heapq.heapify(self.phi3)
-            for combine_name, all_diff_dic in self.save_dict["gameRecord"].items():
-                for diffi, items in all_diff_dic.items():
-                    if diffi == "Legacy":
-                        continue
-                    score = items["score"]
-                    acc = items["acc"]
-                    is_fc = items["fc"]
-                    level = float(result[combine_name][diffi])
-                    singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
-                    acc = round(float(items["acc"]), 3)
-
-                    if len(self.b27) < 27:
+                if int(score) == int(1e6):  # AP了
+                    if len(self.phi3) < 3:
                         heapq.heappush(
-                            self.b27,
+                            self.phi3,
                             (
                                 singal_rks,
-                                (combine_name, acc, level, diffi, score, is_fc),
+                                (combine_namei, acc, level, diffi, score, is_fc),
                             ),
                         )
                     else:
                         heapq.heappushpop(
-                            self.b27,
+                            self.phi3,
                             (
                                 singal_rks,
-                                (combine_name, acc, level, diffi, score, is_fc),
+                                (combine_namei, acc, level, diffi, score, is_fc),
                             ),
                         )
 
-                    if int(score) == int(1e6):  # AP了
-                        if len(self.phi3) < 3:
-                            heapq.heappush(
-                                self.phi3,
-                                (
-                                    singal_rks,
-                                    (combine_name, acc, level, diffi, score, is_fc),
-                                ),
-                            )
-                        else:
-                            heapq.heappushpop(
-                                self.phi3,
-                                (
-                                    singal_rks,
-                                    (combine_name, acc, level, diffi, score, is_fc),
-                                ),
-                            )
-
-            # 不对啊 这不还要重新排一道吗??? 拿时间换空间是吧()
-            self.b27 = sorted(self.b27, key=lambda x: x[0], reverse=True)
-            self.phi3 = sorted(self.phi3, key=lambda x: x[0], reverse=True)
-            self.place_b27_phi3()
+        # 不对啊 这不还要重新排一道吗??? 拿时间换空间是吧()
+        self.b27 = sorted(self.b27, key=lambda x: x[0], reverse=True)
+        self.phi3 = sorted(self.phi3, key=lambda x: x[0], reverse=True)
+        self.place_b27_phi3()
 
     def place_b27_phi3(self):
         """布局rks组成"""
         self.widgets["place_b27_phi3_page"]["b27_widgets"] = []
         layout: QVBoxLayout = self.widgets["place_b27_phi3_page"]["main_layout"]
+
+        player_rks: float = 0
+        player_rks_label = HorizontalInfoCard("当前rks:")
+        layout.addWidget(player_rks_label, 0)
 
         phi3_folder = folder("phi3:", True)
         self.widgets["place_b27_phi3_page"]["phi3_folder"] = phi3_folder
@@ -1938,36 +2022,8 @@ class MainWindow(FramelessWindow):
         for idx, bi in enumerate(self.phi3):
             singal_rks, other = bi
             combine_name, acc, level, diff, score, is_fc = other
-
-            # score_level = self.get_score_level(int(score), is_fc)
-            (song_name, composer, drawer, chapter_dic) = self.cname_to_name[
-                combine_name
-            ]
-            phi3_cardi = song_info_card(
-                ILLUSTRATION_PREPATH + combine_name + ".png",
-                song_name,
-                singal_rks,
-                acc,
-                level,
-                diff,
-                is_fc,
-                int(score),
-                idx + 1,
-                composer,
-                chapter_dic[diff],
-                drawer,
-                False,
-                combine_name,
-            )
-            phi3_cardi.right_func = self.link_and_show
-            selected_group = GROUP_INFO[combine_name].split("`")
-            # print(f'当前歌曲已经存在的分组是:{selected_group}')
-
-            selected_tag = TAG_INFO[combine_name].split("`")
-            # print(f'当前歌曲已经存在的标签是:{selected_tag}')
-
-            now_comment = COMMENT_INFO[combine_name][diff]
-            phi3_cardi.set_edited_info(selected_group, selected_tag, now_comment)
+            player_rks += float(singal_rks)
+            phi3_cardi = self.all_song_card[combine_name][diff]
             phi3_folder.add_widget(phi3_cardi)
         # print("phi3已布局完成!")
 
@@ -1977,36 +2033,8 @@ class MainWindow(FramelessWindow):
         for idx, bi in enumerate(self.b27):
             singal_rks, other = bi
             combine_name, acc, level, diff, score, is_fc = other
-            # score_level = self.get_score_level(int(score), is_fc)
-
-            (song_name, composer, drawer, chapter_dic) = self.cname_to_name[
-                combine_name
-            ]
-            b27_cardi = song_info_card(
-                ILLUSTRATION_PREPATH + combine_name + ".png",
-                song_name,
-                singal_rks,
-                acc,
-                level,
-                diff,
-                is_fc,
-                int(score),
-                idx + 1,
-                composer,
-                chapter_dic[diff],
-                drawer,
-                False,
-                combine_name,
-            )
-            b27_cardi.right_func = self.link_and_show
-            selected_group = GROUP_INFO[combine_name].split("`")
-            # print(f'当前歌曲已经存在的分组是:{selected_group}')
-
-            selected_tag = TAG_INFO[combine_name].split("`")
-            # print(f'当前歌曲已经存在的分组是:{selected_tag}')
-
-            now_comment = COMMENT_INFO[combine_name][diff]
-            b27_cardi.set_edited_info(selected_group, selected_tag, now_comment)
+            player_rks += float(singal_rks)
+            b27_cardi = self.all_song_card[combine_name][diff]
             b27_folder.add_widget(b27_cardi)
         # print("b27已布局完成!")
         InfoBar.success(
@@ -2018,6 +2046,18 @@ class MainWindow(FramelessWindow):
             duration=2000,
             parent=window,
         )
+
+        label_style = """
+            font-size: 24px;
+            font-family:"楷体";
+            color: #333;
+            background: transparent;
+        """
+        player_rks = round(player_rks / 30, 4)
+        rks_content_elm = BodyLabel(str(player_rks))
+        rks_content_elm.setStyleSheet(label_style)
+        rks_content_elm.setWordWrap(True)
+        player_rks_label.add_widget(rks_content_elm)
 
         self.switch_to(self.place_b27_phi3_page)
 
@@ -2056,6 +2096,7 @@ class MainWindow(FramelessWindow):
         self.widgets["edit_info_page"]["display_layout"] = display_layout
         display_widget.setLayout(display_layout)
 
+        # print('intro')
         example_song = song_info_card(  # 占位
             ILLUSTRATION_PREPATH + "introduction.png",
             "introduction",
@@ -2072,6 +2113,7 @@ class MainWindow(FramelessWindow):
             True,
             "introduction",
         )
+        # print('结束')
         self.widgets["edit_info_page"]["song_info_card"] = example_song
         display_layout.addWidget(example_song)
         example_song.set_edited_info(["分组1、分组2"], ["此处为标签"], "此处为简评内容")
@@ -2489,56 +2531,56 @@ class MainWindow(FramelessWindow):
             )
             self.switch_to(self.account_page)
             return
-        with PhigrosCloud(self.token) as cloud:
-            # 获取玩家summary喵
-            summary = cloud.getSummary()
-            # print(summary)
-            # 获取并解析存档喵
-            save_data = cloud.getSave(summary["url"], summary["checksum"])
-            save_dict = unzipSave(save_data)
-            # print("最后得到的是这个东西喵",save_dict)
-            save_dict = decryptSave(save_dict)
-            # print("最后得到的是这个东西喵",save_dict)
-            save_dict = formatSaveDict(save_dict)
-            # print("最后得到的是这个东西喵", save_dict)
+        # self.get_save_data()
 
-            df = pd.read_csv(
-                DIFFICULTY_PATH,
-                sep="\t",
-                header=None,
-                encoding="utf-8",
-                names=["song_name", "EZ", "HD", "IN", "AT"],  # 手动定义所有列名
-            )
+        df = pd.read_csv(
+            DIFFICULTY_PATH,
+            sep="\t",
+            header=None,
+            encoding="utf-8",
+            names=["song_name", "EZ", "HD", "IN", "AT"],  # 手动定义所有列名
+        )
 
-            # 处理缺失值（如果某些行不足5列）
-            df = df.fillna("")  # 将NaN替换为空字符串+
-            # 转换为目标字典格式
-            result = {}
-            for _, row in df.iterrows():
-                name = row.iloc[0]  # 使用iloc获取第一列（名称）
-                diffs = [x for x in row.iloc[1:] if x != ""]  # 使用iloc获取后续列
-                result[name] = diffs
-            # print(result)
+        # 处理缺失值（如果某些行不足5列）
+        df = df.fillna("")  # 将NaN替换为空字符串+
+        # 转换为目标字典格式
+        result = {}
+        for _, row in df.iterrows():
+            name = row.iloc[0]  # 使用iloc获取第一列（名称）
+            diffs = [x for x in row.iloc[1:] if x != ""]  # 使用iloc获取后续列
+            result[name] = diffs
+        # print(result)
 
-            all_song_info = []
-            diff_map = {"EZ": 0, "HD": 1, "IN": 2, "AT": 3}
-            for combine_name, all_diff_dic in save_dict["gameRecord"].items():
-                for diffi, items in all_diff_dic.items():
-                    if diffi == "Legacy":
-                        continue
-                    score = items["score"]
-                    acc = items["acc"]
-                    is_fc = items["fc"]
-                    level = 0
-                    try:
-                        level = float(result[combine_name][diff_map[diffi]])
-                    except:
-                        print(combine_name, diffi)
-                    singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
-                    acc = round(float(items["acc"]), 3)
-                    all_song_info.append(
-                        (combine_name, diffi, score, acc, level, is_fc, singal_rks)
-                    )
+        all_song_info = []
+        diff_map = {"EZ": 0, "HD": 1, "IN": 2, "AT": 3}
+        for combine_namei, diff_dic in self.all_song_card.items():
+            for diffi, song_cardi in diff_dic.items():
+                diffi = song_cardi.diff
+                if diffi == "Legacy":
+                    continue
+                score = song_cardi.score
+                is_fc = song_cardi.is_fc
+                acc = float(song_cardi.acc)
+                level = float(song_cardi.level)
+                singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
+                acc = round(float(acc), 3)
+                all_song_info.append(
+                    (combine_namei, diffi, score, acc, level, is_fc, singal_rks)
+                )
+        # for combine_name, all_diff_dic in self.save_dict["gameRecord"].items():
+        #     for diffi, items in all_diff_dic.items():
+        #         if diffi == "Legacy":
+        #             continue
+        #         score = items["score"]
+        #         acc = items["acc"]
+        #         is_fc = items["fc"]
+        #         level = 0
+        #         try:
+        #             level = float(result[combine_name][diff_map[diffi]])
+        #         except:
+        #             print(combine_name, diffi)
+        #         singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
+        #         acc = round(float(items["acc"]), 3)
 
         filter_obj_list: list[filter_obj] = self.widgets["search_page"][
             "filter_obj_list"
@@ -2603,7 +2645,7 @@ class MainWindow(FramelessWindow):
             ).lower()  # 可能是自己输入的 也可能是直接选择的
         for songi in song_info:
             (combine_name, diffi, score, acc, level, is_fc, singal_rks) = songi
-            song_name, composer, *_ = self.cname_to_name[combine_name]
+            song_name, composer, drawer, chapter_dic = self.cname_to_name[combine_name]
             groups: list[str] = GROUP_INFO[combine_name].split("`")
             tags: list[str] = TAG_INFO[combine_name].split("`")
             comments: str = COMMENT_INFO[combine_name][diffi]
@@ -2701,6 +2743,7 @@ class MainWindow(FramelessWindow):
                     result.append(songi)
 
             elif attribution == "曲师":
+                composer = composer.replace(" ", "").lower()
                 if limit == "等于" and composer == limit_val:
                     result.append(songi)
                 elif limit == "不等于" and composer != limit_val:
@@ -2710,39 +2753,46 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in composer:
                     result.append(songi)
 
-            elif attribution == "谱师":
-                if limit == "等于" and diffi == limit_val:
+            elif attribution == "画师":
+                drawer = drawer.replace(" ", "").lower()
+                if limit == "等于" and drawer == limit_val:
                     result.append(songi)
-                elif limit == "不等于" and diffi != limit_val:
+                elif limit == "不等于" and drawer != limit_val:
                     result.append(songi)
-                elif limit == "包含" and limit_val in diffi:
+                elif limit == "包含" and limit_val in drawer:
                     result.append(songi)
-                elif limit == "不包含" and limit_val not in diffi:
+                elif limit == "不包含" and limit_val not in drawer:
                     result.append(songi)
 
-            elif attribution == "画师":
-                if limit == "等于" and diffi == limit_val:
+            elif attribution == "谱师":
+                chapter = chapter_dic[diffi].replace(" ", "").lower()
+                if limit == "等于" and chapter == limit_val:
                     result.append(songi)
-                elif limit == "不等于" and diffi != limit_val:
+                elif limit == "不等于" and chapter != limit_val:
                     result.append(songi)
-                elif limit == "包含" and limit_val in diffi:
+                elif limit == "包含" and limit_val in chapter:
                     result.append(songi)
-                elif limit == "不包含" and limit_val not in diffi:
+                elif limit == "不包含" and limit_val not in chapter:
                     result.append(songi)
 
             elif attribution == "分组":
+                for i in range(len(groups)):
+                    groups[i] = groups[i].replace(" ", "").lower()
                 if limit == "包含" and limit_val in groups:
                     result.append(songi)
                 elif limit == "不包含" and limit_val not in groups:
                     result.append(songi)
 
             elif attribution == "标签":
+                for i in range(len(tags)):
+                    tags[i] = tags[i].replace(" ", "").lower()
                 if limit == "包含" and limit_val in tags:
                     result.append(songi)
                 elif limit == "不包含" and limit_val not in tags:
                     result.append(songi)
 
             elif attribution == "简评":
+                comments = comments.replace(" ", "").lower()
                 if limit == "包含" and limit_val in comments:
                     result.append(songi)
                 elif limit == "不包含" and limit_val not in comments:
@@ -2846,6 +2896,7 @@ class MainWindow(FramelessWindow):
                 parent=window,
             )
             return
+        
         if not self.filter_result:
             InfoBar.info(
                 title="筛选结果提示",
@@ -2876,6 +2927,7 @@ class MainWindow(FramelessWindow):
         result_display_flow_layout = self.widgets["search_page"][
             "result_display_flow_layout"
         ]
+        self.widgets["search_page"]["scroll_content_widget"].setUpdatesEnabled(False)
         visited_folder: dict[str, list[folder, list[tuple[str, song_info_card]]]] = {}
         # visited_folder[分组依据值][folder控件, [(排序依据值, 歌曲卡片控件), ()...]]
         empty_sort_list: list[tuple[str, song_info_card]] = []
@@ -2893,47 +2945,20 @@ class MainWindow(FramelessWindow):
             elif sort_by == "定数":
                 sort_rely = float(level)
 
-            (song_name, composer, drawer, chapter_dic) = self.cname_to_name[
-                combine_name
-            ]
-            song_cardi = song_info_card(
-                ILLUSTRATION_PREPATH + combine_name + ".png",
-                song_name,
-                singal_rks,
-                acc,
-                level,
-                diffi,
-                is_fc,
-                int(score),
-                None,
-                composer,
-                chapter_dic[diffi],
-                drawer,
-                False,
-                combine_name,
-            )
-            song_cardi.right_func = self.link_and_show
-            selected_group: list[str] = GROUP_INFO[combine_name].split("`")
-            # print(f'当前歌曲已经存在的分组是:{selected_group}')
-
-            selected_tag: list[str] = TAG_INFO[combine_name].split("`")
-            # print(f'当前歌曲已经存在的分组是:{selected_tag}')
-
-            now_comment: str = COMMENT_INFO[combine_name][diffi]
-            song_cardi.set_edited_info(selected_group, selected_tag, now_comment)
+            song_cardi = self.all_song_card[combine_name][diffi]
             self.widgets["search_page"]["song_cards"].append(song_cardi)
 
             if group_by == "曲名":  # 分组依据说明
-                title = self.cname_to_name[combine_name][0]  # 分组标题 (正常名称)
+                title = song_cardi.name  # 分组标题 (正常名称)
                 group_rely = combine_name  # 分组依据值 (组合名称)
             elif group_by == "曲师":
-                title = self.cname_to_name[combine_name][1]
+                title = song_cardi.composer
                 group_rely = title
             elif group_by == "画师":
-                title = self.cname_to_name[combine_name][2]
+                title = song_cardi.drawer
                 group_rely = title
             elif group_by == "谱师":
-                title = self.cname_to_name[combine_name][3][diffi]
+                title = song_cardi.chapter
                 group_rely = title
             elif group_by == "难度":
                 title = diffi
@@ -2999,10 +3024,12 @@ class MainWindow(FramelessWindow):
                 )
             for _, cardi in empty_sort_list:
                 result_display_flow_layout.addWidget(cardi)
+                
+        self.widgets["search_page"]["scroll_content_widget"].setUpdatesEnabled(True)
 
         InfoBar.success(
             title="筛选结果提示",
-            content=f"{len(self.widgets["search_page"]["song_cards"])}条筛选结果布局完成!",
+            content=f"筛选结果布局完成!",
             orient=Qt.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -3052,16 +3079,14 @@ class MainWindow(FramelessWindow):
         self.widgets["account_page"]["log_out_btn"] = log_out_btn
         layout.addWidget(log_out_btn)
 
-        with open(TOKEN_PATH, "r") as token_file:
-            token = token_file.readline()
-            if token:
-                login_confirm_btn.hide()  # 如果已经有了token就不用再获取了
-                QRcode_img.hide()
-                self.token = token
-                # self.switch_to(self.home_page)
-                # get_token_by_qrcode()
-            else:
-                log_out_btn.hide()
+        if self.token:
+            login_confirm_btn.hide()  # 如果已经有了token就不用再获取了
+            QRcode_img.hide()
+            # self.switch_to(self.home_page)
+            # get_token_by_qrcode()
+        else:
+            log_out_btn.hide()
+
         return widget
 
     def check_login_status(self):
@@ -3084,25 +3109,23 @@ class MainWindow(FramelessWindow):
         Login_info = TapTapLogin.CheckQRCodeResult(self.QRCode_info)
         if Login_info.get("data"):
             self.login_check_timer.stop()
-            print(f"登录成功：{Login_info}")
             Profile = TapTapLogin.GetProfile(Login_info["data"])
-            print(f"获取用户资料成功：{Profile}")
             # 这里可以触发登录成功后的操作
             Token = TapTapLogin.GetUserData({**Profile["data"], **Login_info["data"]})
-            print(f"获取userdata成功：{Token}")
+            self.token = Token["sessionToken"]
             with open(TOKEN_PATH, "w") as file:
                 file.write(Token["sessionToken"])
-            print(f"已输出.userdata文件到当前目录！")
-            print(f'你的sessionToken为：{Token["sessionToken"]}')
             self.avatar = self.save_dict["user"]["avatar"]
             original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
-            # 使用QFluentWidgets的AvatarWidget显示
+            print(self.avatar)
+            # 显示用户头像
             avatar = AvatarWidget(
                 original_pixmap, self.widgets["account_page"]["widget"]
             )
+            self.widgets["account_page"]["avatar"] = avatar
             avatar.setFixedSize(100, 100)
             avatar.show()
-            self.token = Token["sessionToken"]
+
             self.widgets["account_page"]["QRcode_img"].hide()
             self.widgets["account_page"]["login_confirm_btn"].hide()
             self.widgets["account_page"]["log_out_btn"].show()
@@ -3116,18 +3139,12 @@ class MainWindow(FramelessWindow):
             self.widgets["account_page"]["QRcode_img"].show()
             self.widgets["account_page"]["login_confirm_btn"].show()
             self.widgets["account_page"]["log_out_btn"].hide()
+            avatar: AvatarWidget = self.widgets["account_page"]["avatar"]
+            avatar.deleteLater()
+            self.avatar = ""
         # 应该还要清除其他的页面
 
-
-if __name__ == "__main__":
-    # 确保在所有DPI设置的显示器上 界面比例协调
-    QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
+# 确保在所有DPI设置的显示器上 界面比例协调
+window = MainWindow()
+window.show()
+sys.exit(app.exec_())

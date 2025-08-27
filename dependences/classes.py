@@ -2,65 +2,46 @@ from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QApplication,
-    QStackedWidget,
     QFrame,
     QLabel,
     QGridLayout,
-    QToolTip,
     QCompleter,
     QListWidgetItem,
 )
-from qframelesswindow import FramelessWindow, StandardTitleBar
-from PyQt5.QtCore import (
-    Qt,
-    QUrl,
-    QTimer,
-    QMargins,
-    QStringListModel,
-    QPropertyAnimation,
-    QEasingCurve,
-)
+from PyQt5.QtCore import Qt, QStringListModel, pyqtSignal, QSize, QTimer
 from PyQt5.QtGui import (
-    QGuiApplication,
-    QDesktopServices,
     QIcon,
-    QPixmap,
-    QPainter,
     QColor,
-    QFontDatabase,
+    QPainter,
     QTextOption,
+    QPen,
 )
 from qfluentwidgets import (
     PrimaryPushButton,
     LineEdit,
     ComboBox,
     EditableComboBox,
-    FluentWindow,
-    Flyout,
-    InfoBarIcon,
-    HorizontalSeparator,
-    NavigationInterface,
-    NavigationItemPosition,
     FlowLayout,
     ElevatedCardWidget,
     CaptionLabel,
     BodyLabel,
     ImageLabel,
-    VerticalSeparator,
     ToolTipFilter,
     ToolTipPosition,
     SmoothScrollArea,
     RoundMenu,
-    IndicatorMenuItemDelegate,
     MenuAnimationType,
     TextEdit,
+    CheckBox,
+    ListWidget,
+    ScrollArea,
 )
-from PyQt5.QtCore import Qt
 from dependences.consts import *
 import re
+import random
 
 # ------------------------- 这里是重写的控件 -------------------------
+init_img = False
 
 
 class combobox(QWidget):  # 重写combobox控件
@@ -198,7 +179,7 @@ class body_label(QLabel):
         super().__init__(parent)
 
         # 1. 基础设置（保持与QFluentBodyLabel一致）
-        self.setText(text)
+        self.setText(str(text))
         self.setWordWrap(True)  # 启用自动换行
         self.setAlignment(Qt.AlignVCenter)  # 默认垂直居中
         # print(style)
@@ -280,24 +261,18 @@ class main_info_card(ElevatedCardWidget):
         score: int = None,  # 等级
         index: int = None,
         expended: bool = False,
+        combine_name: str = None,
     ):
         super().__init__()
         self.setContentsMargins(0, 0, 0, 0)  # 不要边界
         self.left_func = None
         self.imgpath = imgpath
         self.expended = expended
-        font_id = QFontDatabase.addApplicationFont(EN_FONT1)
-        en_font_family = DEFAULT_EN_FONT
-        if font_id != -1:
-            en_font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
-
-        chi_font_id = QFontDatabase.addApplicationFont(EN_FONT1)
-        chi_font_family = DEFAULT_CN_FONT
-        if chi_font_id != -1:
-            chi_font_family = QFontDatabase.applicationFontFamilies(chi_font_id)[0]
+        self.combine_name = combine_name
+        self.diff = diff
         if index:
             self.setToolTip(
-                f"""<span style="font-famliy: '{en_font_family}'; color: #3fe2ff; font-size: 20px;">NO.{index}</span>"""
+                f"""<span style=" color: #3fe2ff; font-size: 20px;">NO.{index}</span>"""
             )
         self.installEventFilter(
             ToolTipFilter(self, showDelay=300, position=ToolTipPosition.TOP)
@@ -311,15 +286,16 @@ class main_info_card(ElevatedCardWidget):
         self.top_layout.setSpacing(3)  # 设置控件之间的间距
 
         # 曲名
-        name_text = f"""
-        <html>
-            <body>
-                <span style="font-family: '{en_font_family}', '{chi_font_family}', '{DEFAULT_JP_FONT}'; font-size: 31px; color: #ffffff">{name}</span>
-            </body>
-        </html>"""
         self.song_name_label = body_label(
-            name_text,
+            name,
             self.top_widget,
+        )
+        self.song_name_label.setStyleSheet(
+            """
+        font-family:'楷体';
+        font-size: 31px;
+        color: #ffffff;
+        """
         )
         self.song_name_label.setWordWrap(True)  # 允许曲名自动换行
         self.top_layout.addWidget(
@@ -357,18 +333,17 @@ class main_info_card(ElevatedCardWidget):
         self.bottom_layout.setContentsMargins(0, 0, 0, 0)  # 不要边界
         self.bottom_layout.setSpacing(2)  # 取消控件之间的间距
         # 单曲rks
-        rks_text = f"""
-        <html>
-            <body>
-                <span style="font-family: '{en_font_family}'; font-size: 27px; color: #a7fffc">rks: </span>
-                <span style="font-size: 26px;color: #ffffff">{singal_rks}</span>
-            </body>
-        </html>"""
         self.rks_label = body_label(
-            rks_text,
+            "rks:" + str(singal_rks),
             self.bottom_widget,
         )
-        self.rks_label.setWordWrap(True)
+        self.rks_label.setStyleSheet(
+            f"""
+        font-size: 27px;
+        color: #ffffff;
+        """
+        )
+        # self.rks_label.setWordWrap(True)
         self.bottom_layout.addWidget(
             self.rks_label, 0, 0, 1, 1
         )  # (行, 列, 行跨度, 列跨度)
@@ -377,18 +352,17 @@ class main_info_card(ElevatedCardWidget):
         self.rks_label.setContentsMargins(15, 0, 0, 0)
 
         # acc
-        acc_text = f"""
-        <html>
-            <body>
-                <span style="font-family: '{en_font_family}'; font-size: 27px; color: #a7fffc">acc: </span>
-                <span style="font-size: 26px;color: #ffffff">{acc}%</span>
-            </body>
-        </html>"""
         self.acc_label = body_label(
-            acc_text,
+            "acc:" + str(acc),
             self.bottom_widget,
         )
-        self.acc_label.setWordWrap(True)
+        self.acc_label.setStyleSheet(
+            f"""
+        font-size: 26px;
+        color: #ffffff;
+        """
+        )
+        # self.acc_label.setWordWrap(True)
         self.bottom_layout.addWidget(
             self.acc_label, 0, 1, 1, 2
         )  # (行, 列, 行跨度, 列跨度)
@@ -396,19 +370,17 @@ class main_info_card(ElevatedCardWidget):
         self.acc_label.setContentsMargins(10, 0, 0, 0)
 
         # 定数
-        level_text = f"""
-        <html>
-            <body>
-                <span style="font-family: '{chi_font_family}'; font-size: 24px; color: #a7fffc">定数:</span>
-                <span style="font-size: 26px; font-family: '{en_font_family}';color: #ffffff">{diff} </span>
-                <span style="font-size: 28px;color: #ffffff">{level}</span>
-            </body>
-        </html>"""
         self.level_label = body_label(
-            level_text,
+            "定数:" + diff + " " + str(level),
             self.bottom_widget,
         )
-        self.level_label.setWordWrap(True)
+        self.level_label.setStyleSheet(
+            f"""
+        font-size: 26px;
+        color: #ffffff;
+        """
+        )
+        # self.level_label.setWordWrap(True)
         self.bottom_layout.addWidget(
             self.level_label, 1, 0, 1, 1
         )  # (行, 列, 行跨度, 列跨度)
@@ -416,31 +388,22 @@ class main_info_card(ElevatedCardWidget):
         self.level_label.setContentsMargins(15, 3, 0, 0)
 
         # 分数
-        score_text = f"""
-        <html>
-            <body>
-                <span style="font-family: '{chi_font_family}'; font-size: 23px; color: #a7fffc">分数:</span>
-                <span style="font-size: 25px;color: #ffffff">{score}</span>
-            </body>
-        </html>"""
         self.score_label = body_label(
-            score_text,
+            "分数:" + str(score),
             self.bottom_widget,
         )
-        self.score_label.setWordWrap(True)
+        self.score_label.setStyleSheet(
+            f"""
+        font-size: 25px;
+        color: #ffffff;
+        """
+        )
+        # self.score_label.setWordWrap(True)
         self.bottom_layout.addWidget(
             self.score_label, 1, 1, 1, 2
         )  # (行, 列, 行跨度, 列跨度)
         self.score_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         self.score_label.setContentsMargins(10, 3, 0, 0)
-
-        self.top_layout.setColumnStretch(0, 1)
-        self.top_layout.setColumnStretch(1, 1)
-        self.top_layout.setColumnStretch(2, 1)
-        self.top_layout.setColumnStretch(3, 1)
-        self.top_layout.setColumnStretch(4, 1)
-        self.top_layout.setRowStretch(0, 1)
-        self.top_layout.setRowStretch(1, 1)
 
         # 主布局（垂直排列）
         self.vBoxLayout = QVBoxLayout(self)
@@ -458,12 +421,9 @@ class main_info_card(ElevatedCardWidget):
 
         if self.imgpath:
             painter = QPainter(self)
-            pixmap = QPixmap(self.imgpath).scaledToWidth(
-                420, Qt.SmoothTransformation  # 平滑缩放
-            )
-            pixmap1 = QPixmap(self.bg_img_path).scaledToWidth(
-                420, Qt.SmoothTransformation
-            )
+            # print(self.combine_name)
+            pixmap = illustration_cache[self.combine_name]
+            pixmap1 = song_card_background_cache[self.diff]
             painter.drawPixmap(self.rect(), pixmap)
             painter.drawPixmap(self.rect(), pixmap1)
             painter.end()
@@ -476,11 +436,68 @@ class main_info_card(ElevatedCardWidget):
         super().mousePressEvent(event)
 
 
-class HorizontalInfoCard(QFrame):  # 改用QFrame作为基础控件
-    def __init__(self, title: str, content: str):
+class tag(PrimaryPushButton):
+    def __init__(self, text="", bg_color=None, border_width=2):
         super().__init__()
 
-        # ================= 底层背景卡片 =================
+        self.setFixedHeight(28)  # 固定高度
+        self.setCursor(Qt.PointingHandCursor)
+        bg_color_list = [
+            QColor(70, 130, 200, 60),
+            QColor(200, 100, 100, 60),
+            QColor(127, 255, 212, 60),
+            QColor(240, 255, 240, 60),
+            QColor(255, 250, 205, 60),
+        ]
+        if bg_color is None:
+            idx = random.randint(0, len(bg_color_list) - 1)
+            bg_color = bg_color_list[idx]
+            border_color = bg_color_list[idx]
+        self.bg_color = bg_color
+        self.border_width = border_width
+        self.border_color = border_color
+        self.border_color.setAlpha(255)  # 边框不透明
+
+        self.setToolTip(text)
+        self.setText(text)
+        self.setStyleSheet(
+            """
+            padding-left: 6px;
+            padding-right: 6px;
+        """
+        )
+        self.installEventFilter(ToolTipFilter(self, 200))
+        # 禁用默认按钮样式
+        self.setStyleSheet("border: none; background: transparent;")
+
+    def paintEvent(self, event):
+        """绘制跑道形状（胶囊样式）"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # 左右各缩进4像素（可根据需要调整数值）
+        rect = self.rect()
+        radius = rect.height() / 2  # 半径=高度的一半
+
+        # 绘制半透明背景
+        painter.setBrush(self.bg_color)
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(rect, radius, radius)
+
+        # 绘制边框（更凝实）
+        painter.setPen(QPen(self.border_color, self.border_width))
+        painter.setBrush(Qt.NoBrush)
+        painter.drawRoundedRect(rect, radius, radius)
+
+        # 调用父类绘制文字
+        super().paintEvent(event)
+
+
+class HorizontalInfoCard(QFrame):
+    def __init__(self, title: str):
+        super().__init__()
+
+        # ------------- 底层背景卡片 -------------
         self.setStyleSheet(
             """
             HorizontalInfoCard {
@@ -494,7 +511,7 @@ class HorizontalInfoCard(QFrame):  # 改用QFrame作为基础控件
         )
         self.setContentsMargins(0, 0, 0, 0)
 
-        # ================= 上层内容容器 =================
+        # ------------- 上层内容容器 -------------
         content_widget = QWidget()
         content_widget.setStyleSheet("background: transparent;")  # 透明背景
         layout = QHBoxLayout(content_widget)
@@ -506,7 +523,7 @@ class HorizontalInfoCard(QFrame):  # 改用QFrame作为基础控件
         self.title_label.setStyleSheet(
             """
             min-width: 60px;
-            font-size: 26px;
+            font-size: 25px;
             font-family:"楷体";
             color: #666;
             padding-right: 8px;
@@ -515,33 +532,49 @@ class HorizontalInfoCard(QFrame):  # 改用QFrame作为基础控件
             background-color: rgba(255, 255, 255, 0.85);
         """
         )
+        layout.addWidget(self.title_label)
 
         # 内容部分
-        self.content_label = BodyLabel(content)
-        self.content_label.setStyleSheet(
-            """
-            font-size: 24px;
-            font-family:"楷体";
-            color: #333;
-            margin: 0;
-            padding: 0;
-            background: transparent;
-        """
+        self.scroll_area = SmoothScrollArea()
+        layout.addWidget(self.scroll_area)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet(
+            """QScrollArea{
+            background-color: transparent; 
+            border: none;
+            max-height: 55px;
+            min-height: 55px;
+            min-width: 250px;
+            max-width: 250px;
+            }"""
         )
-        self.content_label.setWordWrap(True)
-
-        # 添加到布局
-        layout.addWidget(self.title_label)
-        layout.addWidget(self.content_label)
+        # 创建内容容器
+        self.scroll_content_widget = QWidget()
+        self.flow_layout = FlowLayout(self.scroll_content_widget)  # 使用流式布局
+        self.flow_layout.setSpacing(5)
+        self.flow_layout.setContentsMargins(0, 0, 0, 0)
+        # 设置滚动区域的内容
+        self.scroll_area.setWidget(self.scroll_content_widget)
         layout.setStretch(1, 1)
 
-        # ================= 整体布局 =================
+        # ------------- 整体布局 -------------
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(content_widget)
+        self.content_widget_list = []
+
+    def add_widget(self, widget):
+        self.content_widget_list.append(widget)
+        self.flow_layout.addWidget(widget)
 
 
 class song_info_card(QWidget):
+    """
+    改进:
+    - 延迟创建展开的详细内容（lazy build），第一次展开或在 set_edited_info 时创建
+    - 修复 set_edited_info 中使用 tags[0] 的错误 -> 改为使用当前 tagi
+    - 在创建大量卡片时能大幅降低启动开销（默认折叠时不创建大量子控件）
+    """
 
     def __init__(
         self,
@@ -561,6 +594,7 @@ class song_info_card(QWidget):
         combine_name: str = "",
     ):
         super().__init__()
+        # 保存数据
         self.imgpath = imgpath
         self.name = name
         self.singal_rks = singal_rks
@@ -573,17 +607,19 @@ class song_info_card(QWidget):
         self.composer = composer
         self.chapter = chapter
         self.drawer = drawer
-        self.is_expended = is_expended
         self.combine_name = combine_name
-        # print(self.combine_name)
 
         self.right_func = None
         self.setContentsMargins(0, 0, 0, 0)
         self.is_expended = is_expended
+        self._expanded_created = False  # 延迟标志
+
         self.mainlayout = QVBoxLayout(self)
         self.mainlayout.setSpacing(0)
         self.setMaximumHeight(405)
         self.setMaximumWidth(405)
+
+        # 主卡片（保持你现有的 main_info_card 构造）
         self.elevatedcard = main_info_card(
             imgpath,
             name,
@@ -594,67 +630,105 @@ class song_info_card(QWidget):
             is_fc,
             score,
             index,
+            combine_name=combine_name,
         )
         self.mainlayout.addWidget(self.elevatedcard)
         self.elevatedcard.left_func = self.clicked_card
 
+        # 创建占位滚动区（但不创建实际内容，内容延迟创建）
         self.scroll_area = SmoothScrollArea()
         self.mainlayout.addWidget(self.scroll_area)
-        self.scroll_area.setWidgetResizable(True)  # 关键设置
+        self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet(
-            """QScrollArea{background-color: rgba(187, 255, 255, 0.6); border: none;max-width: 400px;
-            min-width: 400px;
-            min-height: 200px;
-            max-height: 200px;}"""
+            """QScrollArea{background-color: rgba(187, 255, 255, 0.6); border: none; max-width: 400px;
+            min-width: 400px; min-height: 200px; max-height: 200px;}"""
         )
         self.setStyleSheet("QWidget{background: transparent}")
 
         if not self.is_expended:
             self.scroll_area.hide()
-        # 创建内容容器
+
+        # 不在 __init__ 创建 scroll_content_widget 的子控件（延迟）
+        self.scroll_content_widget = None
+        self.flow_layout = None
+
+        # 标签/样式预定义（重用）
+        self.label_style = """
+            font-size: 24px;
+            font-family:"楷体";
+            color: #333;
+            background: transparent;
+        """
+
+        # 如果初始状态是展开，则延迟到事件循环创建一次，避免阻塞 __init__
+        if self.is_expended:
+            QTimer.singleShot(0, self._ensure_expanded_created)
+
+    def _ensure_expanded_created(self):
+        """按需构建展开区域（只会执行一次）"""
+        if self._expanded_created:
+            return
+        self._expanded_created = True
+
+        # 内容容器
         self.scroll_content_widget = QWidget()
-        self.flow_layout = QVBoxLayout(self.scroll_content_widget)  # 使用流式布局
+        self.flow_layout = QVBoxLayout(self.scroll_content_widget)
         self.flow_layout.setSpacing(0)
         self.flow_layout.setContentsMargins(0, 0, 0, 0)
-
-        # 设置滚动区域的内容
         self.scroll_area.setWidget(self.scroll_content_widget)
-        if not self.is_expended:
-            self.scroll_content_widget.hide()
 
-        composer_label = HorizontalInfoCard("曲师:", composer)
+        # 禁用更新以批量添加控件，减少重复重绘
+        self.scroll_content_widget.setUpdatesEnabled(False)
+
+        composer_content_elm = BodyLabel(self.composer)
+        composer_content_elm.setStyleSheet(self.label_style)
+        composer_content_elm.setWordWrap(True)
+        composer_label = HorizontalInfoCard("曲师:")
+        composer_label.add_widget(composer_content_elm)
         self.flow_layout.addWidget(composer_label)
 
-        chapter_label = HorizontalInfoCard("谱师:", chapter)
+        chapter_content_elm = BodyLabel(self.chapter)
+        chapter_content_elm.setStyleSheet(self.label_style)
+        chapter_content_elm.setWordWrap(True)
+        chapter_label = HorizontalInfoCard("谱师:")
+        chapter_label.add_widget(chapter_content_elm)
         self.flow_layout.addWidget(chapter_label)
 
-        drawer_label = HorizontalInfoCard("画师:", drawer)
+        drawer_content_elm = BodyLabel(self.drawer)
+        drawer_content_elm.setStyleSheet(self.label_style)
+        drawer_content_elm.setWordWrap(True)
+        drawer_label = HorizontalInfoCard("画师:")
+        drawer_label.add_widget(drawer_content_elm)
         self.flow_layout.addWidget(drawer_label)
 
-        self.group_label = HorizontalInfoCard("分组:", "")
+        self.group_label = HorizontalInfoCard("分组:")
         self.flow_layout.addWidget(self.group_label)
 
-        self.tag_label = HorizontalInfoCard("标签:", "")
+        self.tag_label = HorizontalInfoCard("标签:")
         self.flow_layout.addWidget(self.tag_label)
 
-        self.comment_label = HorizontalInfoCard("简评:", "")
+        self.comment_label = HorizontalInfoCard("简评:")
         self.flow_layout.addWidget(self.comment_label)
+
+        self.scroll_content_widget.setUpdatesEnabled(True)
 
     def clicked_card(self):
         self.is_expended = not self.is_expended
         if not self.is_expended:
-            self.scroll_content_widget.hide()
+            if self.scroll_content_widget:
+                self.scroll_content_widget.hide()
             self.scroll_area.hide()
         else:
+            if not self._expanded_created:
+                # 延迟构建以保持响应
+                QTimer.singleShot(0, self._ensure_expanded_created)
             self.scroll_area.show()
-            self.scroll_content_widget.show()
+            if self.scroll_content_widget:
+                self.scroll_content_widget.show()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.RightButton:
-            if self.right_func:
-                self.right_func(self)
-                # print("运行函数")
-            # print("右键点击了!", self.name)
+        if event.button() == Qt.RightButton and self.right_func:
+            self.right_func(self)
         super().mousePressEvent(event)
 
     def copy(self):
@@ -675,48 +749,41 @@ class song_info_card(QWidget):
             self.combine_name,
         )
 
-    def create_info_card(self, title: str, content: str):
-        card = QWidget()
-        card.setStyleSheet(
-            """
-            background-color: rgba(255, 255, 255, 0.85);
-            border-radius: 8px;
-            padding: 8px;
-            margin: 4px 0;
+    def set_edited_info(self, group: list[str], tags: list[str], comment: str):
         """
-        )
-        layout = QHBoxLayout(card)
-
-        # 标题（带下划线）
-        title_label = CaptionLabel(title)
-        title_label.setStyleSheet(
-            """
-            font-size: 14px;
-            color: #666;
-            border-bottom: 1px solid #EEE;
-            padding-bottom: 4px;
-            margin-bottom: 6px;
+        在确保展开区已创建后批量添加分组/标签/简评，并解决 tags[0] 的错误。
         """
-        )
+        if not self._expanded_created:
+            # 确保先创建展开区（同步创建，避免遗漏）
+            self._ensure_expanded_created()
 
-        # 内容（自适应高度）
-        self.content_label = BodyLabel(content)
-        self.content_label.setWordWrap(True)
+        # 批量添加时关闭更新以避免多次重绘
+        self.scroll_content_widget.setUpdatesEnabled(False)
 
-        layout.addWidget(title_label)
-        layout.addWidget(self.content_label)
-        return card
+        # tags
+        for tagi in tags:
+            if not tagi:
+                continue
+            tag_elm = tag("#" + tagi)  # 修复：使用当前循环元素 tagi
+            self.tag_label.add_widget(tag_elm)
 
-    def set_edited_info(
-        self, group: list[str], tag: list[str], comment: str
-    ):  # 布局/更新 分组标签简评信息
-        if "" in tag:
-            tag = tag.remove("")
-        if tag:
-            tag[0] = "#" + tag[0]
-        self.group_label.content_label.setText("、".join(group))
-        self.tag_label.content_label.setText(" #".join(tag) if tag else "")
-        self.comment_label.content_label.setText(comment)
+        # groups
+        for groupi in group:
+            if not groupi:
+                continue
+            group_elm = BodyLabel(groupi)
+            group_elm.setStyleSheet(self.label_style)
+            group_elm.setWordWrap(True)
+            self.group_label.add_widget(group_elm)
+
+        # comment
+        if comment:
+            comment_elm = BodyLabel(comment)
+            comment_elm.setStyleSheet(self.label_style)
+            comment_elm.setWordWrap(True)
+            self.comment_label.add_widget(comment_elm)
+
+        self.scroll_content_widget.setUpdatesEnabled(True)
 
 
 class folder(QWidget):
@@ -1049,29 +1116,6 @@ class filter_obj(QWidget):
         return (attribution, limit, limit_val)
 
 
-from PyQt5.QtCore import Qt, pyqtSignal
-from qfluentwidgets import (
-    EditableComboBox,
-    CheckBox,
-    ListWidget,
-    RoundMenu,
-    ScrollArea,
-    FlyoutAnimationType,
-)
-
-from PyQt5.QtCore import Qt, pyqtSignal, QSize
-from qfluentwidgets import (
-    EditableComboBox,
-    CheckBox,
-    ListWidget,
-    RoundMenu,
-    ScrollArea,
-    MenuAnimationType,
-    Theme,
-    setTheme,
-)
-
-
 class CheckableComboBox(EditableComboBox):
     selectionChanged = pyqtSignal(list)
 
@@ -1102,7 +1146,6 @@ class CheckableComboBox(EditableComboBox):
         # self.list_widget.itemClicked.connect(self._on_item_clicked)
 
         # 替换默认下拉行为
-        # print(self.width())
         self.dropdown_menu.setMinimumWidth(300 - 5)
         self.scroll_area.setMinimumWidth(300 - 10)
         self.list_widget.setMinimumWidth(300 - 25)  # 考虑滚动条宽度
