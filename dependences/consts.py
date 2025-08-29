@@ -1,6 +1,5 @@
 from enum import Enum
 import pandas as pd
-from PyQt5.QtGui import QFontDatabase
 
 
 # ------------------------- 这里写自定义的枚举量 -------------------------
@@ -24,8 +23,7 @@ class special_type(Enum):
 
 # 默认路径
 # 整个文件的相对路径前缀
-FILE_PATH = "projects/PhiFilter Tool/"
-
+FILE_PATH = "python/rhythmgame_database/"
 # 主文件夹下的文件可以直接写
 CODE_PATH = FILE_PATH + "main_code.py"
 
@@ -68,7 +66,7 @@ FILTER_AGAIN_ICON_PATH = ICON_PREPATH + "filter_again.png"
 
 SCORE_LEVEL_ICONS_PREPATH = ICON_PREPATH + "score_level_icons/"
 
-SCORE_LEVEL_PATH: dict[score_level_type:str] = {
+SCORE_LEVEL_PATH = {
     score_level_type.F: SCORE_LEVEL_ICONS_PREPATH + "F.png",
     score_level_type.C: SCORE_LEVEL_ICONS_PREPATH + "C.png",
     score_level_type.B: SCORE_LEVEL_ICONS_PREPATH + "B.png",
@@ -78,6 +76,7 @@ SCORE_LEVEL_PATH: dict[score_level_type:str] = {
     score_level_type.VFC: SCORE_LEVEL_ICONS_PREPATH + "VFC.png",
     score_level_type.phi: SCORE_LEVEL_ICONS_PREPATH + "phi.png",
 }
+
 # 生成的二维码与空二维码
 QRCODE_IMG_PREPATH = IMAGES_PREPATH + "QRcode/"
 
@@ -87,19 +86,19 @@ QRCODE_EMPTY_IMG_PATH = QRCODE_IMG_PREPATH + "QRcode_empty.jpg"
 # 各种背景
 BACKGROUND_IMG_PREPATH = IMAGES_PREPATH + "background/"
 
-SONG_CARD_BACKGROUND: dict[str, str] = {
+SONG_CARD_BACKGROUND = {  # 区分不同难度的背景
     "EZ": BACKGROUND_IMG_PREPATH + "green-EZ.png",
     "HD": BACKGROUND_IMG_PREPATH + "blue-HD.png",
     "IN": BACKGROUND_IMG_PREPATH + "red-IN.png",
     "AT": BACKGROUND_IMG_PREPATH + "gold-AT.png",
 }
 
-# 插图
+# 曲绘
 ILLUSTRATION_PREPATH = IMAGES_PREPATH + "illustration/"
 
 
 # 默认样式表
-def get_comboBox_style(
+def get_combobox_style(
     font_size: str = 23,
     max_width: str = 360,
     min_width: str = 360,
@@ -109,19 +108,19 @@ def get_comboBox_style(
     background_color: tuple[str, str, str, str] = (255, 255, 255, 0),
 ):
     style = "ComboBox {\n"
-    style += f"font-size: {font_size}px;\n"
-    # style += f'font-family: "{font_family}";\n'
-    # style += f"color: {font_color};\n"
-    style += f"max-width: {max_width}px;\n"
-    style += f"min-width: {min_width}px;\n"
-    style += f"min-height: {min_height}px;\n"
-    style += f"max-height: {max_height}px;\n"
-    style += f"border: 2px solid black;\n"
-    style += f"border-radius: {border_radius}px;\n"
     r, g, b, a = background_color
-    style += f"background-color: rgba({r},{g},{b},{a});\n"
-    style += """text-align: left;  /* 文本左对齐 */
-        padding-left: 5px;  /* 可选：增加左边距 */\n"""
+    style += f"""
+    font-size: {font_size}px;
+    max-width: {max_width}px;
+    min-width: {min_width}px;
+    min-height: {min_height}px;
+    max-height: {max_height}px;
+    border: 2px solid black;
+    border-radius: {border_radius}px;
+    background-color: rgba({r},{g},{b},{a});
+    text-align: left;
+    padding-left: 5px;
+    """
     style += "}"
     return style
 
@@ -136,10 +135,8 @@ def get_button_style(
     border_radius: str = 7,
     background_color: tuple[str, str, str, str] = (0, 159, 170, 1),
     color: str = "white",
-    # color: tuple[str, str, str, str] = (0, 159, 170, 1),
 ):
-    style = """PushButton {\n """
-
+    style = "PushButton {\n "
     r, g, b, a = background_color
     contain = f"""
     font-size: {font_size}px;
@@ -152,21 +149,17 @@ def get_button_style(
     background-color: rgba({r},{g},{b},{a});
     color: {color};
     """
-
     style += (
         contain
-        + "\n}"
-        + """/* 悬停状态 */
+        + """
+        }
     PushButton:hover {
         background-color: #00CDCD;
     }
-    
-    /* 按下状态 */
     PushButton:pressed {
         background-color: #00FFFF;
     }"""
     )
-
     return style
 
 
@@ -177,21 +170,23 @@ def get_label_style(
     min_height: str = 50,
     max_height: str = 50,
     font_family: str = "楷体",
-    font_color: str = "black",
+    font_color: tuple[int, int, int, int] = (0, 0, 0, 1),
     background_color: tuple[int, int, int, int] = (255, 255, 255, 0),
 ):
     style = """QLabel {\n"""
-    style += f"max-width: {max_width}px;\n"
-    style += f"min-width: {min_width}px;\n"
-    style += f"min-height: {min_height}px;\n"
-    style += f"max-height: {max_height}px;\n"
-    style += f"font-size: {font_size}px;\n"
-    style += f'font-family: "{font_family}";\n'
-    style += f"color: {font_color};\n"
     r, g, b, a = background_color
-    style += f"background-color: rgba({r},{g},{b},{a});\n"
+    fr, fg, fb, fa = font_color
+    style += f"""
+    max-width: {max_width}px;
+    min-width: {min_width}px;
+    min-height: {min_height}px;
+    max-height: {max_height}px;
+    font-size: {font_size}px;
+    font-family: '{font_family}';
+    color: rgba({fr},{fg},{fb},{fa});
+    background-color: rgba({r},{g},{b},{a});
+    """
     style += "}"
-    # print(style)
     return style
 
 
@@ -204,12 +199,10 @@ def get_input_box_style(
     font_size: str = 28,
     border_radius: str = 7,
     background_color: tuple[str, str, str, str] = (255, 248, 220, 1),
-    # color: tuple[str, str, str, str] = (0, 159, 170, 1),
 ):
     style = "LineEdit {\n "
-
     r, g, b, a = background_color
-    content = f"""
+    style += f"""
     font-size: {font_size}px;
     font-family: "{font_family}";
     max-width: {max_width}px;
@@ -219,8 +212,7 @@ def get_input_box_style(
     border-radius: {border_radius}px;
     background-color: rgba({r},{g},{b},{a});
     """
-
-    style += content + "\n}"
+    style += "}"
     return style
 
 
@@ -229,23 +221,15 @@ def get_switch_button_style(
     min_width: str = 250,
     min_height: str = 30,
     max_height: str = 30,
-    font_family: str = "仿宋",
-    font_size: str = 28,
-    border_radius: str = 11,
-    # background_color: tuple[str, str, str, str] = (255, 248, 220, 1),
-    # color: tuple[str, str, str, str] = (0, 159, 170, 1), SwitchButton
 ):
-    style = "SwitchButton {\n "
-    # r, g, b, a = background_color
-    content = f"""
+    style = "SwitchButton {\n"
+    style += f"""
     max-width: {max_width}px;
     min-width: {min_width}px;
     min-height: {min_height}px;
     max-height: {max_height}px;
     """
-    # background-color: rgba({r},{g},{b},{a});
-    style += content + "\n}"
-    # print(style)
+    style += "}"
     return style
 
 
@@ -269,6 +253,7 @@ FILTER_ATTRIBUTION_LIST: list[str] = [
     "标签",
     "简评",
 ]
+
 # 数值类比较
 NUMERIC_COMPARATORS: list[str] = [
     "大于",
@@ -563,6 +548,7 @@ SONG_NAME_LIST: list[str] = [
     "ATHAZA",
 ]
 
+
 # 曲师
 COMPOSER_LIST: list[str] = [
     "ああああ",
@@ -794,6 +780,7 @@ COMPOSER_LIST: list[str] = [
     "闫东炜",
     "MonstDeath",
 ]
+
 
 # 画师
 DRAWER_NAME_LIST: list[str] = [
@@ -1705,93 +1692,83 @@ COMBINE_NAME: list[str] = [
     "ATHAZA.LeaF",
 ]
 
-MAX_LEVEL: float = 17.6
-# user_edit:  complex_name goup tag comment
+MAX_LEVEL: float = 17.6  # 当前版本最高定数
 
 # ----- 获取分组信息 -----
 GROUP_INFO = {}
 TAG_INFO = {}
 COMMENT_INFO = {}
-df = pd.read_csv(
-    GROUP_PATH,
-    sep=",",
-    header=None,
-    encoding="utf-8",
-    names=["c_name", "group"],  # 手动定义所有列名
-)
-df = df.fillna("")  # 将NaN替换为空字符串
-df.set_index(df.columns[0], inplace=True)
-# print(df)
-used_group = set()
-for idx, row in df.iterrows():
-    # print(idx)
-    # print(row["group"])
-    GROUP_INFO[idx] = str(row["group"])
-    group_raw = str(row["group"]).strip()
-    for groupi in group_raw.split("`"):
-        used_group.add(groupi)
-used_group.remove("")
-used_group = list(used_group)
+
+try:
+    df = pd.read_csv(
+        GROUP_PATH,
+        sep=",",
+        header=None,
+        encoding="utf-8",
+        names=["c_name", "group"],
+    )
+    df = df.fillna("")
+    df.set_index(df.columns[0], inplace=True)
+    used_group = set()
+    for idx, row in df.iterrows():
+        GROUP_INFO[idx] = str(row["group"])
+        group_raw = str(row["group"]).strip()
+        for groupi in group_raw.split("`"):
+            if groupi:
+                used_group.add(groupi)
+    used_group = list(used_group)
+except Exception:
+    GROUP_INFO = {}
+    used_group = []
 
 # ----- 获取标签信息 -----
-df = pd.read_csv(
-    TAG_PATH,
-    sep=",",
-    header=None,
-    encoding="utf-8",
-    names=["c_name", "tag"],  # 手动定义所有列名
-)
-df = df.fillna("")
-df.set_index(df.columns[0], inplace=True)
-# print(df)
-used_tag = set()
-for idx, row in df.iterrows():
-    TAG_INFO[idx] = str(row["tag"])
-    tag_raw = str(row["tag"]).strip()
-    for tagi in tag_raw.split("`"):
-        used_tag.add(tagi)
-# print(tag_info)
-used_tag.remove("")
-used_tag = list(used_tag)
+try:
+    df = pd.read_csv(
+        TAG_PATH,
+        sep=",",
+        header=None,
+        encoding="utf-8",
+        names=["c_name", "tag"],
+    )
+    df = df.fillna("")
+    df.set_index(df.columns[0], inplace=True)
+    used_tag = set()
+    for idx, row in df.iterrows():
+        TAG_INFO[idx] = str(row["tag"])
+        tag_raw = str(row["tag"]).strip()
+        for tagi in tag_raw.split("`"):
+            if tagi:
+                used_tag.add(tagi)
+    used_tag = list(used_tag)
+except Exception:
+    TAG_INFO = {}
+    used_tag = []
 
 # ----- 获取简评信息 -----
-df = pd.read_csv(
-    COMMENT_PATH,
-    sep=",",
-    header=None,
-    encoding="utf-8",
-    names=[
-        "c_name",
-        "EZ_comment",
-        "HD_comment",
-        "IN_comment",
-        "AT_comment",
-    ],  # 手动定义所有列名
-)
-df = df.fillna("")
-df.set_index(df.columns[0], inplace=True)
-# print(df)
-for idx, row in df.iterrows():
-    # print(idx)
-    # print(row["group"])
-    COMMENT_INFO[idx] = {
-        "EZ": str(row["EZ_comment"]),
-        "HD": str(row["HD_comment"]),
-        "IN": str(row["IN_comment"]),
-        "AT": str(row["AT_comment"]),
-    }
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
-
-song_card_background_cache = {}
-for key, val in SONG_CARD_BACKGROUND.items():
-    pixmap = QPixmap(val).scaledToWidth(420, Qt.SmoothTransformation)  # 平滑缩放
-    song_card_background_cache[key] = pixmap
-
-illustration_cache = {}
-for i in COMBINE_NAME:
-    pixmap1 = QPixmap(ILLUSTRATION_PREPATH + i + ".png").scaledToWidth(
-        420, Qt.SmoothTransformation
+try:
+    df = pd.read_csv(
+        COMMENT_PATH,
+        sep=",",
+        header=None,
+        encoding="utf-8",
+        names=[
+            "c_name",
+            "EZ_comment",
+            "HD_comment",
+            "IN_comment",
+            "AT_comment",
+        ],
     )
-    # print(i, "正在缓存", "路径:", ILLUSTRATION_PREPATH + i + ".png")
-    illustration_cache[i] = pixmap1
+    df = df.fillna("")
+    df.set_index(df.columns[0], inplace=True)
+    for idx, row in df.iterrows():
+        COMMENT_INFO[idx] = {
+            "EZ": str(row["EZ_comment"]),
+            "HD": str(row["HD_comment"]),
+            "IN": str(row["IN_comment"]),
+            "AT": str(row["AT_comment"]),
+        }
+except Exception:
+    COMMENT_INFO = {}
+
+# End of consts.py

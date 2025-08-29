@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QCompleter,
     QListWidgetItem,
+    QSizePolicy,
 )
 from PyQt5.QtCore import Qt, QStringListModel, pyqtSignal, QSize, QTimer
 from PyQt5.QtGui import (
@@ -36,12 +37,12 @@ from qfluentwidgets import (
     ListWidget,
     ScrollArea,
 )
+from dependences.image_cache import *
 from dependences.consts import *
 import re
 import random
 
 # ------------------------- 这里是重写的控件 -------------------------
-init_img = False
 
 
 class combobox(QWidget):  # 重写combobox控件
@@ -59,12 +60,13 @@ class combobox(QWidget):  # 重写combobox控件
 
         # 左侧提示标签
         if hint_label:
+
             self.hint_label = label(hint_label, label_style)
             self.editor_layout.addWidget(self.hint_label)
 
         self.cbb = ComboBox()
         self.cbb.addItems(content)
-        self.cbb.setStyleSheet(get_comboBox_style(**cbb_style))
+        self.cbb.setStyleSheet(get_combobox_style(**cbb_style))
         self.editor_layout.addWidget(self.cbb)
         # print(style)
 
@@ -101,7 +103,7 @@ class editable_combobox(QWidget):
 
         self.cbb = EditableComboBox()
         self.cbb.addItems(content)
-        self.cbb.setStyleSheet(get_comboBox_style(**cbb_style))
+        self.cbb.setStyleSheet(get_combobox_style(**cbb_style))
         self.editor_layout.addWidget(self.cbb)
         # print(style)
         # 初始化补全模型QAbstractItemModel
@@ -270,13 +272,6 @@ class main_info_card(ElevatedCardWidget):
         self.expended = expended
         self.combine_name = combine_name
         self.diff = diff
-        if index:
-            self.setToolTip(
-                f"""<span style=" color: #3fe2ff; font-size: 20px;">NO.{index}</span>"""
-            )
-        self.installEventFilter(
-            ToolTipFilter(self, showDelay=300, position=ToolTipPosition.TOP)
-        )
         self.bg_img_path = SONG_CARD_BACKGROUND[diff]
         # --布局顶部曲名和评级--
         self.top_widget = QFrame(self)
@@ -416,16 +411,15 @@ class main_info_card(ElevatedCardWidget):
         self.setCursor(Qt.PointingHandCursor)  # 鼠标悬停时显示手型指针
 
     def paintEvent(self, event):
-        """绘制背景图片（如果有）"""
+        """绘制背景图片（如果有），使用安全的懒缓存接口获取 pixmap。"""
         super().paintEvent(event)
 
         if self.imgpath:
             painter = QPainter(self)
-            # print(self.combine_name)
-            pixmap = illustration_cache[self.combine_name]
-            pixmap1 = song_card_background_cache[self.diff]
-            painter.drawPixmap(self.rect(), pixmap)
-            painter.drawPixmap(self.rect(), pixmap1)
+            illustration = get_illustration(self.combine_name, self.width())
+            difference = get_song_card_bg(self.diff, self.width())  # 差分
+            painter.drawPixmap(self.rect(), illustration)
+            painter.drawPixmap(self.rect(), difference)
             painter.end()
 
     def mousePressEvent(self, event):
@@ -443,54 +437,44 @@ class tag(PrimaryPushButton):
         self.setFixedHeight(28)  # 固定高度
         self.setCursor(Qt.PointingHandCursor)
         bg_color_list = [
-            QColor(70, 130, 200, 60),
-            QColor(200, 100, 100, 60),
-            QColor(127, 255, 212, 60),
-            QColor(240, 255, 240, 60),
-            QColor(255, 250, 205, 60),
+            (70, 130, 200, 60),
+            (200, 100, 100, 60),
+            (127, 255, 212, 60),
+            (240, 255, 240, 60),
+            (255, 250, 205, 60),
         ]
         if bg_color is None:
             idx = random.randint(0, len(bg_color_list) - 1)
-            bg_color = bg_color_list[idx]
-            border_color = bg_color_list[idx]
-        self.bg_color = bg_color
-        self.border_width = border_width
-        self.border_color = border_color
-        self.border_color.setAlpha(255)  # 边框不透明
+            r, g, b, a = bg_color_list[idx]
+        self.bg_color = (r, g, b, a)
 
         self.setToolTip(text)
         self.setText(text)
-        self.setStyleSheet(
-            """
-            padding-left: 6px;
-            padding-right: 6px;
-        """
-        )
         self.installEventFilter(ToolTipFilter(self, 200))
         # 禁用默认按钮样式
-        self.setStyleSheet("border: none; background: transparent;")
+        self.setStyleSheet(f"border: none; background-color: rgba({r},{g},{b},{a});")
 
-    def paintEvent(self, event):
-        """绘制跑道形状（胶囊样式）"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
+    # def paintEvent(self, event):
+    #     """绘制跑道形状（胶囊样式）"""
+    #     painter = QPainter(self)
+    #     painter.setRenderHint(QPainter.Antialiasing)
 
-        # 左右各缩进4像素（可根据需要调整数值）
-        rect = self.rect()
-        radius = rect.height() / 2  # 半径=高度的一半
+    #     # 左右各缩进4像素（可根据需要调整数值）
+    #     rect = self.rect()
+    #     radius = rect.height() / 2  # 半径=高度的一半
 
-        # 绘制半透明背景
-        painter.setBrush(self.bg_color)
-        painter.setPen(Qt.NoPen)
-        painter.drawRoundedRect(rect, radius, radius)
+    #     # 绘制半透明背景
+    #     painter.setBrush(self.bg_color)
+    #     painter.setPen(Qt.NoPen)
+    #     painter.drawRoundedRect(rect, radius, radius)
 
-        # 绘制边框（更凝实）
-        painter.setPen(QPen(self.border_color, self.border_width))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRoundedRect(rect, radius, radius)
+    #     # 绘制边框（更凝实）
+    #     painter.setPen(QPen(self.border_color, self.border_width))
+    #     painter.setBrush(Qt.NoBrush)
+    #     painter.drawRoundedRect(rect, radius, radius)
 
-        # 调用父类绘制文字
-        super().paintEvent(event)
+    #     # 调用父类绘制文字
+    #     super().paintEvent(event)
 
 
 class HorizontalInfoCard(QFrame):
@@ -567,15 +551,14 @@ class HorizontalInfoCard(QFrame):
         self.content_widget_list.append(widget)
         self.flow_layout.addWidget(widget)
 
+    def clear_content_widget(self):
+        """清理内容区域加入的控件"""
+        for widgeti in self.content_widget_list:
+            widgeti.deleteLater()
+        self.content_widget_list = []
+
 
 class song_info_card(QWidget):
-    """
-    改进:
-    - 延迟创建展开的详细内容（lazy build），第一次展开或在 set_edited_info 时创建
-    - 修复 set_edited_info 中使用 tags[0] 的错误 -> 改为使用当前 tagi
-    - 在创建大量卡片时能大幅降低启动开销（默认折叠时不创建大量子控件）
-    """
-
     def __init__(
         self,
         imgpath: str,
@@ -619,7 +602,6 @@ class song_info_card(QWidget):
         self.setMaximumHeight(405)
         self.setMaximumWidth(405)
 
-        # 主卡片（保持你现有的 main_info_card 构造）
         self.elevatedcard = main_info_card(
             imgpath,
             name,
@@ -635,24 +617,25 @@ class song_info_card(QWidget):
         self.mainlayout.addWidget(self.elevatedcard)
         self.elevatedcard.left_func = self.clicked_card
 
-        # 创建占位滚动区（但不创建实际内容，内容延迟创建）
         self.scroll_area = SmoothScrollArea()
         self.mainlayout.addWidget(self.scroll_area)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet(
-            """QScrollArea{background-color: rgba(187, 255, 255, 0.6); border: none; max-width: 400px;
-            min-width: 400px; min-height: 200px; max-height: 200px;}"""
+            """QScrollArea{
+            background-color: rgba(187, 255, 255, 0.6); 
+            border: none; max-width: 400px;
+            min-width: 400px; 
+            min-height: 200px; 
+            max-height: 200px;}"""
         )
         self.setStyleSheet("QWidget{background: transparent}")
 
         if not self.is_expended:
             self.scroll_area.hide()
 
-        # 不在 __init__ 创建 scroll_content_widget 的子控件（延迟）
         self.scroll_content_widget = None
         self.flow_layout = None
 
-        # 标签/样式预定义（重用）
         self.label_style = """
             font-size: 24px;
             font-family:"楷体";
@@ -750,33 +733,32 @@ class song_info_card(QWidget):
         )
 
     def set_edited_info(self, group: list[str], tags: list[str], comment: str):
-        """
-        在确保展开区已创建后批量添加分组/标签/简评，并解决 tags[0] 的错误。
-        """
         if not self._expanded_created:
-            # 确保先创建展开区（同步创建，避免遗漏）
             self._ensure_expanded_created()
 
         # 批量添加时关闭更新以避免多次重绘
         self.scroll_content_widget.setUpdatesEnabled(False)
 
         # tags
+        self.tag_label.clear_content_widget()
         for tagi in tags:
             if not tagi:
                 continue
-            tag_elm = tag("#" + tagi)  # 修复：使用当前循环元素 tagi
+            # print(tagi)
+            tag_elm = tag("#" + tagi)
             self.tag_label.add_widget(tag_elm)
 
-        # groups
+        self.group_label.clear_content_widget()
         for groupi in group:
             if not groupi:
                 continue
             group_elm = BodyLabel(groupi)
-            group_elm.setStyleSheet(self.label_style)
-            group_elm.setWordWrap(True)
+            # group_elm.setStyleSheet(self.label_style)
+            # group_elm.setWordWrap(True)
             self.group_label.add_widget(group_elm)
 
         # comment
+        self.comment_label.clear_content_widget()
         if comment:
             comment_elm = BodyLabel(comment)
             comment_elm.setStyleSheet(self.label_style)
@@ -787,13 +769,28 @@ class song_info_card(QWidget):
 
 
 class folder(QWidget):
+    """
+    改版 folder：
+    - 去掉固定的大最小高度（折叠时不占用大量空间）
+    - 在展开/折叠时调整自身的 QSizePolicy（展开时竖向 Expanding，折叠时竖向 Minimum）
+    - 发出 toggled(bool) 信号，方便父布局根据展开状态调整 layout 的 stretch 分配
+    """
+
+    toggled = pyqtSignal(bool)
+
     def __init__(self, title="", expend=False):
         super().__init__()
         self.is_expanded = expend
         self.widgets = []
         self.title = title
-        self.setMinimumHeight(265)
+
+        # 不再设置全局固定最小高度，保留宽度最小约束（可按需调整）
+        # self.setMinimumHeight(265)  # <- 移除或注释掉
         self.setMinimumWidth(420)
+
+        # 默认 QSizePolicy：水平方向可扩展，垂直方向使用 Minimum（折叠时不占用多余空间）
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+
         # 主布局
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -804,32 +801,39 @@ class folder(QWidget):
             "background_color": (152, 245, 255, 1),
         }
         self.title_btn = button(title, btn_style)
-        # self.title_btn.setIcon(FluentIcon.CHEVRON_RIGHT)  # 默认向右箭头
         self.title_btn.bind_click_func(self.toggle_expand)
         self.title_btn.setContentsMargins(0, 0, 0, 0)
         self.main_layout.addWidget(self.title_btn)
 
-        # 内容区域 (初始隐藏)
+        # 内容区域 (用 QFrame 包裹)
         self.content_frame = QFrame()
         self.main_layout.addWidget(self.content_frame)
         self.content_frame.setContentsMargins(0, 0, 0, 0)
+
+        # 初始根据 expend 隐藏/显示内容，并设置 sizePolicy
         if not self.is_expanded:
             self.content_frame.hide()
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        else:
+            # 展开时允许竖向扩展以占满可用空间
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
         self.content_layout = QVBoxLayout(self.content_frame)
         self.content_layout.setContentsMargins(0, 0, 0, 0)
 
         self.scroll_area = SmoothScrollArea()
-        self.scroll_area.setWidgetResizable(True)  # 关键设置
+        self.scroll_area.setWidgetResizable(True)  # 保证内部 widget 可伸缩
         self.scroll_area.setStyleSheet(
             "QScrollArea{background: transparent; border: none}"
         )
-        # 必须给内部的视图也加上透明背景样式
         self.content_frame.setStyleSheet("QWidget{background: transparent}")
         self.content_layout.addWidget(self.scroll_area)
         self.content_layout.setSpacing(0)
+
         if not self.is_expanded:
             self.scroll_area.hide()
-        # 创建内容容器
+
+        # 创建内容容器与流式布局
         self.scroll_content_widget = QWidget()
         self.flow_layout = FlowLayout(self.scroll_content_widget)  # 使用流式布局
         self.flow_layout.setSpacing(0)
@@ -841,29 +845,56 @@ class folder(QWidget):
             self.scroll_content_widget.hide()
 
     def toggle_expand(self):
-        """切换展开/折叠状态"""
+        """切换展开/折叠状态，并调整 QSizePolicy，发出 toggled 信号以便父布局调整 stretch"""
         self.is_expanded = not self.is_expanded
         if not self.is_expanded:
+            # 折叠：隐藏内容，同时把自身竖向策略变为 Minimum（不占用额外空间）
             for i in self.widgets:
-                i.hide()
+                try:
+                    i.hide()
+                except Exception:
+                    pass
             self.scroll_content_widget.hide()
             self.scroll_area.hide()
             self.content_frame.hide()
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         else:
-            self.content_frame.show()  # 按顺序！否则 折叠-展开 操作后滚动条就会被吃掉
+            # 展开：显示内容，允许竖向扩展以填充父布局给的可用空间
+            self.content_frame.show()  # 必须先 show content_frame，否则 scroll_area/scroll_content_widget 可能无效
             self.scroll_area.show()
             self.scroll_content_widget.show()
             for i in self.widgets:
-                i.show()
+                try:
+                    i.show()
+                except Exception:
+                    pass
+            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        # 通知布局管理器更新几何
+        try:
+            self.updateGeometry()
+            self.repaint()
+        except Exception:
+            pass
+
+        # 发出信号，父布局（例如 place_b27_phi3）要监听并根据所有 folder 的状态重新分配 stretch
+        try:
+            self.toggled.emit(self.is_expanded)
+        except Exception:
+            pass
 
     def add_widget(self, widget):
         """向内容区域添加控件"""
         self.widgets.append(widget)
         self.flow_layout.addWidget(widget)
-        self.title_btn.setMinimumWidth(self.scroll_content_widget.width())
-        self.title_btn.setMaximumWidth(self.scroll_content_widget.width())
+        # 避免强制 title_btn 宽度跟随内容宽度（会产生副作用），所以移除固定宽度的设置
+        # self.title_btn.setMinimumWidth(self.scroll_content_widget.width())
+        # self.title_btn.setMaximumWidth(self.scroll_content_widget.width())
         if not self.is_expanded:
-            widget.hide()
+            try:
+                widget.hide()
+            except Exception:
+                pass
 
 
 class filter_obj(QWidget):
@@ -1212,3 +1243,39 @@ class CheckableComboBox(EditableComboBox):
         self.list_widget.clear()
         self._selected_items = []
         self.setText("")
+
+
+class quick_function_card(ElevatedCardWidget):
+
+    def __init__(self, title: str, iconpath: str):
+        super().__init__()
+
+        self.left_func = None
+        self.iconWidget = ImageLabel(iconpath, self)
+        label_style = {
+            "min_width": 200,
+            "max_width": 200,
+            "font_size": 24,
+            "max_height": 30,
+            "min_height": 30,
+            "font_color": (0, 245, 255, 0.9),
+        }
+        self.label = label(title, label_style)
+
+        self.iconWidget.scaledToHeight(135)
+
+        self.vBoxLayout = QVBoxLayout(self)
+        self.vBoxLayout.setAlignment(Qt.AlignCenter)
+        self.vBoxLayout.addStretch(1)
+        self.vBoxLayout.addWidget(self.iconWidget, 0, Qt.AlignCenter)
+        self.vBoxLayout.addStretch(1)
+        self.vBoxLayout.addWidget(self.label, 0, Qt.AlignCenter | Qt.AlignBottom)
+
+        self.setFixedSize(200, 200)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            # print("左点击了!")
+            self.left_func()
+            self.clicked.emit()  # 需要先定义信号
+        super().mousePressEvent(event)
