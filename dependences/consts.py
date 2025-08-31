@@ -1,5 +1,6 @@
 from enum import Enum
 import pandas as pd
+from PyQt5.QtGui import QFontDatabase
 
 
 # ------------------------- 这里写自定义的枚举量 -------------------------
@@ -23,7 +24,8 @@ class special_type(Enum):
 
 # 默认路径
 # 整个文件的相对路径前缀
-FILE_PATH = "python/rhythmgame_database/"
+FILE_PATH = "projects/PhiFilter Tool/"
+
 # 主文件夹下的文件可以直接写
 CODE_PATH = FILE_PATH + "main_code.py"
 
@@ -37,9 +39,20 @@ AVATAR_PATH = DEPENDENCES_PREPATH + "avatar.txt"  # 头像名称
 # 字体文件
 FONT_PREPATH = DEPENDENCES_PREPATH + "font/"
 
-EN_FONT1 = FONT_PREPATH + "Playfair_Display/PlayfairDisplay-VariableFont_wght.ttf"
-NUM_FONT1 = FONT_PREPATH + "Share_Tech_Mono/ShareTechMono-Regular.ttf"
-CHI_FONT1 = FONT_PREPATH + "ZCOOLKuaiLe/ZCOOLKuaiLe-Regular.ttf"
+EN_FONT1_PATH = FONT_PREPATH + "Playfair_Display/PlayfairDisplay-VariableFont_wght.ttf"
+NUM_FONT1_PATH = FONT_PREPATH + "Share_Tech_Mono/ShareTechMono-Regular.ttf"
+# CHI_FONT1 = FONT_PREPATH + "ZCOOLKuaiLe/ZCOOLKuaiLe-Regular.ttf"
+CHI_FONT1_PATH = FONT_PREPATH + "Source Han Sans & Saira Hybrid-Regular #5446.ttf"
+
+FONT_FAMILY = {}
+font_id = QFontDatabase.addApplicationFont(CHI_FONT1_PATH)
+if font_id < 0:
+    FONT_FAMILY["chi"] = "仿宋"
+    print("中文字体加载失败！ 已切换为仿宋")
+else:
+    font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+    FONT_FAMILY["chi"] = font_family
+
 
 # 玩家信息(player_info)文件夹下文件的路径前缀
 PLAYER_INFO_PREPATH = FILE_PATH + "player_info/"
@@ -96,10 +109,14 @@ SONG_CARD_BACKGROUND = {  # 区分不同难度的背景
 # 曲绘
 ILLUSTRATION_PREPATH = IMAGES_PREPATH + "illustration/"
 
+ACG_PPIMAGE_URL = "https://www.loliapi.com/acg/pp/"
+ACG_IMAGE_URL = "https://www.loliapi.com/acg/"
+
 
 # 默认样式表
 def get_combobox_style(
     font_size: str = 23,
+    font_family: str = FONT_FAMILY["chi"],
     max_width: str = 360,
     min_width: str = 360,
     min_height: str = 50,
@@ -111,6 +128,7 @@ def get_combobox_style(
     r, g, b, a = background_color
     style += f"""
     font-size: {font_size}px;
+    font-family: "{font_family}";
     max-width: {max_width}px;
     min-width: {min_width}px;
     min-height: {min_height}px;
@@ -130,7 +148,7 @@ def get_button_style(
     min_width: str = 360,
     min_height: str = 50,
     max_height: str = 50,
-    font_family: str = "仿宋",
+    font_family: str = FONT_FAMILY["chi"],
     font_size: str = 34,
     border_radius: str = 7,
     background_color: tuple[str, str, str, str] = (0, 159, 170, 1),
@@ -169,7 +187,7 @@ def get_label_style(
     min_width: str = 80,
     min_height: str = 50,
     max_height: str = 50,
-    font_family: str = "楷体",
+    font_family: str = FONT_FAMILY["chi"],
     font_color: tuple[int, int, int, int] = (0, 0, 0, 1),
     background_color: tuple[int, int, int, int] = (255, 255, 255, 0),
 ):
@@ -185,6 +203,7 @@ def get_label_style(
     font-family: '{font_family}';
     color: rgba({fr},{fg},{fb},{fa});
     background-color: rgba({r},{g},{b},{a});
+    white-space: pre-wrap;
     """
     style += "}"
     return style
@@ -195,7 +214,7 @@ def get_input_box_style(
     min_width: str = 300,
     min_height: str = 60,
     max_height: str = 60,
-    font_family: str = "仿宋",
+    font_family: str = FONT_FAMILY["chi"],
     font_size: str = 28,
     border_radius: str = 7,
     background_color: tuple[str, str, str, str] = (255, 248, 220, 1),
@@ -217,6 +236,7 @@ def get_input_box_style(
 
 
 def get_switch_button_style(
+    font_family: str = FONT_FAMILY["chi"],
     max_width: str = 250,
     min_width: str = 250,
     min_height: str = 30,
@@ -224,6 +244,7 @@ def get_switch_button_style(
 ):
     style = "SwitchButton {\n"
     style += f"""
+    font-family: "{font_family}";
     max-width: {max_width}px;
     min-width: {min_width}px;
     min-height: {min_height}px;

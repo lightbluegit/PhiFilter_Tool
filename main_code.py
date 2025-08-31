@@ -10,7 +10,15 @@ from PyQt5.QtWidgets import (
 )
 from qframelesswindow import FramelessWindow, StandardTitleBar
 from PyQt5.QtCore import Qt, QUrl
-from PyQt5.QtGui import QGuiApplication, QIcon, QPixmap, QDesktopServices, QFont
+from PyQt5.QtGui import (
+    QGuiApplication,
+    QIcon,
+    QPixmap,
+    QDesktopServices,
+    QFont,
+    QFontDatabase,
+)
+import requests
 from qfluentwidgets import (
     NavigationInterface,
     NavigationItemPosition,
@@ -20,6 +28,8 @@ from qfluentwidgets import (
     SwitchButton,
     InfoBarPosition,
     AvatarWidget,
+    HorizontalSeparator,
+    SplashScreen,
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
@@ -27,14 +37,8 @@ import heapq  # 算rks组成
 import os
 from typing import Any, List, Tuple, Dict
 import pandas as pd
-from dependences.classes import *
-from dependences.get_play_data import *
-from dependences.song_list_view_delegate import (
-    SongListViewWidget,
-    ROLE_COMBINE,
-    ROLE_DIFF,
-)
-import time
+from datetime import datetime
+from math import sqrt
 
 
 # 设置高 DPI 渲染策略，保证在高分辨率屏幕上界面清晰
@@ -47,6 +51,15 @@ QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 #! 先创建 QApplication 实例再写窗口 否则初始化缓存图片的时候会失败
 app = QApplication(sys.argv)
 
+from dependences.classes import *
+from dependences.get_play_data import *
+from dependences.song_list_view_delegate import (
+    SongListViewWidget,
+    ROLE_COMBINE,
+    ROLE_DIFF,
+    SongItem,
+)
+
 
 class MainWindow(FramelessWindow):
 
@@ -54,17 +67,19 @@ class MainWindow(FramelessWindow):
         super().__init__()
 
         # ---------- 初始化各种变量 ----------
+        self.tt = datetime.now()
         self.avatar = ""  # 存放用户头像文件名
         self.token = ""  # 存放用户 session_token
         self.save_dict = {}  # 云存档解析后的字典数据
+        self.total_rks = 0  # rks未/30之前得到的值 用于计算某个歌曲是否能推分
         self.widgets: dict[str, dict] = {}
         """self.widgets[页面名称][页面控件名称]=控件"""
 
         self.b27: List[Tuple[float, Tuple[str, Any]]] = []
-        """self.b27 = (单曲rks,(组合名称, acc,   定数, 难度, 分数, 是否fc))"""
+        """self.b27 = (单曲rks,(组合名称, acc,   定数, 难度, 分数, 是否fc, 处于哪一行))"""
 
         self.phi3: List[Tuple[float, Tuple[str, Any]]] = []
-        """self.phi3 = (单曲rks,(组合名称, acc,   定数, 难度, 分数, 是否fc))"""
+        """self.phi3 = (单曲rks,(组合名称, acc,   定数, 难度, 分数, 是否fc, 处于哪一行))"""
 
         self.cname_to_name: dict[str, Tuple[str, str, str, dict]] = {}
         """
@@ -79,6 +94,19 @@ class MainWindow(FramelessWindow):
         self.all_song_card: dict[str, dict[str, int]] = {}
         """self.all_song_card[组合曲名][难度]=歌曲卡片控件"""
 
+        self.illustration_cache: dict[str, QPixmap] = {}
+        self.illustration_cache_process = None
+
+        self.splash_screen = SplashScreen(FIF.ROBOT)
+        self.page_bg_cache: dict[str, QPixmap] = {}
+        self.page_icon_cache: dict[str, QPixmap] = {}
+        # 3. 显示启动屏幕
+        self.splash_screen.show()
+        # （可选）确保启动屏幕在最前面
+        self.splash_screen.raise_()
+
+        # self.font_family = {}
+        self.preinit()
         # ---------- 窗口设置 ----------
         # 设置窗口标题
         self.setTitleBar(StandardTitleBar(self))
@@ -124,8 +152,54 @@ class MainWindow(FramelessWindow):
                 pass
 
         self.generate_cname_to_name_info()
-        self.init_all_pages()
+        # 后续的init的逻辑在 check_preinit_finished 里面 因为需要并行加载完成
 
+    def preinit(self):
+        # 模拟两个不同的存储字典
+        self.illustration_cache = {}
+
+        # 创建 ImageLoaderApp 实例
+        loader = ImageLoaderApp()
+
+        # --- 添加任务 ---
+        # 假设这些图片文件存在
+        for combine_namei in COMBINE_NAME:
+            loader.add_task(
+                rf"{ILLUSTRATION_PREPATH}{combine_namei}.png",
+                combine_namei,
+                self.illustration_cache,
+                400,
+            )
+        # print(f'待办任务{loader.todo_list}')
+        # --- 连接信号 (可选，用于获取状态) ---
+        loader.add_task(
+            self.get_acg_image(ACG_IMAGE_URL, "主页背景"),
+            "home",
+            self.page_bg_cache,
+            self.width(),
+        )
+        loader.add_task(
+            self.get_acg_image(ACG_IMAGE_URL, "编辑页背景"),
+            "edit",
+            self.page_bg_cache,
+            self.width(),
+        )
+        loader.add_task(
+            self.get_acg_image(ACG_PPIMAGE_URL, "rks组成图背景"),
+            "rks组成图背景",
+            self.page_icon_cache,
+            250,
+        )
+
+        loader.all_tasks_finished.connect(self.on_all_finished)
+
+        # --- 启动处理 ---
+        # print("Starting image processing...")
+        loader.start_processing()
+
+    def on_all_finished(self):
+        # print("\n--- All Tasks Completed ---")
+        # print(f"Cache A: {self.illustration_cache}")
         self.song_list_widget = SongListViewWidget()
 
         # ---------- 如果有 token，即刻拉取云存档并设置头像 ----------
@@ -145,11 +219,23 @@ class MainWindow(FramelessWindow):
             except Exception:
                 pass
 
+        self.init_all_pages()
         self.init_navigation()
         if self.token:
             self.switch_to(self.home_page)
         else:
             self.switch_to(self.account_page)
+
+        self.splash_screen.finish()
+        self.show()
+        end_time = datetime.now()
+        time_difference = end_time - self.tt
+
+        total_seconds = time_difference.total_seconds()
+        seconds = int(total_seconds % 60)
+        microseconds = time_difference.microseconds
+
+        print(f"预处理用时:{seconds:02d}s.{microseconds:06d}")
 
     # ------------------ Core data loading / mapping ------------------
     def generate_cname_to_name_info(self):
@@ -192,10 +278,12 @@ class MainWindow(FramelessWindow):
                 self.cname_to_name[combine_name][3]["AT"] = ATchapter
 
     def get_save_data(self):
-        # times = time.time()
         try:
             with PhigrosCloud(self.token) as cloud:
                 summary = cloud.getSummary()
+                # print(f'你的summary是{summary}')
+                user_name = cloud.getNickname()
+                print(f"你的名字是{user_name}")
                 save_data = cloud.getSave(summary["url"], summary["checksum"])
                 save_dict = unzipSave(save_data)
                 save_dict = decryptSave(save_dict)
@@ -238,6 +326,7 @@ class MainWindow(FramelessWindow):
             GROUP_INFO,
             TAG_INFO,
             COMMENT_INFO,
+            self.illustration_cache,
         )
 
         self.all_song_card = {}
@@ -347,50 +436,166 @@ class MainWindow(FramelessWindow):
         - 若后续要添加更多快捷功能，只需在 buttons 列表中加入元组 (label, iconpath, handler, enabled)
         直接将此函数替换你类中的 init_homepage 即可。
         """
-        # imports local to function to avoid polluting module namespace if copied
-        from PyQt5.QtWidgets import QVBoxLayout, QGridLayout
 
         self.widgets["home_page"] = {}
 
-        widget = QWidget()
-        widget.setObjectName("home_page_root")
-        # white background for the page
-        widget.setStyleSheet("QWidget#home_page_root{background-color: #ffffff;}")
-
+        widget = bg_widget(self.page_bg_cache["home"])
         self.widgets["home_page"]["widget"] = widget
 
         layout = QVBoxLayout(widget)
         layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(18)
+        layout.setSpacing(5)
         self.widgets["home_page"]["layout"] = layout
 
         # Header
-        header = QLabel("快捷功能")
-        header.setFont(QFont("微软雅黑", 23, QFont.Bold))
-        header.setStyleSheet("color: #222222;")
+        header_style = {
+            # "min_width": widget.width() - 10,
+            # "max_width": widget.width() - 10,
+            "font_color": (182, 204, 161, 1),
+            "font_size": 35,
+        }
+        header = label("主页", header_style)
+        header.adjustSize()
         layout.addWidget(header)
 
-        # Subtitle / hint
-        hint = QLabel("常用操作快捷入口")
-        hint.setFont(QFont("Sans Serif", 13))
-        hint.setStyleSheet("color: #666666; margin-bottom: 8px;")
-        layout.addWidget(hint)
+        # 水平分割线
+        horizontal_separator = HorizontalSeparator()
+        layout.addWidget(horizontal_separator)
 
-        # Grid container for buttons
         grid = QGridLayout()
-        grid.setHorizontalSpacing(16)
-        grid.setVerticalSpacing(16)
+        grid.setContentsMargins(0, 5, 0, 0)
         layout.addLayout(grid)
 
+        title_style = {
+            "font_size": 29,
+            "min_width": 250,
+            "max_width": 250,
+            "max_height": 40,
+            "min_height": 40,
+        }
+        content_style = {
+            "font_size": 18,
+            "min_width": 250,
+            "max_width": 250,
+            "max_height": 80,
+            "min_height": 80,
+        }
+
         generate_rsk_conpone_card = quick_function_card(
+            self.page_icon_cache["rks组成图背景"],
             "生成rks组成图",
-            GENERATE_RKS_ICON_PATH,
+            "生成b27, phi3组成的文件夹 左键歌曲卡片可展开详细信息，右键跳转编辑页面",
+            title_style,
+            content_style,
         )
         generate_rsk_conpone_card.left_func = self.generate_b27_phi3
         layout.addWidget(generate_rsk_conpone_card)
 
-        layout.addStretch(2)
+        layout.addStretch(1)  # 顶上去
         return widget
+
+    def get_acg_image(self, url: str, img_save_name: str) -> str | None:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()  # 检查请求是否成功
+            img_path = f"{BACKGROUND_IMG_PREPATH}{img_save_name}.png"
+            with open(img_path, "wb") as f:
+                f.write(response.content)
+
+            return img_path  # 返回图片路径
+        except Exception as e:
+            print(f"获取失败: {e}")
+            return None
+
+    def is_improveable(
+        self,
+        song_item: SongItem,
+        delta_rks: float,
+        min_b27_rks: float,
+        b27_dict: dict[str, list[str]],
+    ) -> float | None:
+        """
+        判断某个歌曲的某个难度是否可以通过推acc让玩家信息中的rks发生变化
+
+        入参:
+            song_item: 存储歌曲信息的变量
+            delta_rks: rks需要增加多少才能让玩家信息中的rks发生变化
+            min_b27_rks: b27地板对应的单曲rks
+            b27_dict: b27_dict[组合名称]=[该歌曲在b27中的难度(str) 组成的列表]
+
+        返回:
+            如果不能推分 返回None
+            否则返回需要的达到acc
+        """
+        acc = float(song_item.acc)
+        if int(acc) == 100:
+            return None  # 已经满分的歌曲推不了分
+
+        combine_name = song_item.combine_name
+        level = float(song_item.level)
+        diff = song_item.diff
+        singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
+        if combine_name in b27_dict.keys() and diff in b27_dict[combine_name]:  # 在b27
+            need_rks = delta_rks + singal_rks
+            need_acc = 45 * sqrt(need_rks / level) + 55
+            if need_acc <= 100:  # 可以只靠这首歌在 b27 的表现让rks产生变化
+                return int(need_acc * 100 + 0.9) / 100
+
+            # 考虑推到ap之后能不能靠这首歌在 b27和phi3 中的表现让rks产生变化
+            if level - singal_rks + level - float(self.phi3[-1][0]) >= delta_rks:
+                return 100  # 推AP去吧
+            else:
+                return None  # AP也救不了你
+
+        else:  # 不在b27
+            need_rks = delta_rks + min_b27_rks
+            need_acc = 45 * sqrt(need_rks / level) + 55
+            if need_acc < 70:  # 不到70不计入rks 要上榜最少要70
+                return 70
+            if need_acc <= 100:  # 可以只靠这首歌在 b27 的表现让rks产生变化
+                return int(need_acc * 100 + 0.9) / 100
+
+            # 考虑推到ap之后能不能靠这首歌在 b27和phi3 中的表现让rks产生变化
+            if level - min_b27_rks + level - float(self.phi3[-1][0]) >= delta_rks:
+                return 100  # 推AP去吧
+            else:
+                return None  # AP也救不了你
+
+    def generate_improve_rks_advise(self):
+        model = self.song_list_widget.model
+
+        """self.b27 = (单曲rks,(组合名称, acc, 定数, 难度, 分数, 是否fc))"""
+        b27_dict = {}  # 存储phi3关键信息 b27_dict[组合名称]=['EZ', 'IN']
+        min_b27_rks = MAX_LEVEL + 1
+        for songi in self.b27:
+            singal_rks, other = songi
+            combine_name, acc, level, diff, score, is_fc, rowi = other
+            if combine_name not in b27_dict.keys():
+                b27_dict[combine_name] = []
+            b27_dict[combine_name].append(diff)
+            min_b27_rks = min(min_b27_rks, singal_rks)
+        # print(b27_dict)
+
+        player_now_rks = round(
+            self.total_rks / (len(self.b27) + len(self.phi3)), 4
+        )  # 当前玩家准确rks值
+        show_rks = int(player_now_rks * 100 + 0.5) / 100  # 游戏页面展示的rks值
+        delta_rks = (
+            show_rks + 0.005 - player_now_rks
+        )  # 0.005保证游戏页面四舍五入后rks出现提升
+        # print(f"需要提升的rks是:{delta_rks * 30}")
+        for row in range(model.rowCount()):  # 遍历所有歌曲
+            item = model.get_item(row)
+            if not item:
+                continue
+            diffi = item.diff
+            if diffi == "Legacy":
+                continue
+            next_acc = self.is_improveable(item, delta_rks * 30, min_b27_rks, b27_dict)
+            if next_acc is None:
+                continue
+            item.improve_advice = next_acc
+            # print(f"{item.name},{item.diff}如果{item.acc}->{next_acc}就可以加分喽~")
 
     def init_place_b27_phi3_page(self) -> QWidget:
         """初始化 rks 组成页面"""
@@ -462,7 +667,11 @@ class MainWindow(FramelessWindow):
         self.widgets["search_page"]["filter_confirm_layout"] = filter_confirm_layout
         filter_confirm_layout.setContentsMargins(0, 0, 0, 0)
 
-        filter_btn_style = {"min_height": 45, "max_height": 45, "font_size": 28}
+        filter_btn_style = {
+            "min_height": 45,
+            "max_height": 45,
+            "font_size": 28,
+        }
         filter_from_all_song_btn = button(
             "从所有歌曲中筛一遍", filter_btn_style, FILTER_ICON_PATH
         )
@@ -525,9 +734,9 @@ class MainWindow(FramelessWindow):
         sort_result_reverse_btn.setChecked(True)
         sort_result_reverse_btn.setStyleSheet(get_switch_button_style())
         sort_result_reverse_btn.label.setStyleSheet(
-            """
+            f"""
             font-size: 26px;
-            font-family: "楷体";
+            font-family: "{FONT_FAMILY["chi"]}";
             """
         )
         sort_result_reverse_btn.checkedChanged.connect(self.place_record)
@@ -597,7 +806,7 @@ class MainWindow(FramelessWindow):
 
     def init_edit_info_page(self) -> QWidget:
         self.widgets["edit_info_page"] = {}
-        widget = QWidget()
+        widget = bg_widget(self.page_bg_cache["edit"])
         self.widgets["edit_info_page"]["widget"] = widget
         main_layout = QHBoxLayout(widget)
         self.widgets["edit_info_page"]["main_layout"] = main_layout
@@ -610,10 +819,10 @@ class MainWindow(FramelessWindow):
 
         top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
         display_layout.addItem(top_spacer)
-
+        # print('缓存似',self.illustration_cache)
         # 添加示例 card 占位
         example_song = song_info_card(
-            ILLUSTRATION_PREPATH + "introduction.png",
+            self.illustration_cache["introduction"],
             "introduction",
             "00.0000",
             "00.000",
@@ -951,6 +1160,8 @@ class MainWindow(FramelessWindow):
         if not self.filter_result:
             return
 
+        # itme = time.time()
+        print("开始布局")
         # 获取分组/排序选项并处理默认值
         group_by = (
             self.widgets["search_page"]["group_by"].get_content()
@@ -976,15 +1187,18 @@ class MainWindow(FramelessWindow):
                 pass
         self.widgets["search_page"]["song_cards"] = []
 
-        result_display_flow = self.widgets["search_page"]["result_display_flow"]
+        result_display_flow: FlowLayout = self.widgets["search_page"][
+            "result_display_flow"
+        ]
         # 在批量插入期间关闭更新以避免频繁重绘
-        itme = time.time()
         self.widgets["search_page"]["scroll_content_widget"].setUpdatesEnabled(False)
 
         visited_folder = {}  # 用于分组时缓存 folder -> list[(sort_value, card)]
         empty_sort_list = []  # 当不分组时，直接保存要显示的卡片
 
         # 遍历筛选结果（items 里包含 row，用来按需创建完整 widget）
+
+        cnt = len(self.filter_result)
         for songi in self.filter_result:
             # songi: (combine_name, diffi, score, acc, level, is_fc, singal_rks, row)
             combine_name, diffi, score, acc, level, is_fc, singal_rks, row = songi
@@ -1000,7 +1214,7 @@ class MainWindow(FramelessWindow):
 
             # 惰性创建完整的 song card（仅在这个条目要展示时才构建）
             cardi = self.song_list_widget.build_card_for_row(row, is_expanded=False)
-            # cardi.right_func = self.link_and_show #不同
+            cardi.right_func = self.link_and_show  # 不同
             if cardi is None:
                 continue
             self.widgets["search_page"]["song_cards"].append(cardi)
@@ -1087,7 +1301,7 @@ class MainWindow(FramelessWindow):
 
         # 恢复滚动内容更新并完成布局
         self.widgets["search_page"]["scroll_content_widget"].setUpdatesEnabled(True)
-        print("布局用时:", time.time() - itme)
+        # print(f"布局{cnt}个控件用时:", time.time() - itme)
 
     def link_and_show(self, info_card: song_info_card):
         """
@@ -1320,6 +1534,8 @@ class MainWindow(FramelessWindow):
         heapq.heapify(self.phi3)
         for singal_rks, other in all_song_info:
             combine_name, acc, level, diff, score, is_fc, row = other
+            if float(acc < 70):  # acc < 70% 不计入rks
+                continue
             if len(self.b27) < 27:
                 heapq.heappush(self.b27, (singal_rks, other))
             else:
@@ -1335,6 +1551,7 @@ class MainWindow(FramelessWindow):
         self.b27 = sorted(self.b27, key=lambda x: x[0], reverse=True)
         self.phi3 = sorted(self.phi3, key=lambda x: x[0], reverse=True)
         # print('开始布局b27页面')
+        self.generate_improve_rks_advise()
         self.place_b27_phi3()
 
     def place_b27_phi3(self):
@@ -1364,7 +1581,7 @@ class MainWindow(FramelessWindow):
         player_rks_label.setFixedHeight(50)
         layout.addWidget(player_rks_label, 0)
         # layout.insertWidget(0, player_rks_label, 0)
-        total_rks: float = 0.0
+        self.total_rks: float = 0.0
 
         b27_folder = folder("b27:", True)
         b27_folder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
@@ -1374,7 +1591,7 @@ class MainWindow(FramelessWindow):
         )
         for singal_rks, other in self.b27:
             combine_name, acc, level, diff, score, is_fc, row = other
-            total_rks += float(singal_rks)
+            self.total_rks += float(singal_rks)
             cardi = self.song_list_widget.build_card_for_row(row, is_expanded=False)
             if cardi:
                 cardi.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -1397,7 +1614,7 @@ class MainWindow(FramelessWindow):
         )
         for singal_rks, other in self.phi3:
             combine_name, acc, level, diff, score, is_fc, row = other
-            total_rks += float(singal_rks)
+            self.total_rks += float(singal_rks)
             # 惰性创建：只有这小部分会被创建为 widget
             cardi = self.song_list_widget.build_card_for_row(row, is_expanded=False)
             if cardi:
@@ -1412,12 +1629,11 @@ class MainWindow(FramelessWindow):
                 phi3_folder.add_widget(cardi)
         layout.addWidget(phi3_folder, 0)
 
-        player_rks = round(total_rks / 30, 4)
+        player_rks = round(self.total_rks / (len(self.b27) + len(self.phi3)), 4)
         rks_content_elm = BodyLabel(str(player_rks))
         rks_content_elm.setStyleSheet(
             """
             font-size: 24px;
-            font-family:"楷体";
             color: #333;
             background: transparent;
         """
@@ -1582,5 +1798,5 @@ class MainWindow(FramelessWindow):
 # ---------- 程序入口 ----------
 if __name__ == "__main__":
     window = MainWindow()
-    window.show()
+    # window.show()
     sys.exit(app.exec_())

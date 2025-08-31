@@ -8,15 +8,22 @@ from PyQt5.QtWidgets import (
     QCompleter,
     QListWidgetItem,
     QSizePolicy,
+    QGraphicsBlurEffect,
 )
-from PyQt5.QtCore import Qt, QStringListModel, pyqtSignal, QSize, QTimer
-from PyQt5.QtGui import (
-    QIcon,
-    QColor,
-    QPainter,
-    QTextOption,
-    QPen,
+from PyQt5.QtCore import (
+    Qt,
+    QStringListModel,
+    pyqtSignal,
+    QSize,
+    QTimer,
+    QRectF,
+    QRect,
+    QPropertyAnimation,
+    QObject,
+    QRunnable,
+    QThreadPool,
 )
+from PyQt5.QtGui import QIcon, QColor, QPainter, QTextOption, QImage, QPainterPath
 from qfluentwidgets import (
     PrimaryPushButton,
     LineEdit,
@@ -28,7 +35,7 @@ from qfluentwidgets import (
     BodyLabel,
     ImageLabel,
     ToolTipFilter,
-    ToolTipPosition,
+    HorizontalSeparator,
     SmoothScrollArea,
     RoundMenu,
     MenuAnimationType,
@@ -36,6 +43,7 @@ from qfluentwidgets import (
     CheckBox,
     ListWidget,
     ScrollArea,
+    CardWidget,
 )
 from dependences.image_cache import *
 from dependences.consts import *
@@ -181,7 +189,7 @@ class body_label(QLabel):
         super().__init__(parent)
 
         # 1. 基础设置（保持与QFluentBodyLabel一致）
-        self.setText(str(text))
+        self.setText(text)
         self.setWordWrap(True)  # 启用自动换行
         self.setAlignment(Qt.AlignVCenter)  # 默认垂直居中
         # print(style)
@@ -253,7 +261,7 @@ class main_info_card(ElevatedCardWidget):
 
     def __init__(
         self,
-        imgpath: str,
+        imgpath: QPixmap,
         name: str,
         singal_rks: str,
         acc: str,
@@ -262,40 +270,44 @@ class main_info_card(ElevatedCardWidget):
         is_fc: bool,
         score: int = None,  # 等级
         index: int = None,
-        expended: bool = False,
         combine_name: str = None,
+        improve_advice: float | None = None,
     ):
         super().__init__()
         self.setContentsMargins(0, 0, 0, 0)  # 不要边界
+        self.setStyleSheet("border-radius: 10px;")
         self.left_func = None
         self.imgpath = imgpath
-        self.expended = expended
         self.combine_name = combine_name
         self.diff = diff
         self.bg_img_path = SONG_CARD_BACKGROUND[diff]
+
         # --布局顶部曲名和评级--
         self.top_widget = QFrame(self)
 
         self.top_layout = QGridLayout(self.top_widget)  # 采用网格 控制中间的空白
         self.top_layout.setContentsMargins(0, 0, 0, 0)  # 不要边界
-        self.top_layout.setSpacing(3)  # 设置控件之间的间距
+        self.top_layout.setSpacing(0)  # 设置控件之间的间距
 
         # 曲名
-        self.song_name_label = body_label(
+        self.song_name_label = label(
             name,
-            self.top_widget,
-        )
-        self.song_name_label.setStyleSheet(
-            """
-        font-family:'楷体';
-        font-size: 31px;
-        color: #ffffff;
-        """
+            {
+                "font_size": 29,
+                "max_width": 230,
+                "min_width": 230,
+                "min_height": 30,
+                "max_height": 100,
+                "font_color": (255, 255, 255, 1),
+            },
         )
         self.song_name_label.setWordWrap(True)  # 允许曲名自动换行
         self.top_layout.addWidget(
             self.song_name_label, 0, 1, 1, 4
         )  # (行, 列, 行跨度, 列跨度)
+        self.song_name_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Preferred
+        )  # 水平扩展，垂直自适应
         self.song_name_label.setAlignment(
             Qt.AlignCenter
         )  # 居中对齐 否则与评级图片高度不一致很难看
@@ -327,75 +339,106 @@ class main_info_card(ElevatedCardWidget):
         self.bottom_layout = QGridLayout(self.bottom_widget)  # 采用网格 控制中间的空白
         self.bottom_layout.setContentsMargins(0, 0, 0, 0)  # 不要边界
         self.bottom_layout.setSpacing(2)  # 取消控件之间的间距
+
+        # 推分建议
+        if improve_advice is not None:
+
+            self.improve_advice_label = label(
+                f"推分->{improve_advice}",
+                {
+                    "font_size": 23,
+                    "font_color": (188, 188, 188, 1),
+                    "max_width": 150,
+                    "min_height": 26,
+                },
+            )
+            # self.improve_advice_label.setWordWrap(True)
+            self.bottom_layout.addWidget(
+                self.improve_advice_label, 0, 1, 1, 2
+            )  # (行, 列, 行跨度, 列跨度)
+            self.improve_advice_label.setAlignment(Qt.AlignCenter | Qt.AlignBottom)
+            self.improve_advice_label.setContentsMargins(10, 0, 0, 0)
+
         # 单曲rks
+        rks_text = f"""
+        <span style="font-family: '{FONT_FAMILY["chi"]}'; font-size: 27px; color: #a7fffc">rks:</span><span style="font-family: '{FONT_FAMILY["chi"]}'; font-size: 24px;color: #ffffff">{singal_rks}</span>"""
         self.rks_label = body_label(
-            "rks:" + str(singal_rks),
+            # "rks:" + str(singal_rks),
+            rks_text,
             self.bottom_widget,
         )
-        self.rks_label.setStyleSheet(
-            f"""
-        font-size: 27px;
-        color: #ffffff;
-        """
-        )
+        # self.rks_label.setStyleSheet(
+        # f"""
+        # font-size: 27px;
+        # color: #DCDCDC;
+        # """
+        # )
         # self.rks_label.setWordWrap(True)
         self.bottom_layout.addWidget(
-            self.rks_label, 0, 0, 1, 1
+            self.rks_label, 1, 0, 1, 1
         )  # (行, 列, 行跨度, 列跨度)
         # self.rks_label.setAlignment(Qt.AlignCenter)
         self.rks_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
-        self.rks_label.setContentsMargins(15, 0, 0, 0)
+        self.rks_label.setContentsMargins(18, 0, 0, 0)
 
         # acc
+        acc_text = f"""
+        <span style="font-family: '{FONT_FAMILY["chi"]}'; font-size: 27px; color: #a7fffc">acc:</span><span style="font-family: '{FONT_FAMILY["chi"]}';font-size: 24px;color: #ffffff">{acc}%</span>"""
         self.acc_label = body_label(
-            "acc:" + str(acc),
+            # "acc:" + str(acc),
+            acc_text,
             self.bottom_widget,
         )
-        self.acc_label.setStyleSheet(
-            f"""
-        font-size: 26px;
-        color: #ffffff;
-        """
-        )
+        # self.acc_label.setStyleSheet(
+        #     f"""
+        # font-size: 26px;
+        # color: #ffffff;
+        # """
+        # )
         # self.acc_label.setWordWrap(True)
         self.bottom_layout.addWidget(
-            self.acc_label, 0, 1, 1, 2
+            self.acc_label, 1, 1, 1, 2
         )  # (行, 列, 行跨度, 列跨度)
         self.acc_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         self.acc_label.setContentsMargins(10, 0, 0, 0)
 
         # 定数
+        score_text = f"""
+        <span style="font-family: '{FONT_FAMILY["chi"]}'; font-size: 23px; color: #a7fffc">定数:</span><span style="font-family: '{FONT_FAMILY["chi"]}';font-size: 24px; color: #ffffff">{diff} {level}</span>"""
         self.level_label = body_label(
-            "定数:" + diff + " " + str(level),
+            # "定数:" + diff + " " + str(level),
+            score_text,
             self.bottom_widget,
         )
-        self.level_label.setStyleSheet(
-            f"""
-        font-size: 26px;
-        color: #ffffff;
-        """
-        )
+        # self.level_label.setStyleSheet(
+        #     f"""
+        # font-size: 26px;
+        # color: #ffffff;
+        # """
+        # )
         # self.level_label.setWordWrap(True)
         self.bottom_layout.addWidget(
-            self.level_label, 1, 0, 1, 1
+            self.level_label, 2, 0, 1, 1
         )  # (行, 列, 行跨度, 列跨度)
         self.level_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
-        self.level_label.setContentsMargins(15, 3, 0, 0)
+        self.level_label.setContentsMargins(18, 3, 0, 0)
 
         # 分数
+        score_text = f"""
+        <span style="font-family: '{FONT_FAMILY["chi"]}'; font-size: 23px; color: #a7fffc">分数:</span><span style="font-family: '{FONT_FAMILY["chi"]}';font-size: 24px; color: #ffffff">{score}</span>"""
         self.score_label = body_label(
-            "分数:" + str(score),
+            score_text,
             self.bottom_widget,
         )
-        self.score_label.setStyleSheet(
-            f"""
-        font-size: 25px;
-        color: #ffffff;
-        """
-        )
+        # self.score_label.setStyleSheet(
+        #     f"""
+        # font-size: 25px;
+        # color: #ffffff;
+        # """
+        # )
         # self.score_label.setWordWrap(True)
         self.bottom_layout.addWidget(
-            self.score_label, 1, 1, 1, 2
+            self.score_label, 2, 1, 1, 2
         )  # (行, 列, 行跨度, 列跨度)
         self.score_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         self.score_label.setContentsMargins(10, 3, 0, 0)
@@ -411,15 +454,32 @@ class main_info_card(ElevatedCardWidget):
         self.setCursor(Qt.PointingHandCursor)  # 鼠标悬停时显示手型指针
 
     def paintEvent(self, event):
-        """绘制背景图片（如果有），使用安全的懒缓存接口获取 pixmap。"""
         super().paintEvent(event)
 
         if self.imgpath:
             painter = QPainter(self)
-            illustration = get_illustration(self.combine_name, self.width())
-            difference = get_song_card_bg(self.diff, self.width())  # 差分
-            painter.drawPixmap(self.rect(), illustration)
-            painter.drawPixmap(self.rect(), difference)
+            painter.setRenderHint(QPainter.Antialiasing)
+
+            # 创建一个稍大的矩形以确保覆盖整个区域
+            rect = QRectF(0, 0, self.width(), self.height())
+
+            # 创建圆角矩形路径
+            path = QPainterPath()
+            radius = 10
+            path.addRoundedRect(rect, radius, radius)
+
+            # 设置裁剪区域
+            painter.setClipPath(path)
+
+            # 绘制背景图片
+            # illustration = get_illustration(self.combine_name, self.width())
+            difference = get_song_card_bg(self.diff, self.width())
+
+            # 绘制到整个矩形区域
+            # print(f"种类是{type(self.imgpath)}, {self.imgpath}")
+            painter.drawPixmap(QRect(0, 0, self.width(), self.height()), self.imgpath)
+            painter.drawPixmap(QRect(0, 0, self.width(), self.height()), difference)
+
             painter.end()
 
     def mousePressEvent(self, event):
@@ -430,6 +490,7 @@ class main_info_card(ElevatedCardWidget):
         super().mousePressEvent(event)
 
 
+#! 这个要删掉
 class tag(PrimaryPushButton):
     def __init__(self, text="", bg_color=None, border_width=2):
         super().__init__()
@@ -453,28 +514,6 @@ class tag(PrimaryPushButton):
         self.installEventFilter(ToolTipFilter(self, 200))
         # 禁用默认按钮样式
         self.setStyleSheet(f"border: none; background-color: rgba({r},{g},{b},{a});")
-
-    # def paintEvent(self, event):
-    #     """绘制跑道形状（胶囊样式）"""
-    #     painter = QPainter(self)
-    #     painter.setRenderHint(QPainter.Antialiasing)
-
-    #     # 左右各缩进4像素（可根据需要调整数值）
-    #     rect = self.rect()
-    #     radius = rect.height() / 2  # 半径=高度的一半
-
-    #     # 绘制半透明背景
-    #     painter.setBrush(self.bg_color)
-    #     painter.setPen(Qt.NoPen)
-    #     painter.drawRoundedRect(rect, radius, radius)
-
-    #     # 绘制边框（更凝实）
-    #     painter.setPen(QPen(self.border_color, self.border_width))
-    #     painter.setBrush(Qt.NoBrush)
-    #     painter.drawRoundedRect(rect, radius, radius)
-
-    #     # 调用父类绘制文字
-    #     super().paintEvent(event)
 
 
 class HorizontalInfoCard(QFrame):
@@ -508,7 +547,6 @@ class HorizontalInfoCard(QFrame):
             """
             min-width: 60px;
             font-size: 25px;
-            font-family:"楷体";
             color: #666;
             padding-right: 8px;
             border-radius: 8px;
@@ -561,7 +599,7 @@ class HorizontalInfoCard(QFrame):
 class song_info_card(QWidget):
     def __init__(
         self,
-        imgpath: str,
+        imgpath: QPixmap,
         name: str,
         singal_rks: str,
         acc: str,
@@ -575,6 +613,7 @@ class song_info_card(QWidget):
         drawer: str = "",
         is_expended: bool = False,
         combine_name: str = "",
+        improve_advice: float | None = None,
     ):
         super().__init__()
         # 保存数据
@@ -591,6 +630,7 @@ class song_info_card(QWidget):
         self.chapter = chapter
         self.drawer = drawer
         self.combine_name = combine_name
+        self.improve_advice = improve_advice
 
         self.right_func = None
         self.setContentsMargins(0, 0, 0, 0)
@@ -612,7 +652,8 @@ class song_info_card(QWidget):
             is_fc,
             score,
             index,
-            combine_name=combine_name,
+            combine_name,
+            improve_advice,
         )
         self.mainlayout.addWidget(self.elevatedcard)
         self.elevatedcard.left_func = self.clicked_card
@@ -638,7 +679,6 @@ class song_info_card(QWidget):
 
         self.label_style = """
             font-size: 24px;
-            font-family:"楷体";
             color: #333;
             background: transparent;
         """
@@ -730,6 +770,7 @@ class song_info_card(QWidget):
             self.drawer,
             True,  # 默认展开相关信息
             self.combine_name,
+            self.improve_advice,
         )
 
     def set_edited_info(self, group: list[str], tags: list[str], comment: str):
@@ -785,7 +826,6 @@ class folder(QWidget):
         self.title = title
 
         # 不再设置全局固定最小高度，保留宽度最小约束（可按需调整）
-        # self.setMinimumHeight(265)  # <- 移除或注释掉
         self.setMinimumWidth(420)
 
         # 默认 QSizePolicy：水平方向可扩展，垂直方向使用 Minimum（折叠时不占用多余空间）
@@ -1245,33 +1285,47 @@ class CheckableComboBox(EditableComboBox):
         self.setText("")
 
 
-class quick_function_card(ElevatedCardWidget):
-
-    def __init__(self, title: str, iconpath: str):
+class quick_function_card(CardWidget):
+    def __init__(
+        self,
+        bg: QPixmap,
+        preview_text="",
+        content_text="",
+        title_style={},
+        content_style={},
+    ):
         super().__init__()
-
         self.left_func = None
-        self.iconWidget = ImageLabel(iconpath, self)
-        label_style = {
-            "min_width": 200,
-            "max_width": 200,
-            "font_size": 24,
-            "max_height": 30,
-            "min_height": 30,
-            "font_color": (0, 245, 255, 0.9),
-        }
-        self.label = label(title, label_style)
+        self.bg = bg
+        self.mainlayout = QVBoxLayout(self)
+        self.mainlayout.setSpacing(0)
+        self.mainlayout.setContentsMargins(0, 0, 0, 0)
+        self.setFixedSize(250, 250)
 
-        self.iconWidget.scaledToHeight(135)
+        self.mainlayout.addStretch(1)
 
-        self.vBoxLayout = QVBoxLayout(self)
-        self.vBoxLayout.setAlignment(Qt.AlignCenter)
-        self.vBoxLayout.addStretch(1)
-        self.vBoxLayout.addWidget(self.iconWidget, 0, Qt.AlignCenter)
-        self.vBoxLayout.addStretch(1)
-        self.vBoxLayout.addWidget(self.label, 0, Qt.AlignCenter | Qt.AlignBottom)
+        self.moveable_part = ExpandableTextWidget(
+            preview_text, content_text, title_style, content_style
+        )
+        self.mainlayout.addWidget(self.moveable_part)
 
-        self.setFixedSize(200, 200)
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        if self.bg:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            # 绘制背景图片
+            rect = QRectF(0, 0, self.width(), self.height())
+            path = QPainterPath()
+            radius = 15
+            path.addRoundedRect(rect, radius, radius)
+
+            # 设置裁剪区域
+            painter.setClipPath(path)
+            # 绘制到整个矩形区域
+            painter.drawPixmap(QRect(0, 0, self.width(), self.height()), self.bg)
+            painter.end()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -1279,3 +1333,307 @@ class quick_function_card(ElevatedCardWidget):
             self.left_func()
             self.clicked.emit()  # 需要先定义信号
         super().mousePressEvent(event)
+
+
+class ExpandableTextWidget(QWidget):
+    def __init__(self, preview_text, content_text, title_style, content_style):
+        super().__init__()
+
+        # 初始化布局
+        self.expand = False
+        self.mainlayout = QVBoxLayout(self)
+        self.mainlayout.setContentsMargins(0, 0, 0, 0)
+        self.mainlayout.setSpacing(10)
+
+        # 创建标签
+        self.title_label = label(preview_text, title_style)
+        self.title_label.setWordWrap(True)  # 允许文字换行
+        self.title_label.setAlignment(Qt.AlignCenter)  # 居中显示
+        self.mainlayout.addWidget(self.title_label)
+
+        self.horizontal_separator = HorizontalSeparator()
+        self.mainlayout.addWidget(self.horizontal_separator)
+        self.horizontal_separator.hide()
+
+        self.content_label = label(content_text, content_style)
+        # print(f"content_style={content_style}")
+        self.content_label.setWordWrap(True)  # 允许文字换行
+        self.content_label.setAlignment(Qt.AlignTop)  # 居中显示
+        self.mainlayout.addWidget(self.content_label)
+        self.content_label.hide()
+
+        # 设置初始大小
+        self.resize(250, 70)
+
+        # 创建几何动画
+        self.geometryAni = QPropertyAnimation(self, b"geometry")
+        self.geometryAni.setDuration(300)
+        self.len = 100
+        # self.geometryAni.setEasingCurve(QEasingCurve.OutBack)
+
+        # 保存初始几何状态
+        self._originalGeo = self.geometry()
+        self.geometryAni.finished.connect(self._on_animation_finished)
+
+    def _on_animation_finished(self):
+        # print("动画完成！")
+        if self.expand:
+            self.resize(250, 70 + self.len)
+            self.content_label.show()
+            self.horizontal_separator.show()
+        else:
+            self.resize(250, 70)
+            self.content_label.hide()
+            self.horizontal_separator.hide()
+        # 在这里执行动画完成后的操作
+
+    def enterEvent(self, e):
+        super().enterEvent(e)
+        if self.geometryAni.state() != QPropertyAnimation.Running:
+            self._originalGeo = self.geometry()
+        # 计算悬停状态的目标几何
+        targetRect = QRect(
+            self._originalGeo.x(),
+            self._originalGeo.y() - self.len,
+            self._originalGeo.width(),
+            self.height() + self.len,
+        )
+
+        # 没有在运行动画的话我就启动动画
+        if self.geometryAni.state() != QPropertyAnimation.Running:
+            self._startGeometryAni(self._originalGeo, targetRect)
+            self.expand = True
+
+    def leaveEvent(self, e):
+        super().leaveEvent(e)
+        # 返回初始几何
+        self._startGeometryAni(self.geometry(), self._originalGeo)
+        self.expand = False
+
+        # self.resize(250, 100)
+        # self.content_label.hide()
+        # self.horizontal_separator.hide()
+
+    # def mousePressEvent(self, e):
+    #     super().mousePressEvent(e)
+    #     # 返回初始几何
+    #     self._startGeometryAni(self.geometry(), self._originalGeo)
+    #     self.content_label.hide()
+    #     self.horizontal_separator.hide()
+
+    def _startGeometryAni(self, start, end):
+        """启动几何动画"""
+        self.geometryAni.setStartValue(start)
+        self.geometryAni.setEndValue(end)
+        self.geometryAni.start()
+
+    def paintEvent(self, event):
+        # 创建圆角矩形路径
+
+        # 创建QPainter并设置裁剪区域
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # 填充背景（透明白色）
+        painter.fillRect(QRectF(self.rect()), QColor(255, 255, 255, 200))
+        painter.end()
+
+        # 调用父类方法绘制其他内容
+        super().paintEvent(event)
+
+
+from PyQt5.QtWidgets import (
+    QWidget,
+    QGraphicsBlurEffect,
+    QGraphicsScene,
+    QGraphicsPixmapItem,
+)
+from PyQt5.QtGui import QPainter, QPixmap
+from PyQt5.QtCore import Qt
+
+
+class bg_widget(QWidget):
+    def __init__(self, bg: QPixmap, blur_num: float = 18.0):
+        super().__init__()
+        # self.setWindowTitle("Blurred Background with QGraphicsBlurEffect")
+        # self.resize(800, 600)
+        # 请确保有一个名为 'bg.jpg' 的图片文件在脚本同目录下
+        # 或者提供完整路径
+        self.bg = bg
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        # 加载图片
+        # 创建一个临时的 QGraphicsScene
+        scene = QGraphicsScene(self)
+
+        # 创建一个 QGraphicsPixmapItem 来持有图片
+        pixmap_item = QGraphicsPixmapItem(self.bg)
+
+        # 创建 QGraphicsBlurEffect 并设置模糊半径
+        blur_effect = QGraphicsBlurEffect()
+        blur_effect.setBlurRadius(16.0)  # 调整此值以改变模糊强度
+
+        # 将模糊效果应用到 pixmap item
+        pixmap_item.setGraphicsEffect(blur_effect)
+
+        # 将 item 添加到场景
+        scene.addItem(pixmap_item)
+
+        # 缩放图片以适应窗口大小 (保持宽高比填充)
+        # 我们需要先将 pixmap_item 放入场景才能正确获取其 bounds
+        # 因此，我们先添加 item，然后根据原始 pixmap 大小设置 scale
+        original_size = self.bg.size()
+        scaled_size = self.size()  # 目标大小是 widget 的大小
+        if original_size.width() > 0 and original_size.height() > 0:
+            # 计算缩放比例以填充
+            scale_x = scaled_size.width() / original_size.width()
+            scale_y = scaled_size.height() / original_size.height()
+            scale = max(scale_x, scale_y)  # 选择较大的比例以确保填充
+            pixmap_item.setScale(scale)
+
+        # 确定场景的渲染区域 (即 widget 的大小)
+        scene_rect = QRectF(self.rect())
+
+        # 使用 QPainter 将 QGraphicsScene 渲染到 widget 上
+        # render(target painter, target area, source area, render options)
+        scene.render(painter, scene_rect, scene_rect)
+
+        # 清理 (可选，因为 scene 是临时的，会在方法结束时被销毁)
+
+
+# --- 信号类 ---
+class WorkerSignals(QObject):
+    finished = pyqtSignal()  # Worker 完成信号 (单个任务)
+    progress = pyqtSignal(int, int)  # 发送 (当前完成任务数, 总任务数)
+    log_message = pyqtSignal(str)
+    # 修改 pixmap_loaded 信号，包含 key 和 target_dict
+    pixmap_loaded = pyqtSignal(str, object, object)  # (key, QPixmap, target_dict)
+
+
+# --- 工作单元 (QRunnable) - 处理单个任务 ---
+class ImageLoaderWorker(QRunnable):
+    def __init__(self, image_path, key, target_dict, target_width):
+        super().__init__()
+        self.image_path = image_path
+        self.key = key
+        self.target_dict = target_dict  # 虽然传递了，但实际存储由 ImageLoaderApp 控制
+        self.target_width = target_width
+        self.signals = WorkerSignals()
+        self.setAutoDelete(True)
+
+    def run(self):
+        # print('run了', self.key)
+        try:
+            image = QImage(self.image_path)
+            if image.isNull():
+                self.signals.finished.emit()
+                print(f"图片不存在哦~")
+                return
+
+            original_width = image.width()
+            original_height = image.height()
+            if original_width <= 0 or original_height <= 0:
+                self.signals.finished.emit()
+                return
+
+            target_height = int((self.target_width / original_width) * original_height)
+            scaled_image = image.scaled(
+                self.target_width,
+                target_height,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            pixmap = QPixmap.fromImage(scaled_image)
+
+            # 发射信号，携带 key, pixmap 和 target_dict
+            self.signals.pixmap_loaded.emit(self.key, pixmap, self.target_dict)
+            # print('信号发射!')
+
+        except Exception as e:
+            self.signals.log_message.emit(
+                f"[Error] Processing '{self.image_path}': {e}"
+            )
+        finally:
+            # 无论成功与否，都发出 finished 信号
+            # print('finishi了喵')
+            self.signals.finished.emit()
+
+
+# --- 任务管理器 ---
+class ImageLoaderApp(QObject):  # 继承 QObject 以支持信号
+    # 定义一个总的完成信号
+    all_tasks_finished = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()  # 调用父类 QObject 的初始化
+        self.todo_list = []  # 存储 (image_path, key, target_dict) 元组
+        self.threadpool = QThreadPool()
+        self.total_tasks = 0
+        self.completed_tasks = 0
+        self.active_workers = set()  # 使用集合存储，避免重复
+        # print(f"Multithreading with maximum {self.threadpool.maxThreadCount()} threads")
+
+    def add_task(self, image_path, key, target_dict, width):
+        """添加一个待处理任务"""
+        self.todo_list.append((image_path, key, target_dict, width))
+        # print(f"Task added: {image_path} -> {key}")
+
+    def start_processing(self):
+        """启动所有已添加的任务"""
+        self.total_tasks = len(self.todo_list)
+        # print(f"self.total_tasks={self.total_tasks}")
+        self.completed_tasks = 0
+
+        if self.total_tasks == 0:
+            self.all_tasks_finished.emit()
+            return
+
+        self.threadpool.setMaxThreadCount(
+            min(8, self.threadpool.maxThreadCount())
+        )  # 可选：限制最大线程数
+
+        # 清空上一次可能残留的引用
+        self.active_workers.clear()
+        for image_path, key, target_dict, width in self.todo_list:
+            worker = ImageLoaderWorker(image_path, key, target_dict, width)
+            finished_slot = lambda w=worker: self._on_single_task_finished(
+                w
+            )  # w=worker 是捕获当前 worker
+            worker.signals.finished.connect(finished_slot)
+            worker.signals.pixmap_loaded.connect(self._store_pixmap)  # 连接存储信号
+            worker.signals.log_message.connect(self._log_message)  # 连接日志信号 (可选)
+
+            self.active_workers.add(worker)
+            self.threadpool.start(worker)
+
+        # 清空 todo_list，为下一次使用做准备
+        self.todo_list.clear()
+
+    def _on_single_task_finished(self, worker):
+        """内部槽函数：处理单个任务完成"""
+        self.completed_tasks += 1
+        self.active_workers.discard(worker)  # discard 不会抛出异常如果 worker 不存在
+        # print(f"Task finished. Progress: {self.completed_tasks}/{self.total_tasks}")
+        # 发射进度信号
+        self.progress.emit(self.completed_tasks, self.total_tasks)
+
+        if self.completed_tasks >= self.total_tasks:
+            # print("All tasks finished!")
+            self.all_tasks_finished.emit()  # 发射总完成信号
+
+    def _store_pixmap(self, key, pixmap, target_dict):
+        """内部槽函数：将 pixmap 存储到指定的字典中"""
+        # print(f"Storing pixmap for key '{key}' into target dict.")
+        self.active_workers.clear()
+        target_dict[key] = pixmap
+        # print(target_dict)
+
+    def _log_message(self, message):
+        """内部槽函数：处理日志消息 (可选)"""
+        print(message)
+
+    # 如果需要从 ImageLoaderApp 外部连接进度信号，可以在这里定义
+    progress = pyqtSignal(int, int)  # (completed, total)

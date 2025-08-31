@@ -58,6 +58,7 @@ ROLE_BG_PIXMAP = Qt.UserRole + 14
 ROLE_GROUPS = Qt.UserRole + 15
 ROLE_TAGS = Qt.UserRole + 16
 ROLE_COMMENT = Qt.UserRole + 17
+ROLE_ADVICE = Qt.UserRole + 18
 
 
 # -------------------------
@@ -79,6 +80,7 @@ class SongItem:
     acc: float
     level: float
     score: int
+    improve_advice: float | None
     is_fc: bool
     composer: str
     chapter: str
@@ -148,6 +150,8 @@ class SongListModel(QAbstractListModel):
             return item.tags
         if role == ROLE_COMMENT:
             return item.comment
+        if role == ROLE_ADVICE:
+            return item.improve_advice
         # Qt.SizeHintRole: 告诉视图每行的推荐尺寸（delegate 或 view 可使用）
         if role == Qt.SizeHintRole:
             return QSize(400, 198)
@@ -211,9 +215,6 @@ class ImageLoadTask(QRunnable):
 
     def run(self):
         # 注意：run 在工作线程中执行
-        if not self.path or not os.path.exists(self.path):
-            # 文件不存在则直接返回（不会发信号）
-            return
         img = QImage(self.path)
         if img.isNull():
             # 加载失败（格式不支持等）
@@ -421,6 +422,7 @@ class SongListViewWidget(QWidget):
         group_info: dict,
         tag_info: dict,
         comment_info: dict,
+        illustration_cache: dict[str, QPixmap],
     ):
         """
         从已解析的存档字典填充模型（等价于原来 get_save_data 中构建 song_info_card 的数据处理逻辑）
@@ -446,9 +448,10 @@ class SongListViewWidget(QWidget):
                 is_fc = True if items["fc"] == 1 else False
                 level = float(diff_map_result[combine_name][diffi])
                 singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
-                acc = round(acc, 3)
+                acc = round(acc, 4)
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
-                illustration_path = ILLUSTRATION_PREPATH + combine_name + ".png"
+                # illustration_path = ILLUSTRATION_PREPATH + combine_name + ".png"
+                illustration_path = illustration_cache[combine_name]
                 bg_path = SONG_CARD_BACKGROUND[diffi]
                 groups = group_info.get(combine_name, "").split("`")
                 tags = tag_info.get(combine_name, "").split("`")
@@ -462,6 +465,7 @@ class SongListViewWidget(QWidget):
                     acc=acc,
                     level=level,
                     score=score,
+                    improve_advice=None,
                     is_fc=is_fc,
                     composer=composer,
                     chapter=chapter_dic[diffi],
@@ -476,7 +480,7 @@ class SongListViewWidget(QWidget):
                 # 图像键：用 combine+diff 标识（若多行共享同一图可复用）
                 key = f"{combine_name}_{diffi}"
                 # 调度插图与背景的异步加载。加载完成后主线程槽会把 pixmap 写回 model
-                self._schedule_image_load_for_row(row, key, illustration_path, False)
+                # self._schedule_image_load_for_row(row, key, illustration_path, False)
                 self._schedule_image_load_for_row(row, key, bg_path, True)
                 row += 1
 
@@ -498,6 +502,7 @@ class SongListViewWidget(QWidget):
 
         # 构造一个完整的 song_info_card（参数尽量与原构造器匹配）
         # 注意：SongItem 目前没有保存 is_fc，这里暂以 False 填充；若需要保存可扩展 SongItem
+        # print(f"背景图片路径:{item.illustration_path}")
         card = song_info_card(
             item.illustration_path,
             item.name,
@@ -513,6 +518,7 @@ class SongListViewWidget(QWidget):
             item.drawer,
             is_expanded,
             item.combine_name,
+            item.improve_advice,
         )
 
         # 为保持与旧代码兼容：某些地方（如 classes.main_info_card.paintEvent）可能从
