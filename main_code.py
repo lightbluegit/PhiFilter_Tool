@@ -15,8 +15,6 @@ from PyQt5.QtGui import (
     QIcon,
     QPixmap,
     QDesktopServices,
-    QFont,
-    QFontDatabase,
 )
 import requests
 from qfluentwidgets import (
@@ -30,6 +28,7 @@ from qfluentwidgets import (
     AvatarWidget,
     HorizontalSeparator,
     SplashScreen,
+    ProgressRing,
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
@@ -69,6 +68,7 @@ class MainWindow(FramelessWindow):
         # ---------- 初始化各种变量 ----------
         self.tt = datetime.now()
         self.avatar = ""  # 存放用户头像文件名
+        self.user_name = ""  # 存放用户ID
         self.token = ""  # 存放用户 session_token
         self.save_dict = {}  # 云存档解析后的字典数据
         self.total_rks = 0  # rks未/30之前得到的值 用于计算某个歌曲是否能推分
@@ -97,16 +97,28 @@ class MainWindow(FramelessWindow):
         self.illustration_cache: dict[str, QPixmap] = {}
         self.illustration_cache_process = None
 
-        self.splash_screen = SplashScreen(FIF.ROBOT)
         self.page_bg_cache: dict[str, QPixmap] = {}
         self.page_icon_cache: dict[str, QPixmap] = {}
+
+        self.home_page_tips: list[str] = [
+            "这里是主页 有各种小工具哦~",
+            "鼠标放在卡片底端的文字上可以展开详细信息 试试吧",
+        ]
+
         # 3. 显示启动屏幕
+        self.splash_screen = QWidget()
+        self.splash_screen.setFixedSize(self.width(), self.height())
+        open_layout = QGridLayout(self.splash_screen)
+        self.ring = ProgressRing()
+        self.ring.setAlignment(Qt.AlignCenter)
+        self.ring.setTextVisible(True)
+        self.ring.setFixedSize(130, 130)
+        self.ring.setStrokeWidth(10)
+        open_layout.addWidget(self.ring, 1, 1, 1, 1)
+
         self.splash_screen.show()
-        # （可选）确保启动屏幕在最前面
-        self.splash_screen.raise_()
 
         # self.font_family = {}
-        self.preinit()
         # ---------- 窗口设置 ----------
         # 设置窗口标题
         self.setTitleBar(StandardTitleBar(self))
@@ -152,6 +164,7 @@ class MainWindow(FramelessWindow):
                 pass
 
         self.generate_cname_to_name_info()
+        self.preinit()
         # 后续的init的逻辑在 check_preinit_finished 里面 因为需要并行加载完成
 
     def preinit(self):
@@ -159,43 +172,51 @@ class MainWindow(FramelessWindow):
         self.illustration_cache = {}
 
         # 创建 ImageLoaderApp 实例
-        loader = ImageLoaderApp()
+        self.loader = ImageLoaderApp()
 
         # --- 添加任务 ---
         # 假设这些图片文件存在
         for combine_namei in COMBINE_NAME:
-            loader.add_task(
+            self.loader.add_task(
                 rf"{ILLUSTRATION_PREPATH}{combine_namei}.png",
                 combine_namei,
                 self.illustration_cache,
                 400,
             )
-        # print(f'待办任务{loader.todo_list}')
+        # print(f'待办任务{self.loader.todo_list}')
         # --- 连接信号 (可选，用于获取状态) ---
-        loader.add_task(
+        self.loader.add_task(
             self.get_acg_image(ACG_IMAGE_URL, "主页背景"),
             "home",
             self.page_bg_cache,
             self.width(),
         )
-        loader.add_task(
+        self.loader.add_task(
             self.get_acg_image(ACG_IMAGE_URL, "编辑页背景"),
             "edit",
             self.page_bg_cache,
             self.width(),
         )
-        loader.add_task(
+        self.loader.add_task(
             self.get_acg_image(ACG_PPIMAGE_URL, "rks组成图背景"),
             "rks组成图背景",
             self.page_icon_cache,
             250,
         )
-
-        loader.all_tasks_finished.connect(self.on_all_finished)
+        self.loader.add_task(
+            self.get_acg_image(ACG_IMAGE_URL, "账号页背景"),
+            "account",
+            self.page_bg_cache,
+            250,
+        )
+        self.ring.setRange(0, len(self.loader.todo_list))
+        self.ring.setValue(0)
+        self.loader.all_tasks_finished.connect(self.on_all_finished)
+        self.loader.progress.connect(self.update_open_page)
 
         # --- 启动处理 ---
         # print("Starting image processing...")
-        loader.start_processing()
+        self.loader.start_processing()
 
     def on_all_finished(self):
         # print("\n--- All Tasks Completed ---")
@@ -206,16 +227,7 @@ class MainWindow(FramelessWindow):
         if self.token:
             self.get_save_data()
             try:
-                avatar_name = self.save_dict["user"]["avatar"]
-                avatar_pixmap = QPixmap(
-                    os.path.join(AVATER_IMG_PREPATH, avatar_name + ".png")
-                )
-                avatar = AvatarWidget(
-                    avatar_pixmap, self.widgets["account_page"]["widget"]
-                )
-                avatar.setFixedSize(100, 100)
-                self.widgets["account_page"]["avatar"] = avatar
-                avatar.show()
+                self.avatar = self.save_dict["user"]["avatar"]
             except Exception:
                 pass
 
@@ -226,8 +238,9 @@ class MainWindow(FramelessWindow):
         else:
             self.switch_to(self.account_page)
 
-        self.splash_screen.finish()
+        self.splash_screen.close()
         self.show()
+
         end_time = datetime.now()
         time_difference = end_time - self.tt
 
@@ -236,6 +249,9 @@ class MainWindow(FramelessWindow):
         microseconds = time_difference.microseconds
 
         print(f"预处理用时:{seconds:02d}s.{microseconds:06d}")
+
+    def update_open_page(self):
+        self.ring.setValue(self.loader.completed_tasks)
 
     # ------------------ Core data loading / mapping ------------------
     def generate_cname_to_name_info(self):
@@ -282,8 +298,8 @@ class MainWindow(FramelessWindow):
             with PhigrosCloud(self.token) as cloud:
                 summary = cloud.getSummary()
                 # print(f'你的summary是{summary}')
-                user_name = cloud.getNickname()
-                print(f"你的名字是{user_name}")
+                self.user_name = cloud.getNickname()
+                # print(f"你的名字是{self.user_name}")
                 save_data = cloud.getSave(summary["url"], summary["checksum"])
                 save_dict = unzipSave(save_data)
                 save_dict = decryptSave(save_dict)
@@ -427,6 +443,10 @@ class MainWindow(FramelessWindow):
         widget = content_widget.widget(index)
         navigation_interface = self.widgets["basepage"]["navigation_interface"]
         navigation_interface.setCurrentItem(widget.objectName())
+        if widget.objectName() == "home_page":
+            self.widgets["home_page"]["tip"].set_text(
+                random.choice(self.home_page_tips)
+            )
 
     # ------------------ Pages implementations ------------------
     def init_homepage(self) -> QWidget:
@@ -449,10 +469,11 @@ class MainWindow(FramelessWindow):
 
         # Header
         header_style = {
-            # "min_width": widget.width() - 10,
+            "min_height": 50,
+            "max_height": 50,
             # "max_width": widget.width() - 10,
             "font_color": (182, 204, 161, 1),
-            "font_size": 35,
+            "font_size": 40,
         }
         header = label("主页", header_style)
         header.adjustSize()
@@ -492,6 +513,23 @@ class MainWindow(FramelessWindow):
         layout.addWidget(generate_rsk_conpone_card)
 
         layout.addStretch(1)  # 顶上去
+
+        tip_layout = QVBoxLayout()
+        tip_layout.setAlignment(Qt.AlignLeft)
+        layout.addLayout(tip_layout)
+        tip_style = {
+            "font_size": 22,
+            "min_width": widget.width(),
+            "max_width": widget.width(),
+            "max_height": 21,
+            "min_height": 21,
+            "font_color": (138, 138, 138, 1),
+        }
+        tip = label(random.choice(self.home_page_tips), tip_style)
+        self.widgets["home_page"]["tip"] = tip
+        tip.setAlignment(Qt.AlignLeft)
+        tip_layout.addWidget(tip)
+
         return widget
 
     def get_acg_image(self, url: str, img_save_name: str) -> str | None:
@@ -892,6 +930,7 @@ class MainWindow(FramelessWindow):
 
         # 重新读取难度表（也可以复用之前的 diff_map_result）
 
+        self.tt = datetime.now()
         df = pd.read_csv(
             DIFFICULTY_PATH,
             sep="\t",
@@ -1127,6 +1166,8 @@ class MainWindow(FramelessWindow):
             return
         if not hasattr(self, "filter_result"):
             return
+
+        self.tt = datetime.now()
         filter_obj_list = self.widgets["search_page"]["filter_obj_list"]
         logical_link = filter_obj_list[0].logical_cbb.get_content()
         filter_result_copy = self.filter_result.copy()
@@ -1160,7 +1201,6 @@ class MainWindow(FramelessWindow):
         if not self.filter_result:
             return
 
-        # itme = time.time()
         print("开始布局")
         # 获取分组/排序选项并处理默认值
         group_by = (
@@ -1302,6 +1342,14 @@ class MainWindow(FramelessWindow):
         # 恢复滚动内容更新并完成布局
         self.widgets["search_page"]["scroll_content_widget"].setUpdatesEnabled(True)
         # print(f"布局{cnt}个控件用时:", time.time() - itme)
+        end_time = datetime.now()
+        time_difference = end_time - self.tt
+
+        total_seconds = time_difference.total_seconds()
+        seconds = int(total_seconds % 60)
+        microseconds = time_difference.microseconds
+
+        print(f"筛选并布局{cnt}个控件用时:{seconds:02d}s.{microseconds:06d}")
 
     def link_and_show(self, info_card: song_info_card):
         """
@@ -1690,20 +1738,35 @@ class MainWindow(FramelessWindow):
     # --------------- 账号页面 -------------------
     def init_account_page(self) -> QWidget:
         self.widgets["account_page"] = {}
-        widget = QWidget()
+        widget = bg_widget(self.page_bg_cache["account"])
         self.widgets["account_page"]["widget"] = widget
 
         layout = QVBoxLayout(widget)
         self.widgets["account_page"]["layout"] = layout
         widget.setLayout(layout)
+
         if self.avatar:
             original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
             # 使用QFluentWidgets的AvatarWidget显示
             avatar = AvatarWidget(original_pixmap, widget)
             avatar.setFixedSize(110, 110)
             avatar.show()
+
+        if self.user_name:
+            name_label = label(
+                self.user_name,
+                {
+                    "font_size": 28,
+                    "max_width": 300,
+                    "min_height": 30,
+                    "background_color": (255, 255, 255, 0.8),
+                    "font_color": (138, 225, 252, 1),
+                },
+            )
+            layout.addWidget(name_label)
         QRcode_img = ImageLabel(QRCODE_EMPTY_IMG_PATH)  # 空二维码
         QRcode_img.setFixedSize(410, 410)
+
         # 2. 保持长宽比缩放图片
         pixmap = QPixmap(QRCODE_EMPTY_IMG_PATH)
         pixmap = pixmap.scaled(
