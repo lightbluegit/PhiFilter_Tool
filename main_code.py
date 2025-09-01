@@ -27,7 +27,6 @@ from qfluentwidgets import (
     InfoBarPosition,
     AvatarWidget,
     HorizontalSeparator,
-    SplashScreen,
     ProgressRing,
 )
 from qfluentwidgets import FluentIcon as FIF
@@ -68,6 +67,11 @@ class MainWindow(FramelessWindow):
         # ---------- 初始化各种变量 ----------
         self.tt = datetime.now()
         self.avatar = ""  # 存放用户头像文件名
+        self.background_name = ""  # 背景名称
+        self.rks = 0  # 玩家的rks
+        self.money = (0, 0, 0, 0, 0)  # KB MB GB TB PB
+        self.challengemode_rank = ""  # 待处理
+        self.user_introduction = ""  # 用户自我介绍
         self.user_name = ""  # 存放用户ID
         self.token = ""  # 存放用户 session_token
         self.save_dict = {}  # 云存档解析后的字典数据
@@ -103,6 +107,10 @@ class MainWindow(FramelessWindow):
         self.home_page_tips: list[str] = [
             "这里是主页 有各种小工具哦~",
             "鼠标放在卡片底端的文字上可以展开详细信息 试试吧",
+            "搜索页面对于曲师 曲名等内容提供自动补全",
+            "筛选条件大于1个的时候记得选择连接逻辑",
+            "所有歌曲卡片都可以左键展开详细信息 右键跳转编辑页面喵",
+            "由于找不到合适的图标索性就用二次元头像做icon了捏",
         ]
 
         # 3. 显示启动屏幕
@@ -175,7 +183,6 @@ class MainWindow(FramelessWindow):
         self.loader = ImageLoaderApp()
 
         # --- 添加任务 ---
-        # 假设这些图片文件存在
         for combine_namei in COMBINE_NAME:
             self.loader.add_task(
                 rf"{ILLUSTRATION_PREPATH}{combine_namei}.png",
@@ -183,7 +190,17 @@ class MainWindow(FramelessWindow):
                 self.illustration_cache,
                 400,
             )
+
+        for keyi, pathi in SONG_CARD_BACKGROUND.items():  # 背景卡片
+            self.loader.add_task(pathi, keyi, self.page_bg_cache, 250)
+
         # print(f'待办任务{self.loader.todo_list}')
+        self.loader.add_task(  # introduction(新手教学背景) 不在combine_name列表中 需要单独处理喵
+            rf"{ILLUSTRATION_PREPATH}introduction.png",
+            "introduction",
+            self.illustration_cache,
+            400,
+        )
         # --- 连接信号 (可选，用于获取状态) ---
         self.loader.add_task(
             self.get_acg_image(ACG_IMAGE_URL, "主页背景"),
@@ -203,6 +220,14 @@ class MainWindow(FramelessWindow):
             self.page_icon_cache,
             250,
         )
+
+        self.loader.add_task(
+            self.get_acg_image(ACG_PPIMAGE_URL, "更新背景"),
+            "更新背景",
+            self.page_icon_cache,
+            250,
+        )
+
         self.loader.add_task(
             self.get_acg_image(ACG_IMAGE_URL, "账号页背景"),
             "account",
@@ -234,7 +259,8 @@ class MainWindow(FramelessWindow):
         self.init_all_pages()
         self.init_navigation()
         if self.token:
-            self.switch_to(self.home_page)
+            # self.switch_to(self.home_page)
+            self.switch_to(self.account_page)
         else:
             self.switch_to(self.account_page)
 
@@ -305,6 +331,15 @@ class MainWindow(FramelessWindow):
                 save_dict = decryptSave(save_dict)
                 save_dict = formatSaveDict(save_dict)
                 self.save_dict = save_dict
+                self.background_name = save_dict["user"]["background"]
+                self.challengemode_rank = str(
+                    save_dict["gameProgress"]["challengeModeRank"]
+                )
+                # print(f"你的挑战模式组成是{self.challengemode_rank}")
+                self.money = save_dict["gameProgress"]["money"]
+                # print('你的金币是', self.money)
+                self.user_introduction = save_dict["user"]["selfIntro"]
+                # print(f'你的自我介绍是{self.user_introduction}')
                 # print(f'存档文件是这个喵{save_dict}')
         except:
             # InfoBar.warning(
@@ -335,6 +370,7 @@ class MainWindow(FramelessWindow):
             diff_map_result[name] = diff_map
 
         # 使用委托式视图填充 model：效率高，避免创建大量 QWidget
+        self.song_list_widget = SongListViewWidget()  # 覆盖掉之前的所有存档
         self.song_list_widget.populate_from_save(
             self.save_dict,
             diff_map_result,
@@ -343,6 +379,7 @@ class MainWindow(FramelessWindow):
             TAG_INFO,
             COMMENT_INFO,
             self.illustration_cache,
+            self.page_bg_cache,
         )
 
         self.all_song_card = {}
@@ -354,7 +391,17 @@ class MainWindow(FramelessWindow):
             if combine not in self.all_song_card.keys():
                 self.all_song_card[combine] = {}
             self.all_song_card[combine][diff] = row
+        print("更新完成喵~")
 
+        InfoBar.success(
+            title="连接成功",
+            content="更新完成喵~",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=3000,
+            parent=window,
+        )
         # print("get_save_data 用时", time.time() - times, "s")
 
     # ------------------ UI pages init (kept consistent) ------------------
@@ -463,7 +510,7 @@ class MainWindow(FramelessWindow):
         self.widgets["home_page"]["widget"] = widget
 
         layout = QVBoxLayout(widget)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(0, 24, 24, 24)
         layout.setSpacing(5)
         self.widgets["home_page"]["layout"] = layout
 
@@ -471,19 +518,20 @@ class MainWindow(FramelessWindow):
         header_style = {
             "min_height": 50,
             "max_height": 50,
-            # "max_width": widget.width() - 10,
             "font_color": (182, 204, 161, 1),
             "font_size": 40,
         }
         header = label("主页", header_style)
         header.adjustSize()
+        header.setAlignment(Qt.AlignCenter)
         layout.addWidget(header)
 
         # 水平分割线
         horizontal_separator = HorizontalSeparator()
         layout.addWidget(horizontal_separator)
 
-        grid = QGridLayout()
+        # grid = QGridLayout()
+        grid = FlowLayout()
         grid.setContentsMargins(0, 5, 0, 0)
         layout.addLayout(grid)
 
@@ -510,20 +558,34 @@ class MainWindow(FramelessWindow):
             content_style,
         )
         generate_rsk_conpone_card.left_func = self.generate_b27_phi3
-        layout.addWidget(generate_rsk_conpone_card)
+        # grid.addWidget(generate_rsk_conpone_card, 0, 0, 1, 1)
+        grid.addWidget(generate_rsk_conpone_card)
+
+        update_savedata_card = quick_function_card(
+            self.page_icon_cache["更新背景"],
+            "更新一下数据~",
+            "初始化记录数据后使用的就是存储的数据 也可以在设置中改为自动更新(TODO) 但是会很慢",
+            title_style,
+            content_style,
+        )
+        update_savedata_card.left_func = self.get_save_data
+        # grid.addWidget(update_savedata_card, 0, 1, 1, 1)
+        grid.addWidget(update_savedata_card)
 
         layout.addStretch(1)  # 顶上去
 
         tip_layout = QVBoxLayout()
         tip_layout.setAlignment(Qt.AlignLeft)
+        tip_layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(tip_layout)
         tip_style = {
             "font_size": 22,
             "min_width": widget.width(),
             "max_width": widget.width(),
-            "max_height": 21,
-            "min_height": 21,
+            "max_height": 26,
+            "min_height": 26,
             "font_color": (138, 138, 138, 1),
+            "background_color": (255, 255, 255, 0.8),
         }
         tip = label(random.choice(self.home_page_tips), tip_style)
         self.widgets["home_page"]["tip"] = tip
@@ -857,10 +919,11 @@ class MainWindow(FramelessWindow):
 
         top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
         display_layout.addItem(top_spacer)
-        # print('缓存似',self.illustration_cache)
+        # print("缓存似", self.illustration_cache)
         # 添加示例 card 占位
         example_song = song_info_card(
             self.illustration_cache["introduction"],
+            self.page_bg_cache["EZ"],  # 作为背景 这里的键就是跟难度相关
             "introduction",
             "00.0000",
             "00.000",
@@ -1677,8 +1740,8 @@ class MainWindow(FramelessWindow):
                 phi3_folder.add_widget(cardi)
         layout.addWidget(phi3_folder, 0)
 
-        player_rks = round(self.total_rks / (len(self.b27) + len(self.phi3)), 4)
-        rks_content_elm = BodyLabel(str(player_rks))
+        self.rks = round(self.total_rks / (len(self.b27) + len(self.phi3)), 4)
+        rks_content_elm = BodyLabel(str(self.rks))
         rks_content_elm.setStyleSheet(
             """
             font-size: 24px;
@@ -1687,6 +1750,8 @@ class MainWindow(FramelessWindow):
         """
         )
         player_rks_label.add_widget(rks_content_elm)
+        rks_label: label = self.widgets["account_page"]["rks_label"]
+        rks_label.set_text(f"rks: {int(self.rks * 100 + 0.5) / 100}")
         # layout.addStretch(1)
         # 当某个 folder 的展开状态变化时，重新分配 layout 中所有 folder 的 stretch
 
@@ -1738,11 +1803,14 @@ class MainWindow(FramelessWindow):
     # --------------- 账号页面 -------------------
     def init_account_page(self) -> QWidget:
         self.widgets["account_page"] = {}
-        widget = bg_widget(self.page_bg_cache["account"])
+        if self.background_name != "introduction":
+            self.background_name = self.background_name[:-2:]
+        widget = bg_widget(self.illustration_cache[self.background_name])
         self.widgets["account_page"]["widget"] = widget
 
-        layout = QVBoxLayout(widget)
+        layout = QGridLayout(widget)
         self.widgets["account_page"]["layout"] = layout
+        layout.setSpacing(0)
         widget.setLayout(layout)
 
         if self.avatar:
@@ -1750,20 +1818,173 @@ class MainWindow(FramelessWindow):
             # 使用QFluentWidgets的AvatarWidget显示
             avatar = AvatarWidget(original_pixmap, widget)
             avatar.setFixedSize(110, 110)
-            avatar.show()
+            layout.addWidget(avatar, 0, 0, 1, 1)
+            # avatar.show()
+
+        lable_style = {
+            "font_size": 33,
+            "background_color": (255, 255, 255, 0.8),
+        }
+
+        if self.challengemode_rank:
+            bg_color = self.challengemode_rank[0]
+        if bg_color == "0":
+            bg_img = self.page_bg_cache["white"]
+        elif bg_color == "1":
+            bg_img = self.page_bg_cache["EZ"]
+        elif bg_color == "2":
+            bg_img = self.page_bg_cache["HD"]
+        elif bg_color == "3":
+            bg_img = self.page_bg_cache["IN"]
+        elif bg_color == "4":
+            bg_img = self.page_bg_cache["AT"]
+        elif bg_color == "5":
+            bg_img = self.page_bg_cache["colorful"]
+
+        levelsum = self.challengemode_rank[1::]
+        challenge_widget = bg_widget(bg_img.scaled(130, 46), 0)
+        challenge_widget.setFixedSize(130, 46)
+        layout.addWidget(challenge_widget, 1, 0, 1, 1)
+
+        challenge_part_layout = QHBoxLayout(challenge_widget)
+        cahllenge_text_label = label(
+            levelsum,
+            {
+                "font_size": 40,
+                "font_color": (255, 255, 255, 1),
+                "max_height": 42,
+            },
+        )
+        challenge_part_layout.addWidget(
+            cahllenge_text_label, alignment=Qt.AlignHCenter | Qt.AlignTop
+        )
+
+        name_rks_widget = QWidget()
+        layout.addWidget(name_rks_widget, 0, 1, 1, 2)
+        name_rks_layout = QVBoxLayout(name_rks_widget)
+        name_rks_layout.setSpacing(0)
 
         if self.user_name:
-            name_label = label(
-                self.user_name,
-                {
-                    "font_size": 28,
-                    "max_width": 300,
-                    "min_height": 30,
-                    "background_color": (255, 255, 255, 0.8),
-                    "font_color": (138, 225, 252, 1),
-                },
-            )
-            layout.addWidget(name_label)
+            name_label = label(self.user_name, lable_style)
+            name_label.setAlignment(Qt.AlignLeft)
+            # name_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+            name_rks_layout.addWidget(name_label)
+            name_label.adjustSize()
+
+        rks_label = label(f"rks: 生成rks组成以计算", lable_style)
+        # rks_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        rks_label.setAlignment(Qt.AlignCenter)
+        self.widgets["account_page"]["rks_label"] = rks_label
+        name_rks_layout.addWidget(rks_label)
+
+        self_introduction_label_style = {
+            "font_size": 23,
+            "min_width": 450,
+            "max_width": 450,
+            "max_height": 500,
+            "background_color": (255, 255, 255, 0.8),
+        }
+        self_introduction_label = label(
+            self.user_introduction, self_introduction_label_style
+        )
+        self_introduction_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self_introduction_label, 2, 0, 5, 4)
+        self_introduction_label.adjustSize()
+
+        # ------------------ 打歌统计部分 -------------------
+        summary_label_style = {
+            "font_size": 26,
+            "max_width": 110,
+            "min_width": 110,
+            "background_color": (255, 255, 255, 0.8),
+            "other": """border-width: 2px;
+                    border-style: solid;
+                    border-color: rgba(138, 225, 252, 1);""",
+        }
+        # -------第1行 标题-------
+        empty_label = label("", summary_label_style)
+        layout.addWidget(empty_label, 2, 4, 1, 1)
+
+        clear_label = label("Cleared", summary_label_style)
+        clear_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(clear_label, 2, 5, 1, 1)
+
+        FC_label = label("FC", summary_label_style)
+        FC_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(FC_label, 2, 6, 1, 1)
+
+        AP_label = label("AP", summary_label_style)
+        AP_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(AP_label, 2, 7, 1, 1)
+
+        # -------第2行 EZ统计数据-------
+        EZ_label = label("EZ", summary_label_style)
+        EZ_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(EZ_label, 3, 4, 1, 1)
+
+        EZclear_label = label(200, summary_label_style)
+        EZclear_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(EZclear_label, 3, 5, 1, 1)
+
+        EZFC_label = label(100, summary_label_style)
+        EZFC_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(EZFC_label, 3, 6, 1, 1)
+
+        EZAP_label = label(300, summary_label_style)
+        EZAP_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(EZAP_label, 3, 7, 1, 1)
+
+        # -------第3行 HD统计数据-------
+        HD_label = label("HD", summary_label_style)
+        HD_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(HD_label, 4, 4, 1, 1)
+
+        HDclear_label = label(200, summary_label_style)
+        HDclear_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(HDclear_label, 4, 5, 1, 1)
+
+        HDFC_label = label(100, summary_label_style)
+        HDFC_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(HDFC_label, 4, 6, 1, 1)
+
+        HDAP_label = label(300, summary_label_style)
+        HDAP_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(HDAP_label, 4, 7, 1, 1)
+
+        # -------第4行 IN统计数据-------
+        IN_label = label("IN", summary_label_style)
+        IN_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(IN_label, 5, 4, 1, 1)
+
+        INclear_label = label(200, summary_label_style)
+        INclear_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(INclear_label, 5, 5, 1, 1)
+
+        INFC_label = label(100, summary_label_style)
+        INFC_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(INFC_label, 5, 6, 1, 1)
+
+        INAP_label = label(300, summary_label_style)
+        INAP_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(INAP_label, 5, 7, 1, 1)
+
+        # -------第5行 AT统计数据-------
+        AT_label = label("AT", summary_label_style)
+        AT_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(AT_label, 6, 4, 1, 1)
+
+        ATclear_label = label(200, summary_label_style)
+        ATclear_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(ATclear_label, 6, 5, 1, 1)
+
+        ATFC_label = label(100, summary_label_style)
+        ATFC_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(ATFC_label, 6, 6, 1, 1)
+
+        ATAP_label = label(300, summary_label_style)
+        ATAP_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(ATAP_label, 6, 7, 1, 1)
+
         QRcode_img = ImageLabel(QRCODE_EMPTY_IMG_PATH)  # 空二维码
         QRcode_img.setFixedSize(410, 410)
 
@@ -1790,7 +2011,7 @@ class MainWindow(FramelessWindow):
         log_out_btn = button("退出登录")
         log_out_btn.bind_click_func(self.log_out)
         self.widgets["account_page"]["log_out_btn"] = log_out_btn
-        layout.addWidget(log_out_btn)
+        layout.addWidget(log_out_btn, 7, 0, 1, 2)
 
         if self.token:
             login_confirm_btn.hide()  # 如果已经有了token就不用再获取了
@@ -1855,7 +2076,7 @@ class MainWindow(FramelessWindow):
             avatar: AvatarWidget = self.widgets["account_page"]["avatar"]
             avatar.deleteLater()
             self.avatar = ""
-        # 应该还要清除其他的页面
+        # 应该还要把其他的页面初始化
 
 
 # ---------- 程序入口 ----------

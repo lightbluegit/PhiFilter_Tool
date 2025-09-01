@@ -423,6 +423,7 @@ class SongListViewWidget(QWidget):
         tag_info: dict,
         comment_info: dict,
         illustration_cache: dict[str, QPixmap],
+        bg_cache: dict[str, QPixmap],
     ):
         """
         从已解析的存档字典填充模型（等价于原来 get_save_data 中构建 song_info_card 的数据处理逻辑）
@@ -446,13 +447,16 @@ class SongListViewWidget(QWidget):
                 score = int(items["score"])
                 acc = float(items["acc"])
                 is_fc = True if items["fc"] == 1 else False
-                level = float(diff_map_result[combine_name][diffi])
+                try:
+                    level = float(diff_map_result[combine_name][diffi])
+                except:
+                    print(f"{combine_name}没有{diffi}难度哦 再看看文件是否更新了")
                 singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
                 acc = round(acc, 4)
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
                 # illustration_path = ILLUSTRATION_PREPATH + combine_name + ".png"
                 illustration_path = illustration_cache[combine_name]
-                bg_path = SONG_CARD_BACKGROUND[diffi]
+                bg_path = bg_cache[diffi]
                 groups = group_info.get(combine_name, "").split("`")
                 tags = tag_info.get(combine_name, "").split("`")
                 comment = comment_info.get(combine_name, {}).get(diffi, "")
@@ -497,14 +501,12 @@ class SongListViewWidget(QWidget):
         item = self.model.get_item(row)
         if not item:
             return None
-        # 延迟导入 dependences.classes 中的 song_info_card 类，避免模块循环依赖
         from dependences.classes import song_info_card
 
-        # 构造一个完整的 song_info_card（参数尽量与原构造器匹配）
-        # 注意：SongItem 目前没有保存 is_fc，这里暂以 False 填充；若需要保存可扩展 SongItem
         # print(f"背景图片路径:{item.illustration_path}")
         card = song_info_card(
             item.illustration_path,
+            item.bg_path,
             item.name,
             item.rks,
             item.acc,
@@ -521,29 +523,4 @@ class SongListViewWidget(QWidget):
             item.improve_advice,
         )
 
-        # 为保持与旧代码兼容：某些地方（如 classes.main_info_card.paintEvent）可能从
-        # dependences.consts.illustration_cache / song_card_background_cache 读取 pixmap。
-        # 因此如果我们已经在 _pixmap_cache 中有对应 pixmap，就写入 consts 中的缓存字典。
-        # 这样用旧方法绘制的 card.paintEvent 仍会找到 pixmap。
-        from dependences import consts as _c
-
-        # 如果 consts 上还未创建这些字典，先创建以避免 AttributeError
-        if not hasattr(_c, "song_card_background_cache"):
-            _c.song_card_background_cache = {}
-        if not hasattr(_c, "illustration_cache"):
-            _c.illustration_cache = {}
-
-        # 在 _pixmap_cache 中以 (f"{combine}_{diff}", False/True) 作为键保存，
-        # 这里尝试取出并注入 consts 的缓存字典
-        pix_ill = _pixmap_cache.get((f"{item.combine_name}_{item.diff}", False))
-        pix_bg = _pixmap_cache.get((f"{item.combine_name}_{item.diff}", True))
-        if pix_ill:
-            _c.illustration_cache[item.combine_name] = pix_ill
-        if pix_bg:
-            _c.song_card_background_cache[item.diff] = pix_bg
-
-        # 返回构建好的 card；调用方负责把 card.left_func / right_func 等行为绑定上
         return card
-
-
-# End of song_list_view_delegate.py

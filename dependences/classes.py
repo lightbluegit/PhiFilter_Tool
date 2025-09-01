@@ -23,7 +23,15 @@ from PyQt5.QtCore import (
     QRunnable,
     QThreadPool,
 )
-from PyQt5.QtGui import QIcon, QColor, QPainter, QTextOption, QImage, QPainterPath
+from PyQt5.QtGui import (
+    QIcon,
+    QColor,
+    QPainter,
+    QTextOption,
+    QImage,
+    QPainterPath,
+    QPixmap,
+)
 from qfluentwidgets import (
     PrimaryPushButton,
     LineEdit,
@@ -45,7 +53,6 @@ from qfluentwidgets import (
     ScrollArea,
     CardWidget,
 )
-from dependences.image_cache import *
 from dependences.consts import *
 import re
 import random
@@ -176,12 +183,12 @@ class button(PrimaryPushButton):
 class label(QLabel):
     def __init__(self, text: str, style: dict[str, str] = {}):
         super().__init__()
-        self.setText(text)  # 设置文本内容
+        self.setText(str(text))  # 设置文本内容
         self.setWordWrap(True)  # 启用自动换行
         self.setStyleSheet(get_label_style(**style))
 
     def set_text(self, text: str):
-        self.setText(text)
+        self.setText(str(text))
 
 
 class body_label(QLabel):
@@ -262,6 +269,7 @@ class main_info_card(ElevatedCardWidget):
     def __init__(
         self,
         imgpath: QPixmap,
+        diff_bg_path: QPixmap,
         name: str,
         singal_rks: str,
         acc: str,
@@ -280,7 +288,7 @@ class main_info_card(ElevatedCardWidget):
         self.imgpath = imgpath
         self.combine_name = combine_name
         self.diff = diff
-        self.bg_img_path = SONG_CARD_BACKGROUND[diff]
+        self.diff_bg_path = diff_bg_path
 
         # --布局顶部曲名和评级--
         self.top_widget = QFrame(self)
@@ -473,12 +481,14 @@ class main_info_card(ElevatedCardWidget):
 
             # 绘制背景图片
             # illustration = get_illustration(self.combine_name, self.width())
-            difference = get_song_card_bg(self.diff, self.width())
+            # difference = get_song_card_bg(, self.width())
 
             # 绘制到整个矩形区域
             # print(f"种类是{type(self.imgpath)}, {self.imgpath}")
             painter.drawPixmap(QRect(0, 0, self.width(), self.height()), self.imgpath)
-            painter.drawPixmap(QRect(0, 0, self.width(), self.height()), difference)
+            painter.drawPixmap(
+                QRect(0, 0, self.width(), self.height()), self.diff_bg_path
+            )
 
             painter.end()
 
@@ -600,6 +610,7 @@ class song_info_card(QWidget):
     def __init__(
         self,
         imgpath: QPixmap,
+        diff_bg_path: QPixmap,
         name: str,
         singal_rks: str,
         acc: str,
@@ -631,6 +642,7 @@ class song_info_card(QWidget):
         self.drawer = drawer
         self.combine_name = combine_name
         self.improve_advice = improve_advice
+        self.diff_bg_path = diff_bg_path
 
         self.right_func = None
         self.setContentsMargins(0, 0, 0, 0)
@@ -644,6 +656,7 @@ class song_info_card(QWidget):
 
         self.elevatedcard = main_info_card(
             imgpath,
+            diff_bg_path,
             name,
             singal_rks,
             acc,
@@ -1094,11 +1107,14 @@ class filter_obj(QWidget):
             self.limit_val_cbb.set_content(self.limit_val_cbb.comments)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.comment_info_completer)
 
-    def input_val_check(self, attribution, limit, value) -> bool:
+    def input_val_check(self, attribution, value) -> tuple[bool, str]:
         if attribution == "acc":
+            print(f"val={value}")
             if not value:
-                return False
+                return (False, None)
             pattern = r"\d+\.?\d+"
+            if "." not in value:  # 没有 . 就只能是 23 这样的整数
+                value += "."
             if (
                 value[0] == "."
             ):  # 如果输入为省略的格式(10. -> 10.0; .33 -> 0.33) 则补齐省略的0
@@ -1108,22 +1124,24 @@ class filter_obj(QWidget):
             match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
             if match_results is None:
                 print("无法匹配")
-                return False
+                return (False, None)
             match_results = match_results.group()  # 获取匹配后的值
             # print(match_results)
             acc = float(value)
             if acc > 100:  # 范围限定
                 print("acc不可能大于100喵")
-                return False
+                return (False, None)
             if acc < 0:
                 print("acc不可能小于0喵")
-                return False
-            return True
+                return (False, None)
+            return (True, value)
 
         elif attribution in ("单曲rks", "定数"):
             if not value:
-                return False
+                return (False, None)
             pattern = r"\d+\.?\d+"
+            if "." not in value:  # 没有 . 就只能是 23 这样的整数
+                value += "."
             if (
                 value[0] == "."
             ):  # 如果输入为省略的格式(10. -> 10.0; .33 -> 0.33) 则补齐省略的0
@@ -1133,7 +1151,7 @@ class filter_obj(QWidget):
             match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
             if match_results is None:
                 print("无法匹配")
-                return False
+                return (False, None)
             match_results = match_results.group()  # 获取匹配后的值
             # print(match_results)
             singal_rks = float(value)
@@ -1141,49 +1159,51 @@ class filter_obj(QWidget):
                 print(
                     f"当前最高定数为{MAX_LEVEL}喵 {attribution}不可能高于{MAX_LEVEL}喵"
                 )
-                return False
+                return (False, None)
             if singal_rks < 0:
                 print(f"{attribution}不可能小于0喵")
-                return False
-            return True
+                return (False, None)
+            return (True, value)
 
         elif attribution == "得分":
             if not value:
-                return False
+                return (False, None)
             pattern = r"\d+"
             match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
             if match_results is None:
                 print("无法匹配")
-                return False
+                return (False, None)
             match_results = match_results.group()  # 获取匹配后的值
             # print(match_results)
             score = int(value)
             if score > 1000000:  # 范围限定
                 print("最高分只有100w喵 太高了啦")
-                return False
+                return (False, None)
             if score < 0:
                 print("得分不可能小于0喵")
-                return False
-            return True
+                return (False, None)
+            return (True, value)
 
         elif attribution == "评级":
             if value not in ("F", "C", "B", "A", "S", "V", "蓝V", "phi"):
                 print(f"评级不可能是{value}喵")
-                return False
-            return True
+                return (False, None)
+            return (True, value)
 
         elif attribution in ("分组", "标签"):
             if "`" in value:
-                return False
+                return (False, None)
 
-        return True
+        return (True, value)
 
     def get_all_condition(self) -> tuple[str, str, str]:  # 组合并返回当前的所有限制条件
         attribution = self.attribution_choose_cbb.get_content()
         limit = self.limit_choose_cbb.get_content()
         limit_val = self.limit_val_cbb.get_content()
-        if self.input_val_check(attribution, limit, limit_val) == False:
+        check_result = self.input_val_check(attribution, limit_val)
+        if check_result[0] == False:
             return None
+        limit_val = check_result[1]
         return (attribution, limit, limit_val)
 
 
@@ -1453,13 +1473,14 @@ from PyQt5.QtCore import Qt
 
 
 class bg_widget(QWidget):
-    def __init__(self, bg: QPixmap, blur_num: float = 18.0):
+    def __init__(self, bg: QPixmap, blur_num: float = 32.0):
         super().__init__()
         # self.setWindowTitle("Blurred Background with QGraphicsBlurEffect")
         # self.resize(800, 600)
         # 请确保有一个名为 'bg.jpg' 的图片文件在脚本同目录下
         # 或者提供完整路径
         self.bg = bg
+        self.blur_num = blur_num
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -1468,20 +1489,15 @@ class bg_widget(QWidget):
         # 加载图片
         # 创建一个临时的 QGraphicsScene
         scene = QGraphicsScene(self)
-
         # 创建一个 QGraphicsPixmapItem 来持有图片
         pixmap_item = QGraphicsPixmapItem(self.bg)
-
         # 创建 QGraphicsBlurEffect 并设置模糊半径
         blur_effect = QGraphicsBlurEffect()
-        blur_effect.setBlurRadius(16.0)  # 调整此值以改变模糊强度
-
+        blur_effect.setBlurRadius(self.blur_num)  # 调整此值以改变模糊强度
         # 将模糊效果应用到 pixmap item
         pixmap_item.setGraphicsEffect(blur_effect)
-
         # 将 item 添加到场景
         scene.addItem(pixmap_item)
-
         # 缩放图片以适应窗口大小 (保持宽高比填充)
         # 我们需要先将 pixmap_item 放入场景才能正确获取其 bounds
         # 因此，我们先添加 item，然后根据原始 pixmap 大小设置 scale
@@ -1530,7 +1546,7 @@ class ImageLoaderWorker(QRunnable):
             image = QImage(self.image_path)
             if image.isNull():
                 self.signals.finished.emit()
-                print(f"图片不存在哦~")
+                print(f"{self.image_path}地址的图片不存在哦~")
                 return
 
             original_width = image.width()
@@ -1566,6 +1582,7 @@ class ImageLoaderWorker(QRunnable):
 class ImageLoaderApp(QObject):  # 继承 QObject 以支持信号
     # 定义一个总的完成信号
     all_tasks_finished = pyqtSignal()
+    progress = pyqtSignal(int)  # (completed)
 
     def __init__(self):
         super().__init__()  # 调用父类 QObject 的初始化
@@ -1579,7 +1596,8 @@ class ImageLoaderApp(QObject):  # 继承 QObject 以支持信号
     def add_task(self, image_path, key, target_dict, width):
         """添加一个待处理任务"""
         self.todo_list.append((image_path, key, target_dict, width))
-        # print(f"Task added: {image_path} -> {key}")
+        # if key == '雪降り雪が降っている.AiSSw夜輪ft結月ゆかり':
+        #     print(f"接入任务: {image_path} -> {key}")
 
     def start_processing(self):
         """启动所有已添加的任务"""
@@ -1591,9 +1609,9 @@ class ImageLoaderApp(QObject):  # 继承 QObject 以支持信号
             self.all_tasks_finished.emit()
             return
 
-        self.threadpool.setMaxThreadCount(
-            min(8, self.threadpool.maxThreadCount())
-        )  # 可选：限制最大线程数
+        # self.threadpool.setMaxThreadCount(
+        #     min(8, self.threadpool.maxThreadCount())
+        # )  # 可选：限制最大线程数
 
         # 清空上一次可能残留的引用
         self.active_workers.clear()
@@ -1618,7 +1636,7 @@ class ImageLoaderApp(QObject):  # 继承 QObject 以支持信号
         self.active_workers.discard(worker)  # discard 不会抛出异常如果 worker 不存在
         # print(f"Task finished. Progress: {self.completed_tasks}/{self.total_tasks}")
         # 发射进度信号
-        self.progress.emit(self.completed_tasks, self.total_tasks)
+        self.progress.emit(self.completed_tasks)
 
         if self.completed_tasks >= self.total_tasks:
             # print("All tasks finished!")
@@ -1636,4 +1654,3 @@ class ImageLoaderApp(QObject):  # 继承 QObject 以支持信号
         print(message)
 
     # 如果需要从 ImageLoaderApp 外部连接进度信号，可以在这里定义
-    progress = pyqtSignal(int, int)  # (completed, total)
