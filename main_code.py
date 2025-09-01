@@ -64,28 +64,10 @@ class MainWindow(FramelessWindow):
     def __init__(self):
         super().__init__()
 
-        # ---------- 初始化各种变量 ----------
-        self.tt = datetime.now()
-        self.avatar = ""  # 存放用户头像文件名
-        self.background_name = ""  # 背景名称
-        self.rks = 0  # 玩家的rks
-        self.money = (0, 0, 0, 0, 0)  # KB MB GB TB PB
-        self.challengemode_rank = ""  # 待处理
-        self.user_introduction = ""  # 用户自我介绍
-        self.user_name = ""  # 存放用户ID
-        self.token = ""  # 存放用户 session_token
-        self.save_dict = {}  # 云存档解析后的字典数据
-        self.total_rks = 0  # rks未/30之前得到的值 用于计算某个歌曲是否能推分
-        self.widgets: dict[str, dict] = {}
-        """self.widgets[页面名称][页面控件名称]=控件"""
-
-        self.b27: List[Tuple[float, Tuple[str, Any]]] = []
-        """self.b27 = (单曲rks,(组合名称, acc,   定数, 难度, 分数, 是否fc, 处于哪一行))"""
-
-        self.phi3: List[Tuple[float, Tuple[str, Any]]] = []
-        """self.phi3 = (单曲rks,(组合名称, acc,   定数, 难度, 分数, 是否fc, 处于哪一行))"""
-
-        self.cname_to_name: dict[str, Tuple[str, str, str, dict]] = {}
+        self.widgets: dict[str, dict] = (
+            {}
+        )  # 按照页面分类存储各个控件 方便 不同页面重复使用同样的变量名 及 在类的各个地方调用任意控件
+        self.cname_to_name: dict[str, Tuple[str, str, str, dict[str, str]]] = {}
         """
         self.cname_to_name[组合名称] = (
             正常名称,
@@ -94,17 +76,18 @@ class MainWindow(FramelessWindow):
             {"EZ": EZ难度谱师, "HD": HD难度谱师, "IN": IN难度谱师}
         )
         """
+        self.illustration_cache: dict[str, QPixmap] = (
+            {}
+        )  # 多线程预处理曲绘转化与裁切 后续 搜索/rks组成 布局就可以复用这些缓存 加速布局
+        """self.illustration_cache[组合名称] = 曲绘缓存图"""
 
-        self.all_song_card: dict[str, dict[str, int]] = {}
-        """self.all_song_card[组合曲名][难度]=歌曲卡片控件"""
+        self.page_bg_cache: dict[str, QPixmap] = {}  # 各个页面的二次元背景及图片缓存
+        """self.page_bg_cache[组合名称] = 背景缓存图"""
 
-        self.illustration_cache: dict[str, QPixmap] = {}
-        self.illustration_cache_process = None
+        self.page_icon_cache: dict[str, QPixmap] = {}  # 主页各个组件的二次元图标缓存
+        """self.page_icon_cache[组合名称] = 图标缓存图"""
 
-        self.page_bg_cache: dict[str, QPixmap] = {}
-        self.page_icon_cache: dict[str, QPixmap] = {}
-
-        self.home_page_tips: list[str] = [
+        self.home_page_tips: list[str] = [  # 主页下方的各种tips的内容
             "这里是主页 有各种小工具哦~",
             "鼠标放在卡片底端的文字上可以展开详细信息 试试吧",
             "搜索页面对于曲师 曲名等内容提供自动补全",
@@ -112,22 +95,9 @@ class MainWindow(FramelessWindow):
             "所有歌曲卡片都可以左键展开详细信息 右键跳转编辑页面喵",
             "由于找不到合适的图标索性就用二次元头像做icon了捏",
         ]
-
-        # 3. 显示启动屏幕
-        self.splash_screen = QWidget()
-        self.splash_screen.setFixedSize(self.width(), self.height())
-        open_layout = QGridLayout(self.splash_screen)
-        self.ring = ProgressRing()
-        self.ring.setAlignment(Qt.AlignCenter)
-        self.ring.setTextVisible(True)
-        self.ring.setFixedSize(130, 130)
-        self.ring.setStrokeWidth(10)
-        open_layout.addWidget(self.ring, 1, 1, 1, 1)
-
-        self.splash_screen.show()
-
-        # self.font_family = {}
-        # ---------- 窗口设置 ----------
+        self.init_variable()  # 初始化各种变量
+        self.preinit()  # 并行预处理图片
+        # ---------------- 主窗口设置 ----------------
         # 设置窗口标题
         self.setTitleBar(StandardTitleBar(self))
         self.titleBar.setTitle("PhiFilter Tool")
@@ -137,8 +107,8 @@ class MainWindow(FramelessWindow):
             font-family: "Segoe UI";
         """
         )
-        self.setWindowTitle("PhiFilter Tool")  # 设置窗口标题
-        self.resize(950, 800)  # 默认窗口大小
+        self.setWindowTitle("PhiFilter Tool")  # 设置任务栏标题
+        self.resize(950, 800)  # 主窗口大小 随便设的
         # 将窗口居中显示
         screen = QDesktopWidget().screenGeometry()
         pos_x = (screen.width() - self.width()) // 2
@@ -146,6 +116,7 @@ class MainWindow(FramelessWindow):
         self.move(pos_x, pos_y)
 
         # ---------- 主区域 ----------
+        # 基础页面布局 切开内容区和导航栏区
         self.widgets["basepage"] = {}
         main_layout = QHBoxLayout(self)
         self.widgets["basepage"]["main_layout"] = main_layout
@@ -157,33 +128,64 @@ class MainWindow(FramelessWindow):
         # 导航栏
         navigation_interface = NavigationInterface(self)
         self.widgets["basepage"]["navigation_interface"] = navigation_interface
-        main_layout.addWidget(navigation_interface)
+        main_layout.addWidget(navigation_interface, 0)  # 导航栏不可延伸
         navigation_interface.setExpandWidth(200)  # 设置导航展开宽度
 
-        content_widget = QStackedWidget(self)
+        content_widget = QStackedWidget(self)  # 内容页面管理器
         self.widgets["basepage"]["content_widget"] = content_widget
-        main_layout.addWidget(content_widget, 1)
+        main_layout.addWidget(content_widget, 1)  # 额外空间全给内容页面
 
-        if os.path.exists(TOKEN_PATH):
-            try:
-                with open(TOKEN_PATH, "r") as token_file:
-                    self.token = token_file.readline().strip()
-            except Exception:
-                pass
-
+        if os.path.exists(TOKEN_PATH):  # 尝试获取已存储的token
+            with open(TOKEN_PATH, "r") as token_file:
+                self.token = token_file.readline().strip()
+        else:  # TOKEN_PATH 不存在
+            with open(TOKEN_PATH, "w") as token_file:
+                pass  # 创建空文件
         self.generate_cname_to_name_info()
-        self.preinit()
-        # 后续的init的逻辑在 check_preinit_finished 里面 因为需要并行加载完成
+        self.song_list_widget = SongListViewWidget()
 
+    # 初始化各种与账号相关的变量
+    def init_variable(self):
+        """初始化各种与账号相关的变量"""
+        self.time_record = datetime.now()  # 记录各种起始时间
+        self.is_updated: bool = False  # 之前 存储的数据是否为最新的数据
+        self.avatar: str = ""  # 存放用户头像文件名
+        self.background_name: str = ""  # 背景名称
+        self.EZ_statistical_data: list[int] = [
+            -1,
+            -1,
+            -1,
+        ]  # 各个难度的统计数据[cleared, FC, AP]
+        self.HD_statistical_data: list[int] = [-1, -1, -1]
+        self.IN_statistical_data: list[int] = [-1, -1, -1]
+        self.AT_statistical_data: list[int] = [-1, -1, -1]
+        self.rks: float = 0  # 玩家的rks
+        self.money: tuple[int] = (0, 0, 0, 0, 0)  # KB MB GB TB PB
+        self.challengemode_rank: str = ""  # (待完善)
+        self.user_introduction: str = ""  # 用户自我介绍
+        self.user_name: str = ""  # 用户名
+        self.token: str = ""  # 用户 session_token
+        self.save_dict: dict = {}  # 云存档解析后的字典数据
+        self.total_rks = 0  # rks未/30之前得到的值 用于计算某个歌曲是否能推分
+
+        """self.widgets[页面名称][页面控件名称]=控件"""
+
+        self.b27: List[Tuple[float, Tuple[str, Any]]] = []
+        """self.b27 = (单曲rks,(组合名称, acc,   定数, 难度, 分数, 是否fc, 处于哪一行))"""
+
+        self.phi3: List[Tuple[float, Tuple[str, Any]]] = []  # 格式同self.b27
+
+        # (待完善)这个有用吗?save_edit的地方遍历就可以了啊
+        self.all_song_card: dict[str, dict[str, int]] = {}
+        """self.all_song_card[组合曲名][难度]=歌曲卡片控件"""
+
+    # 多线程预处理函数
     def preinit(self):
-        # 模拟两个不同的存储字典
-        self.illustration_cache = {}
+        """多线程预处理函数"""
+        self.loader = ImageLoader()  # 任务管理器
 
-        # 创建 ImageLoaderApp 实例
-        self.loader = ImageLoaderApp()
-
-        # --- 添加任务 ---
-        for combine_namei in COMBINE_NAME:
+        # ------------ 添加任务 ------------
+        for combine_namei in COMBINE_NAME:  # 缓存曲绘
             self.loader.add_task(
                 rf"{ILLUSTRATION_PREPATH}{combine_namei}.png",
                 combine_namei,
@@ -194,26 +196,35 @@ class MainWindow(FramelessWindow):
         for keyi, pathi in SONG_CARD_BACKGROUND.items():  # 背景卡片
             self.loader.add_task(pathi, keyi, self.page_bg_cache, 250)
 
-        # print(f'待办任务{self.loader.todo_list}')
         self.loader.add_task(  # introduction(新手教学背景) 不在combine_name列表中 需要单独处理喵
             rf"{ILLUSTRATION_PREPATH}introduction.png",
             "introduction",
             self.illustration_cache,
             400,
         )
-        # --- 连接信号 (可选，用于获取状态) ---
+        # --------- 各个页面背景图缓存 ---------
         self.loader.add_task(
             self.get_acg_image(ACG_IMAGE_URL, "主页背景"),
             "home",
             self.page_bg_cache,
             self.width(),
         )
+
         self.loader.add_task(
             self.get_acg_image(ACG_IMAGE_URL, "编辑页背景"),
             "edit",
             self.page_bg_cache,
             self.width(),
         )
+
+        self.loader.add_task(
+            self.get_acg_image(ACG_IMAGE_URL, "账号页背景"),
+            "account",
+            self.page_bg_cache,
+            self.width(),
+        )
+
+        # --------- 控件图标缓存 ---------
         self.loader.add_task(
             self.get_acg_image(ACG_PPIMAGE_URL, "rks组成图背景"),
             "rks组成图背景",
@@ -222,53 +233,34 @@ class MainWindow(FramelessWindow):
         )
 
         self.loader.add_task(
-            self.get_acg_image(ACG_PPIMAGE_URL, "更新背景"),
-            "更新背景",
+            self.get_acg_image(ACG_PPIMAGE_URL, "更新控件背景"),
+            "更新控件背景",
             self.page_icon_cache,
             250,
         )
+        # print(f'待办任务{self.loader.todo_list}')
 
-        self.loader.add_task(
-            self.get_acg_image(ACG_IMAGE_URL, "账号页背景"),
-            "account",
-            self.page_bg_cache,
-            250,
-        )
-        self.ring.setRange(0, len(self.loader.todo_list))
-        self.ring.setValue(0)
-        self.loader.all_tasks_finished.connect(self.on_all_finished)
-        self.loader.progress.connect(self.update_open_page)
+        self.loader.all_tasks_finished.connect(self.on_all_finished)  # 所有任务完成
+        self.loader.start_processing()  # 开始处理任务
 
-        # --- 启动处理 ---
-        # print("Starting image processing...")
-        self.loader.start_processing()
-
+    # 预处理结束后执行的操作
     def on_all_finished(self):
-        # print("\n--- All Tasks Completed ---")
-        # print(f"Cache A: {self.illustration_cache}")
-        self.song_list_widget = SongListViewWidget()
-
-        # ---------- 如果有 token，即刻拉取云存档并设置头像 ----------
+        """预处理结束后执行的操作"""
         if self.token:
             self.get_save_data()
-            try:
-                self.avatar = self.save_dict["user"]["avatar"]
-            except Exception:
-                pass
-
         self.init_all_pages()
         self.init_navigation()
+        self.generate_b27_phi3()  # 先预生成 后续
         if self.token:
-            # self.switch_to(self.home_page)
-            self.switch_to(self.account_page)
+            self.switch_to(self.home_page)
+            # self.switch_to(self.account_page)
         else:
             self.switch_to(self.account_page)
 
-        self.splash_screen.close()
         self.show()
 
         end_time = datetime.now()
-        time_difference = end_time - self.tt
+        time_difference = end_time - self.time_record
 
         total_seconds = time_difference.total_seconds()
         seconds = int(total_seconds % 60)
@@ -276,19 +268,16 @@ class MainWindow(FramelessWindow):
 
         print(f"预处理用时:{seconds:02d}s.{microseconds:06d}")
 
-    def update_open_page(self):
-        self.ring.setValue(self.loader.completed_tasks)
-
-    # ------------------ Core data loading / mapping ------------------
+    # 生成组合名称与其对应名称 曲师等信息对照
     def generate_cname_to_name_info(self):
         """读取 info.tsv 并构建 self.cname_to_name 信息"""
 
         df = pd.read_csv(
             INFO_PATH,
-            sep="\t",
-            header=None,
+            sep="\t",  # 文酱的项目生成的.tsv文件 分隔符是 \t
+            header=None,  # 无头模式
             encoding="utf-8",
-            names=[
+            names=[  # 每一列的名称
                 "combine_name",
                 "song_name",
                 "composer",
@@ -300,7 +289,7 @@ class MainWindow(FramelessWindow):
                 "Legendchapter",
             ],
         )
-        df = df.fillna("")
+        df = df.fillna("")  # 没有数据的部分填充空字符
         for _, row in df.iterrows():
             combine_name = row["combine_name"]
             song_name = row["song_name"]
@@ -310,49 +299,85 @@ class MainWindow(FramelessWindow):
             HDchapter = row["HDchapter"]
             INchapter = row["INchapter"]
             ATchapter = row["ATchapter"]
+
             self.cname_to_name[combine_name] = (
                 song_name,
                 composer,
                 drawer,
                 {"EZ": EZchapter, "HD": HDchapter, "IN": INchapter},
             )
-            if ATchapter:
+
+            if ATchapter:  # 有可能没有AT
                 self.cname_to_name[combine_name][3]["AT"] = ATchapter
 
+    # 获取存档信息并填充歌曲信息(待处理)
     def get_save_data(self):
+        """
+        获取存档信息并填充歌曲信息
+
+        依赖: self.cname_to_name 图片缓存
+        """
+
+        if self.token == "":
+            InfoBar.warning(
+                title="用户未登录",
+                content="请先回到账号页面进行授权喵！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            self.switch_to(self.account_page)
+            return
         try:
+            # 此部分来自 千柒 的 Phi-CloudAction-python-master 项目
             with PhigrosCloud(self.token) as cloud:
-                summary = cloud.getSummary()
-                # print(f'你的summary是{summary}')
+                summary_data = (
+                    cloud.getSummary()
+                )  # summary_data的值就是get_play_data.py的 class summary 里面的那些变量做成字典
+                # print(f'你的summary是{summary_data}')
+
+                self.challengemode_rank = str(summary_data["challenge"])
+                # print(f"你的挑战模式组成是{self.challengemode_rank}")
+
+                # self.rks = summary_data['rks'] # 这里的rks可以被修改 自己算比较安全
+                self.avatar = summary_data["avatar"]
+                self.EZ_statistical_data = summary_data["EZ"]
+                self.HD_statistical_data = summary_data["HD"]
+                self.IN_statistical_data = summary_data["IN"]
+                self.AT_statistical_data = summary_data["AT"]
+
                 self.user_name = cloud.getNickname()
                 # print(f"你的名字是{self.user_name}")
-                save_data = cloud.getSave(summary["url"], summary["checksum"])
+
+                save_data = cloud.getSave(summary_data["url"], summary_data["checksum"])
                 save_dict = unzipSave(save_data)
                 save_dict = decryptSave(save_dict)
                 save_dict = formatSaveDict(save_dict)
                 self.save_dict = save_dict
+                # print(f'存档文件是这个喵{save_dict}')
+
                 self.background_name = save_dict["user"]["background"]
-                self.challengemode_rank = str(
-                    save_dict["gameProgress"]["challengeModeRank"]
-                )
-                # print(f"你的挑战模式组成是{self.challengemode_rank}")
+
                 self.money = save_dict["gameProgress"]["money"]
                 # print('你的金币是', self.money)
+
                 self.user_introduction = save_dict["user"]["selfIntro"]
                 # print(f'你的自我介绍是{self.user_introduction}')
-                # print(f'存档文件是这个喵{save_dict}')
         except:
-            # InfoBar.warning(
-            #     title="连接失败",
-            #     content="读取信息失败 请稍后重试",
-            #     orient=Qt.Horizontal,
-            #     isClosable=True,
-            #     position=InfoBarPosition.TOP,
-            #     duration=3000,
-            #     parent=window,
-            # )
+            InfoBar.error(
+                title="未知错误",
+                content="云存档获取失败了喵 重新试试吧",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
             return
 
+        # 生成难度对照表
         df = pd.read_csv(
             DIFFICULTY_PATH,
             sep="\t",
@@ -361,7 +386,9 @@ class MainWindow(FramelessWindow):
             names=["song_name", "EZ", "HD", "IN", "AT"],
         )
         df = df.fillna("")  # 用空字符串替换 NaN
-        diff_map_result: Dict[str, Dict[str, str]] = {}
+        diff_map_result: Dict[str, Dict[str, str]] = (
+            {}
+        )  # diff_map_result[组合名称][难度]=定数
         for _, row in df.iterrows():
             name = row["song_name"]
             diff_map = {"EZ": row["EZ"], "HD": row["HD"], "IN": row["IN"]}
@@ -369,8 +396,8 @@ class MainWindow(FramelessWindow):
                 diff_map["AT"] = row["AT"]
             diff_map_result[name] = diff_map
 
-        # 使用委托式视图填充 model：效率高，避免创建大量 QWidget
-        self.song_list_widget = SongListViewWidget()  # 覆盖掉之前的所有存档
+        # 使用委托式视图填充 model
+        self.song_list_widget = SongListViewWidget()  # 覆盖掉之前的所有信息
         self.song_list_widget.populate_from_save(
             self.save_dict,
             diff_map_result,
@@ -391,7 +418,7 @@ class MainWindow(FramelessWindow):
             if combine not in self.all_song_card.keys():
                 self.all_song_card[combine] = {}
             self.all_song_card[combine][diff] = row
-        print("更新完成喵~")
+        # print("更新完成喵~")
 
         InfoBar.success(
             title="连接成功",
@@ -402,10 +429,16 @@ class MainWindow(FramelessWindow):
             duration=3000,
             parent=window,
         )
+        self.is_updated = False  # 更新过数据了 之前存储的就不是最新的数据了
         # print("get_save_data 用时", time.time() - times, "s")
 
-    # ------------------ UI pages init (kept consistent) ------------------
+    # 初始化所有页面
     def init_all_pages(self):
+        """
+        初始化所有页面
+
+        依赖: 图片缓存
+        """
         self.home_page = self.init_homepage()
         self.home_page.setObjectName("home_page")
 
@@ -421,8 +454,12 @@ class MainWindow(FramelessWindow):
         self.edit_info_page = self.init_edit_info_page()
         self.edit_info_page.setObjectName("edit_info_page")
 
+    # 初始化导航栏
     def init_navigation(self):
-        """把导航项（主页、rks组成页、搜索、编辑等）添加到 NavigationInterface"""
+        """把导航项（主页、rks组成页、搜索、编辑等）添加到 导航栏
+
+        依赖: self.init_all_pages
+        """
         navigation_interface: NavigationInterface = self.widgets["basepage"][
             "navigation_interface"
         ]
@@ -498,10 +535,9 @@ class MainWindow(FramelessWindow):
     # ------------------ Pages implementations ------------------
     def init_homepage(self) -> QWidget:
         """
-        替换版 init_homepage：
-        - 整合为“快捷功能”页（白色基调），使用卡片式视觉与网格按钮布局
-        - 若后续要添加更多快捷功能，只需在 buttons 列表中加入元组 (label, iconpath, handler, enabled)
-        直接将此函数替换你类中的 init_homepage 即可。
+        初始化主页
+
+        返回homepage以记录
         """
 
         self.widgets["home_page"] = {}
@@ -510,74 +546,69 @@ class MainWindow(FramelessWindow):
         self.widgets["home_page"]["widget"] = widget
 
         layout = QVBoxLayout(widget)
-        layout.setContentsMargins(0, 24, 24, 24)
-        layout.setSpacing(5)
         self.widgets["home_page"]["layout"] = layout
+        layout.setContentsMargins(0, 24, 24, 24)
+        layout.setSpacing(4)
 
         # Header
-        header_style = {
+        title_style = {
             "min_height": 50,
             "max_height": 50,
             "font_color": (182, 204, 161, 1),
-            "font_size": 40,
+            "font_size": 48,
         }
-        header = label("主页", header_style)
-        header.adjustSize()
-        header.setAlignment(Qt.AlignCenter)
-        layout.addWidget(header)
+        home_page_title_label = label("主页", title_style)
+        home_page_title_label.adjustSize()
+        home_page_title_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(home_page_title_label)
 
         # 水平分割线
         horizontal_separator = HorizontalSeparator()
         layout.addWidget(horizontal_separator)
 
         # grid = QGridLayout()
-        grid = FlowLayout()
-        grid.setContentsMargins(0, 5, 0, 0)
-        layout.addLayout(grid)
+        flow_layout = FlowLayout()
+        self.widgets["home_page"]["flow_layout"] = flow_layout
+        flow_layout.setContentsMargins(
+            0, 7, 0, 0
+        )  # 上侧是跟分割线相邻的地方 设置一点距离
+        layout.addLayout(flow_layout)  # layout直接加layout?
 
-        title_style = {
+        card_title_style = {
             "font_size": 29,
-            "min_width": 250,
-            "max_width": 250,
-            "max_height": 40,
-            "min_height": 40,
         }
-        content_style = {
+        card_content_style = {
             "font_size": 18,
-            "min_width": 250,
-            "max_width": 250,
-            "max_height": 80,
-            "min_height": 80,
         }
-
         generate_rsk_conpone_card = quick_function_card(
             self.page_icon_cache["rks组成图背景"],
             "生成rks组成图",
             "生成b27, phi3组成的文件夹 左键歌曲卡片可展开详细信息，右键跳转编辑页面",
-            title_style,
-            content_style,
+            card_title_style,
+            card_content_style,
         )
+        self.widgets["home_page"][
+            "generate_rsk_conpone_card"
+        ] = generate_rsk_conpone_card
         generate_rsk_conpone_card.left_func = self.generate_b27_phi3
-        # grid.addWidget(generate_rsk_conpone_card, 0, 0, 1, 1)
-        grid.addWidget(generate_rsk_conpone_card)
+        flow_layout.addWidget(generate_rsk_conpone_card)
 
         update_savedata_card = quick_function_card(
-            self.page_icon_cache["更新背景"],
+            self.page_icon_cache["更新控件背景"],
             "更新一下数据~",
             "初始化记录数据后使用的就是存储的数据 也可以在设置中改为自动更新(TODO) 但是会很慢",
-            title_style,
-            content_style,
+            card_title_style,
+            card_content_style,
         )
+        self.widgets["home_page"]["update_savedata_card"] = update_savedata_card
         update_savedata_card.left_func = self.get_save_data
-        # grid.addWidget(update_savedata_card, 0, 1, 1, 1)
-        grid.addWidget(update_savedata_card)
-
-        layout.addStretch(1)  # 顶上去
+        flow_layout.addWidget(update_savedata_card)
 
         tip_layout = QVBoxLayout()
+        self.widgets["home_page"]["tip_layout"] = tip_layout
+        layout.addLayout(tip_layout)
         tip_layout.setAlignment(Qt.AlignLeft)
         tip_layout.setContentsMargins(0, 0, 0, 0)
-        layout.addLayout(tip_layout)
         tip_style = {
             "font_size": 22,
             "min_width": widget.width(),
@@ -587,10 +618,12 @@ class MainWindow(FramelessWindow):
             "font_color": (138, 138, 138, 1),
             "background_color": (255, 255, 255, 0.8),
         }
-        tip = label(random.choice(self.home_page_tips), tip_style)
+        tip = label(
+            random.choice(self.home_page_tips), tip_style
+        )  # 随机选一个作为展示的内容
         self.widgets["home_page"]["tip"] = tip
-        tip.setAlignment(Qt.AlignLeft)
         tip_layout.addWidget(tip)
+        tip.setAlignment(Qt.AlignLeft)
 
         return widget
 
@@ -938,6 +971,7 @@ class MainWindow(FramelessWindow):
             True,
             "introduction",
         )
+        self.widgets["edit_info_page"]["example_song"] = example_song
         display_layout.addWidget(example_song)
         self.widgets["edit_info_page"]["song_info_card"] = example_song
 
@@ -993,7 +1027,7 @@ class MainWindow(FramelessWindow):
 
         # 重新读取难度表（也可以复用之前的 diff_map_result）
 
-        self.tt = datetime.now()
+        self.time_record = datetime.now()
         df = pd.read_csv(
             DIFFICULTY_PATH,
             sep="\t",
@@ -1230,7 +1264,7 @@ class MainWindow(FramelessWindow):
         if not hasattr(self, "filter_result"):
             return
 
-        self.tt = datetime.now()
+        self.time_record = datetime.now()
         filter_obj_list = self.widgets["search_page"]["filter_obj_list"]
         logical_link = filter_obj_list[0].logical_cbb.get_content()
         filter_result_copy = self.filter_result.copy()
@@ -1406,7 +1440,7 @@ class MainWindow(FramelessWindow):
         self.widgets["search_page"]["scroll_content_widget"].setUpdatesEnabled(True)
         # print(f"布局{cnt}个控件用时:", time.time() - itme)
         end_time = datetime.now()
-        time_difference = end_time - self.tt
+        time_difference = end_time - self.time_record
 
         total_seconds = time_difference.total_seconds()
         seconds = int(total_seconds % 60)
@@ -1607,6 +1641,11 @@ class MainWindow(FramelessWindow):
         - 用两个小堆维护 top27 和 top3(AP)
         - 排序后调用 place_b27_phi3 进行布局（惰性创建 widget）
         """
+        if self.is_updated:  # 最新的版本已经布局过了 直接跳转即可
+            self.switch_to(self.place_b27_phi3_page)
+            # print('最新最热rks')
+            return
+
         if not self.token:
             InfoBar.warning(
                 title="用户未登录",
@@ -1790,6 +1829,7 @@ class MainWindow(FramelessWindow):
         except Exception:
             pass
         _refresh_folder_stretches()
+        self.is_updated = True  # 更新完就是最新的啦
         self.switch_to(self.place_b27_phi3_page)
 
     # ------------------ utility UI methods ------------------
@@ -1803,16 +1843,51 @@ class MainWindow(FramelessWindow):
     # --------------- 账号页面 -------------------
     def init_account_page(self) -> QWidget:
         self.widgets["account_page"] = {}
-        if self.background_name != "introduction":
-            self.background_name = self.background_name[:-2:]
-        widget = bg_widget(self.illustration_cache[self.background_name])
-        self.widgets["account_page"]["widget"] = widget
+        if self.token:
+            if self.background_name != "introduction":
+                self.background_name = self.background_name[:-2:]
+            widget = bg_widget(self.illustration_cache[self.background_name])
+            self.widgets["account_page"]["widget"] = widget
+        else:
+            widget = QWidget()
+            self.widgets["account_page"]["暂存"] = widget
 
         layout = QGridLayout(widget)
         self.widgets["account_page"]["layout"] = layout
         layout.setSpacing(0)
-        widget.setLayout(layout)
 
+        # 这些部分必须写 否则登出的时候会出问题
+        QRcode_img = ImageLabel(QRCODE_EMPTY_IMG_PATH)  # 空二维码
+        QRcode_img.setFixedSize(410, 410)
+        # 2. 保持长宽比缩放图片
+        pixmap = QPixmap(QRCODE_EMPTY_IMG_PATH)
+        pixmap = pixmap.scaled(
+            410,
+            410,
+            Qt.KeepAspectRatioByExpanding,  # 保持长宽比（扩展填充）
+            Qt.SmoothTransformation,  # 平滑缩放
+        )
+        # 3. 居中显示（避免拉伸变形）
+        QRcode_img.setAlignment(Qt.AlignCenter)
+        QRcode_img.setPixmap(pixmap)
+        self.widgets["account_page"]["QRcode_img"] = QRcode_img
+        self.widgets["account_page"]["layout"].addWidget(QRcode_img)
+
+        login_confirm_btn = button("点击这里开始授权")
+        login_confirm_btn.bind_click_func(self.check_login_status)
+        self.widgets["account_page"]["login_confirm_btn"] = login_confirm_btn
+        layout.addWidget(login_confirm_btn)
+
+        if self.token:
+            login_confirm_btn.hide()  # 如果已经有了token就不用再获取了
+            QRcode_img.hide()
+            self.draw_account_page(widget, layout)
+            # self.switch_to(self.home_page)
+            # get_token_by_qrcode()
+
+        return widget
+
+    def draw_account_page(self, widget: bg_widget, layout: QGridLayout):
         if self.avatar:
             original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
             # 使用QFluentWidgets的AvatarWidget显示
@@ -1871,7 +1946,7 @@ class MainWindow(FramelessWindow):
             name_rks_layout.addWidget(name_label)
             name_label.adjustSize()
 
-        rks_label = label(f"rks: 生成rks组成以计算", lable_style)
+        rks_label = label("", lable_style)
         # rks_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         rks_label.setAlignment(Qt.AlignCenter)
         self.widgets["account_page"]["rks_label"] = rks_label
@@ -1922,15 +1997,15 @@ class MainWindow(FramelessWindow):
         EZ_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZ_label, 3, 4, 1, 1)
 
-        EZclear_label = label(200, summary_label_style)
+        EZclear_label = label(self.EZ_statistical_data[0], summary_label_style)
         EZclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZclear_label, 3, 5, 1, 1)
 
-        EZFC_label = label(100, summary_label_style)
+        EZFC_label = label(self.EZ_statistical_data[1], summary_label_style)
         EZFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZFC_label, 3, 6, 1, 1)
 
-        EZAP_label = label(300, summary_label_style)
+        EZAP_label = label(self.EZ_statistical_data[2], summary_label_style)
         EZAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZAP_label, 3, 7, 1, 1)
 
@@ -1939,15 +2014,15 @@ class MainWindow(FramelessWindow):
         HD_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HD_label, 4, 4, 1, 1)
 
-        HDclear_label = label(200, summary_label_style)
+        HDclear_label = label(self.HD_statistical_data[0], summary_label_style)
         HDclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HDclear_label, 4, 5, 1, 1)
 
-        HDFC_label = label(100, summary_label_style)
+        HDFC_label = label(self.HD_statistical_data[1], summary_label_style)
         HDFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HDFC_label, 4, 6, 1, 1)
 
-        HDAP_label = label(300, summary_label_style)
+        HDAP_label = label(self.HD_statistical_data[2], summary_label_style)
         HDAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HDAP_label, 4, 7, 1, 1)
 
@@ -1956,15 +2031,15 @@ class MainWindow(FramelessWindow):
         IN_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(IN_label, 5, 4, 1, 1)
 
-        INclear_label = label(200, summary_label_style)
+        INclear_label = label(self.IN_statistical_data[0], summary_label_style)
         INclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INclear_label, 5, 5, 1, 1)
 
-        INFC_label = label(100, summary_label_style)
+        INFC_label = label(self.HD_statistical_data[1], summary_label_style)
         INFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INFC_label, 5, 6, 1, 1)
 
-        INAP_label = label(300, summary_label_style)
+        INAP_label = label(self.HD_statistical_data[2], summary_label_style)
         INAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INAP_label, 5, 7, 1, 1)
 
@@ -1973,55 +2048,22 @@ class MainWindow(FramelessWindow):
         AT_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(AT_label, 6, 4, 1, 1)
 
-        ATclear_label = label(200, summary_label_style)
+        ATclear_label = label(self.AT_statistical_data[0], summary_label_style)
         ATclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(ATclear_label, 6, 5, 1, 1)
 
-        ATFC_label = label(100, summary_label_style)
+        ATFC_label = label(self.AT_statistical_data[1], summary_label_style)
         ATFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(ATFC_label, 6, 6, 1, 1)
 
-        ATAP_label = label(300, summary_label_style)
+        ATAP_label = label(self.AT_statistical_data[2], summary_label_style)
         ATAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(ATAP_label, 6, 7, 1, 1)
-
-        QRcode_img = ImageLabel(QRCODE_EMPTY_IMG_PATH)  # 空二维码
-        QRcode_img.setFixedSize(410, 410)
-
-        # 2. 保持长宽比缩放图片
-        pixmap = QPixmap(QRCODE_EMPTY_IMG_PATH)
-        pixmap = pixmap.scaled(
-            410,
-            410,
-            Qt.KeepAspectRatioByExpanding,  # 保持长宽比（扩展填充）
-            Qt.SmoothTransformation,  # 平滑缩放
-        )
-
-        # 3. 居中显示（避免拉伸变形）
-        QRcode_img.setAlignment(Qt.AlignCenter)
-        QRcode_img.setPixmap(pixmap)
-        self.widgets["account_page"]["QRcode_img"] = QRcode_img
-        self.widgets["account_page"]["layout"].addWidget(QRcode_img)
-
-        login_confirm_btn = button("点击这里开始授权")
-        login_confirm_btn.bind_click_func(self.check_login_status)
-        self.widgets["account_page"]["login_confirm_btn"] = login_confirm_btn
-        layout.addWidget(login_confirm_btn)
 
         log_out_btn = button("退出登录")
         log_out_btn.bind_click_func(self.log_out)
         self.widgets["account_page"]["log_out_btn"] = log_out_btn
         layout.addWidget(log_out_btn, 7, 0, 1, 2)
-
-        if self.token:
-            login_confirm_btn.hide()  # 如果已经有了token就不用再获取了
-            QRcode_img.hide()
-            # self.switch_to(self.home_page)
-            # get_token_by_qrcode()
-        else:
-            log_out_btn.hide()
-
-        return widget
 
     def check_login_status(self):
         self.QRCode_info = TapTapLogin.RequestLoginQRCode()
@@ -2049,34 +2091,38 @@ class MainWindow(FramelessWindow):
             self.token = Token["sessionToken"]
             with open(TOKEN_PATH, "w") as file:
                 file.write(Token["sessionToken"])
-            self.avatar = self.save_dict["user"]["avatar"]
-            original_pixmap = QPixmap(AVATER_IMG_PREPATH + self.avatar + ".png")
-            print(self.avatar)
-            # 显示用户头像
-            avatar = AvatarWidget(
-                original_pixmap, self.widgets["account_page"]["widget"]
-            )
-            self.widgets["account_page"]["avatar"] = avatar
-            avatar.setFixedSize(100, 100)
-            avatar.show()
+            self.get_save_data()
 
             self.widgets["account_page"]["QRcode_img"].hide()
             self.widgets["account_page"]["login_confirm_btn"].hide()
-            self.widgets["account_page"]["log_out_btn"].show()
-            self.switch_to(self.home_page)
+            if self.background_name != "introduction":
+                self.background_name = self.background_name[:-2:]
+            widget = bg_widget(self.illustration_cache[self.background_name])
+            self.widgets["account_page"]["widget"] = widget
+            print(f'old={self.widgets["account_page"]["widget"]}')
+            self.account_page = widget
+            widget.setLayout(self.widgets["account_page"]["layout"])
+            self.widgets["account_page"]["暂存"].deleteLater()
+            self.draw_account_page(widget, self.widgets["account_page"]["layout"])
+            self.switch_to(self.account_page)
+
+            # self.switch_to(self.home_page)
         else:
             print("二维码登录未授权...")
 
     def log_out(self):
         with open(TOKEN_PATH, "w") as _:  # 清空tokn记录及self.token
             self.token = ""
-            self.widgets["account_page"]["QRcode_img"].show()
-            self.widgets["account_page"]["login_confirm_btn"].show()
-            self.widgets["account_page"]["log_out_btn"].hide()
-            avatar: AvatarWidget = self.widgets["account_page"]["avatar"]
-            avatar.deleteLater()
-            self.avatar = ""
-        # 应该还要把其他的页面初始化
+            # QWidget().setLayout(self.widgets["account_page"]["layout"])
+            # self.widgets["account_page"]["layout"].deleteLater()
+            self.init_variable()
+            self.reset_filter_result()
+            self.link_and_show(self.widgets["edit_info_page"]["example_song"])
+            old_widget = self.widgets["account_page"]["widget"]
+            print(f'old={self.widgets["account_page"]["widget"]}')
+            old_widget.deleteLater()
+            self.account_page = self.init_account_page()
+            self.switch_to(self.account_page)
 
 
 # ---------- 程序入口 ----------

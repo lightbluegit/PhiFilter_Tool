@@ -1,3 +1,4 @@
+"""该文件复制自 千柒 的 Phi-CloudAction-python-master 项目"""
 from typing import Any, Optional, Union
 from base64 import b64decode
 from requests import Session
@@ -300,6 +301,7 @@ class PigeonRequest:
 
         if self._req.content is None:
             print(f"返回数据 : *无返回数据*")
+
         else:
             try:
                 print(f"返回数据 : {self._req.content.decode()}")
@@ -392,35 +394,25 @@ class PhigrosCloud:
         result = (self.request.get(self.baseUrl + "classes/_GameSave?limit=1")).json()[
             "results"
         ][0]
-        summary = b64decode(result["summary"])  # base64解码summary数据喵
-        # print(f"全体目光向我看齐, result={result}, 类型:{type(result)}")
-        # try:
-        #     print(result['nickname'])
-        # except:
-        #     print("名称并不是在result中哦")
-        # try:
-        #     print(summary["nickname"])
-        # except:
-        #     print("名称并不是在summary中哦")
-        # print(
-        #     summary
-        # )  # b'\x06Y\x01\xc0\x94}A\x81\x01\x07\xe7\x93\xb7\xe5\xb2\x811\x00\x00\x00\x00\x00\x00\x05\x00\x04\x00\x02\x00\xdd\x00L\x00\t\x00\x1f\x00\x02\x00\x00\x00'
-        # 解析summary数据喵(这行是真的看不懂喵)
-        # summary = unpack("=BHfBx%ds12H" % summary[8], summary)
+        summary_data = b64decode(result["summary"])  # base64解码summary数据喵
+
+        # 解析summary数据喵（谢谢废酱喵！）
+        summary_dict = Reader(summary_data).parseStructure(summary)
+
         return_data = {  # 解析数据并返回一个字典喵
             # 这是存档的md5校验值喵
             "checksum": result["gameFile"]["metaData"]["_checksum"],
             "updateAt": result["updatedAt"],  # 这是存档更新时间喵
             "url": result["gameFile"]["url"],  # 这是存档直链喵
-            "saveVersion": summary[0],  # 这是存档版本喵
-            "challenge": summary[1],  # 课题分喵
-            "rks": summary[2],  # 正如其名不多讲了喵
-            "gameVersion": summary[3],  # 这是游戏版本喵
-            "avatar": summary[4],  # 这是头像喵
-            "EZ": summary[5:8],  # EZ难度的评级情况喵
-            "HD": summary[8:11],  # HD难度的评级情况喵
-            "IN": summary[11:14],  # IN难度的评级情况喵
-            "AT": summary[14:17],  # AT难度的评级情况喵
+            "saveVersion": summary_dict["saveVersion"],  # 这是存档版本喵
+            "challenge": summary_dict["challenge"],  # 课题分喵
+            "rks": summary_dict["rks"],  # 正如其名不多讲了喵
+            "gameVersion": summary_dict["gameVersion"],  # 这是游戏版本喵
+            "avatar": summary_dict["avatar"],  # 这是头像喵
+            "EZ": summary_dict["EZ"],  # EZ难度的评级情况喵
+            "HD": summary_dict["HD"],  # HD难度的评级情况喵
+            "IN": summary_dict["IN"],  # IN难度的评级情况喵
+            "AT": summary_dict["AT"],  # AT难度的评级情况喵
         }
 
         print(f'函数"getSummary()"返回：{return_data}')
@@ -444,10 +436,13 @@ class PhigrosCloud:
         print("调用函数：getSave()")
 
         if url is None:
-            return
+            summary = self.getSummary()
+            url = summary["url"]
+            if checksum is None:
+                checksum = summary["checksum"]
 
         elif checksum is None:
-            return
+            checksum = (self.getSummary())["checksum"]
 
         # 请求存档文件并获取数据喵
         save_data = (self.request.get(url)).content  # type: ignore
@@ -472,6 +467,144 @@ class PhigrosCloud:
 
         print(f'函数"getSave()"返回：*{len(save_data)} bytes*')
         return save_data  # 返回存档数据喵
+
+    def refreshSessionToken(self):
+        """
+        刷新sessionToken喵
+
+        注意：原先的sessionToken将会失效喵！
+
+        (会返回新的sessionToken喵！)
+
+        (刷新是即时的喵，旧token会立即失效喵，新的会即时生效喵)
+
+        返回:
+            (str): 新的sessionToken喵
+        """
+        print("调用函数：refreshSessionToken()")
+
+        # 获取玩家的objectId喵
+        objectId = (self.request.get(self.baseUrl + "users/me")).json()["objectId"]
+
+        # 发送刷新sessionToken请求喵
+        new_sessionToken = (
+            self.request.put(self.baseUrl + f"users/{objectId}/refreshSessionToken")
+        ).json()[1]["sessionToken"]
+
+        print(f'函数"refreshSessionToken()"返回：{new_sessionToken}')
+        return new_sessionToken
+
+    def uploadNickname(self, name: str):
+        """
+        用于更新玩家昵称喵
+
+        参数:
+            name (str): 要更改的昵称喵
+
+        返回:
+            (None): 无喵~
+        """
+        print("调用函数：uploadNickname()")
+
+        # 请求存档信息喵
+        response = (self.request.get(self.baseUrl + "users/me")).json()
+        userObjectId = response["objectId"]  # 获取user的ObjectId喵
+        print(f"userObjectId{userObjectId}")
+
+        # 请求更新用户信息喵
+        self.request.put(
+            url=self.baseUrl + f"users/{userObjectId}",
+            data=dumps({"nickname": name}),
+            headers={
+                **self.request.headers,
+                "Content-Type": "application/json",
+            },
+        )
+
+        print('函数"uploadNickname()"无返回')
+
+    def uploadSummary(self, summary: dict):
+        """
+        上传summary喵(从上传存档里面独立出来的喵)
+
+        (注意这个只能用来看，没有任何实际用处，上传覆盖之后就没了喵)
+
+        参数:
+            summarys (dict): 要上传的summary喵
+        """
+        print("调用函数：uploadSummary()")
+
+        from struct import pack
+        from base64 import b64encode
+        from json import dumps
+        from datetime import datetime
+
+        # 将解析过的summary构建回去喵
+        avatar_data = summary["avatar"].encode()  # 对头像名称进行编码喵
+        _summary = bytearray()  # 创建一个空的summary数据喵
+        _summary.extend(pack("=B", summary["saveVersion"]))
+        _summary.extend(pack("=H", summary["challenge"]))
+        _summary.extend(pack("=f", summary["rks"]))
+        _summary.extend(pack("=B", summary["gameVersion"]))
+        _summary.append(len(avatar_data))
+        _summary.extend(avatar_data)
+        for key in ["EZ", "HD", "IN", "AT"]:
+            for i in summary[key]:
+                _summary.extend(pack("=H", i))
+
+        _summary = b64encode(_summary).decode()  # 把summary数据编码回去喵
+
+        # 请求存档信息喵
+        save_info = (
+            self.request.get(self.baseUrl + "classes/_GameSave?limit=1")
+        ).json()["results"][0]
+
+        objectId = save_info["objectId"]  # 获取objectId喵
+        userObjectId = save_info["user"]["objectId"]  # 获取user的ObjectId喵
+        # 存档的md5校验值喵
+        checksum = save_info["gameFile"]["metaData"]["_checksum"]
+        saveSize = save_info["gameFile"]["metaData"]["size"]  # 存档的大小喵
+        fileObjectId = save_info["gameFile"]["objectId"]  # 存档的objectId喵
+
+        print(f"objectId：{objectId}")
+        print(f"userObjectId：{userObjectId}")
+        print(f"checksum：{checksum}")
+        print(f"saveSize：{saveSize}")
+
+        print(f'现summary：{save_info["summary"]}')
+        print(f"新summary：{summary}")
+
+        # 上传summary喵
+        self.request.put(
+            url=self.baseUrl + "classes/_GameSave/{objectId}?",
+            data=dumps(
+                {
+                    "summary": summary,
+                    "modifiedAt": {
+                        "__type": "Date",
+                        "iso": datetime.utcnow().isoformat(timespec="milliseconds")
+                        + "Z",
+                    },
+                    "gameFile": {
+                        "__type": "Pointer",
+                        "className": "_File",
+                        "objectId": fileObjectId,
+                    },
+                    "ACL": {userObjectId: {"read": True, "write": True}},
+                    "user": {
+                        "__type": "Pointer",
+                        "className": "_User",
+                        "objectId": userObjectId,
+                    },
+                }
+            ),
+            headers={
+                **self.request.headers,
+                "Content-Type": "application/json",
+            },
+        )
+
+        print('函数"uploadSummary()"无返回')
 
 
 def unzipSave(zip_data: bytes) -> dict[str, bytes]:
@@ -1422,6 +1555,33 @@ class settings01:
 
     noteScale: Float
     """按键缩放喵"""
+
+
+class Summary(dataTypeAbstract):
+    @staticmethod
+    def read(data: bytes, pos: int):
+        reader = Reader(data, pos)
+        return [reader.type_read(ShortInt) for _ in range(3)], reader.pos
+
+    @staticmethod
+    def write(data: bytearray, value: list):
+        writer = Writer(data)
+        for i in value:
+            writer.type_write(ShortInt, i)
+
+        return writer.get_data()
+
+
+class summary:
+    saveVersion: Byte
+    challenge: ShortInt
+    rks: Float
+    gameVersion: VarInt
+    avatar: String
+    EZ: Summary
+    HD: Summary
+    IN: Summary
+    AT: Summary
 
 
 def getStructure(file_head: dict[str, bytes]) -> dict[str, Any]:
