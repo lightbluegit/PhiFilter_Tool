@@ -1,9 +1,9 @@
 from enum import Enum
-import pandas as pd
+
+# import pandas as pd
 from PyQt5.QtGui import QFontDatabase
 
 
-# ------------------------- 这里写自定义的枚举量 -------------------------
 class score_level_type(Enum):
     F = "F"
     C = "C"
@@ -15,16 +15,9 @@ class score_level_type(Enum):
     phi = "phi"
 
 
-class special_type(Enum):
-    AP = "AP"
-    FC = "FC"
-    NO_PLAY = "NO_PLAY"  # 还没玩过
-    EMPTY = ""  # 无特殊状态
-
-
 # 默认路径
 # 整个文件的相对路径前缀
-FILE_PATH = "projects/PhiFilter Tool/"
+FILE_PATH = "python/rhythmgame_database/"
 
 # 主文件夹下的文件可以直接写
 CODE_PATH = FILE_PATH + "main_code.py"
@@ -35,6 +28,9 @@ DEPENDENCES_PREPATH = FILE_PATH + "dependences/"
 DIFFICULTY_PATH = DEPENDENCES_PREPATH + "difficulty.tsv"  # 各个歌曲难度文件
 INFO_PATH = DEPENDENCES_PREPATH + "info.tsv"  # 组合名称与拆分名称对应关系文件
 AVATAR_PATH = DEPENDENCES_PREPATH + "avatar.txt"  # 头像名称
+
+UPDATE_PREPATH = DEPENDENCES_PREPATH + "update/"
+OUTPUT_PATH = UPDATE_PREPATH + "output.txt"
 
 # 字体文件
 FONT_PREPATH = DEPENDENCES_PREPATH + "font/"
@@ -60,7 +56,6 @@ PLAYER_INFO_PREPATH = FILE_PATH + "player_info/"
 TOKEN_PATH = PLAYER_INFO_PREPATH + "session_token.txt"  # 玩家session_token存储路径
 GROUP_PATH = PLAYER_INFO_PREPATH + "group.csv"  # 玩家自定义分组信息存储路径
 COMMENT_PATH = PLAYER_INFO_PREPATH + "comment.csv"  # 玩家自定义简评信息存储路径
-TAG_PATH = PLAYER_INFO_PREPATH + "tag.csv"  # 玩家自定义标签信息存储路径
 
 # 图片素材(images)文件夹下文件的路径前缀
 IMAGES_PREPATH = FILE_PATH + "images/"
@@ -73,10 +68,11 @@ ICON_PREPATH = IMAGES_PREPATH + "icons/"
 
 RESET_PATH = ICON_PREPATH + "reset.png"
 SAVE_ICON_PATH = ICON_PREPATH + "save.png"
-GENERATE_RKS_ICON_PATH = ICON_PREPATH + "generate_rks_compose.png"
 FILTER_ICON_PATH = ICON_PREPATH + "filter.png"
 FILTER_AGAIN_ICON_PATH = ICON_PREPATH + "filter_again.png"
+QRCODE_EMPTY_IMG_PATH = ICON_PREPATH + "QRcode_empty.jpg"
 
+# 各个评级的图标
 SCORE_LEVEL_ICONS_PREPATH = ICON_PREPATH + "score_level_icons/"
 
 SCORE_LEVEL_PATH = {
@@ -90,16 +86,10 @@ SCORE_LEVEL_PATH = {
     score_level_type.phi: SCORE_LEVEL_ICONS_PREPATH + "phi.png",
 }
 
-# 生成的二维码与空二维码
-QRCODE_IMG_PREPATH = IMAGES_PREPATH + "QRcode/"
-
-QRCODE_IMG_PATH = QRCODE_IMG_PREPATH + "QRcode.png"
-QRCODE_EMPTY_IMG_PATH = QRCODE_IMG_PREPATH + "QRcode_empty.jpg"
-
 # 各种背景
 BACKGROUND_IMG_PREPATH = IMAGES_PREPATH + "background/"
 
-SONG_CARD_BACKGROUND = {  # 区分不同难度的背景
+SONG_CARD_BACKGROUND = {  # 用途 作为背景区分不同难度 表示玩家挑战模式的等级
     "EZ": BACKGROUND_IMG_PREPATH + "green-EZ.png",
     "HD": BACKGROUND_IMG_PREPATH + "blue-HD.png",
     "IN": BACKGROUND_IMG_PREPATH + "red-IN.png",
@@ -111,11 +101,43 @@ SONG_CARD_BACKGROUND = {  # 区分不同难度的背景
 # 曲绘
 ILLUSTRATION_PREPATH = IMAGES_PREPATH + "illustration/"
 
-ACG_PPIMAGE_URL = "https://www.loliapi.com/acg/pp/"
-ACG_IMAGE_URL = "https://www.loliapi.com/acg/"
+# 可作为筛选依据的属性
+FILTER_ATTRIBUTION_LIST: list[str] = [
+    "acc",
+    "单曲rks",
+    "得分",
+    "定数",
+    "评级",
+    "难度",
+    "曲名",
+    "曲师",
+    "谱师",
+    "画师",
+    # "分组",
+    # "简评",
+]
+
+# 数值类比较
+NUMERIC_COMPARATORS: list[str] = [
+    "大于",
+    "大于等于",
+    "小于",
+    "小于等于",
+    "等于",
+    "不等于",
+]
+
+# 精确 模糊比较
+LOGICAL_OPERATORS: list[str] = ["等于", "不等于", "包含", "不包含"]
+
+# ACG图片获取API
+ACG_PPIMAGE_URL = "https://www.loliapi.com/acg/pp/"  # 头像获取
+ACG_IMAGE_URL = "https://www.loliapi.com/acg/"  # 图片获取
+
+MAX_LEVEL: float = 17.6  # 当前版本最高定数
 
 
-# 默认样式表
+# ---------------默认样式表获取---------------
 def get_combobox_style(
     font_size: str = 23,
     font_family: str = FONT_FAMILY["chi"],
@@ -262,40 +284,7 @@ def get_switch_button_style(
     return style
 
 
-DEFAULT_EN_FONT = "Segoe UI"
-DEFAULT_CN_FONT = "Microsoft YaHei"
-DEFAULT_JP_FONT = "Yu Gothic UI"
-
-
-FILTER_ATTRIBUTION_LIST: list[str] = [
-    "acc",
-    "单曲rks",
-    "得分",
-    "定数",
-    "评级",
-    "难度",
-    "曲名",
-    "曲师",
-    "谱师",
-    "画师",
-    "分组",
-    "标签",
-    "简评",
-]
-
-# 数值类比较
-NUMERIC_COMPARATORS: list[str] = [
-    "大于",
-    "大于等于",
-    "小于",
-    "小于等于",
-    "等于",
-    "不等于",
-]
-
-# 精确 模糊比较
-LOGICAL_OPERATORS: list[str] = ["等于", "不等于", "包含", "不包含"]
-
+# ------------------ 缓存内容 --------------------
 # 曲名
 SONG_NAME_LIST: list[str] = [
     """Glaciaxion""",
@@ -1890,83 +1879,76 @@ COMBINE_NAME: list[str] = [
     """ATHAZA.LeaF""",
 ]
 
-MAX_LEVEL: float = 17.6  # 当前版本最高定数
-
 # ----- 获取分组信息 -----
-GROUP_INFO = {}
-TAG_INFO = {}
-COMMENT_INFO = {}
+# GROUP_INFO = {}
+# COMMENT_INFO = {}
 
-try:
-    df = pd.read_csv(
-        GROUP_PATH,
-        sep=",",
-        header=None,
-        encoding="utf-8",
-        names=["c_name", "group"],
-    )
-    df = df.fillna("")
-    df.set_index(df.columns[0], inplace=True)
-    used_group = set()
-    for idx, row in df.iterrows():
-        GROUP_INFO[idx] = str(row["group"])
-        group_raw = str(row["group"]).strip()
-        for groupi in group_raw.split("`"):
-            if groupi:
-                used_group.add(groupi)
-    used_group = list(used_group)
-except Exception:
-    GROUP_INFO = {}
-    used_group = []
+# try:
+#     df = pd.read_csv(
+#         GROUP_PATH,
+#         sep=",",
+#         header=None,
+#         encoding="utf-8",
+#         names=["c_name", "group"],
+#     )
+#     df = df.fillna("")
+#     df.set_index(df.columns[0], inplace=True)
+#     used_group = set()
+#     for idx, row in df.iterrows():
+#         GROUP_INFO[idx] = str(row["group"])
+#         group_raw = str(row["group"]).strip()
+#         for groupi in group_raw.split("`"):
+#             if groupi:
+#                 used_group.add(groupi)
+#     used_group = list(used_group)
+# except Exception:
+#     GROUP_INFO = {}
+#     used_group = []
 
-# ----- 获取标签信息 -----
-try:
-    df = pd.read_csv(
-        TAG_PATH,
-        sep=",",
-        header=None,
-        encoding="utf-8",
-        names=["c_name", "tag"],
-    )
-    df = df.fillna("")
-    df.set_index(df.columns[0], inplace=True)
-    used_tag = set()
-    for idx, row in df.iterrows():
-        TAG_INFO[idx] = str(row["tag"])
-        tag_raw = str(row["tag"]).strip()
-        for tagi in tag_raw.split("`"):
-            if tagi:
-                used_tag.add(tagi)
-    used_tag = list(used_tag)
-except Exception:
-    TAG_INFO = {}
-    used_tag = []
 
-# ----- 获取简评信息 -----
-try:
-    df = pd.read_csv(
-        COMMENT_PATH,
-        sep=",",
-        header=None,
-        encoding="utf-8",
-        names=[
-            "c_name",
-            "EZ_comment",
-            "HD_comment",
-            "IN_comment",
-            "AT_comment",
-        ],
-    )
-    df = df.fillna("")
-    df.set_index(df.columns[0], inplace=True)
-    for idx, row in df.iterrows():
-        COMMENT_INFO[idx] = {
-            "EZ": str(row["EZ_comment"]),
-            "HD": str(row["HD_comment"]),
-            "IN": str(row["IN_comment"]),
-            "AT": str(row["AT_comment"]),
-        }
-except Exception:
-    COMMENT_INFO = {}
+# # ----- 获取简评信息 -----
+# try:
+#     df = pd.read_csv(
+#         COMMENT_PATH,
+#         sep=",",
+#         header=None,
+#         encoding="utf-8",
+#         names=[
+#             "c_name",
+#             "EZ_comment",
+#             "HD_comment",
+#             "IN_comment",
+#             "AT_comment",
+#         ],
+#     )
+#     df = df.fillna("")
+#     df.set_index(df.columns[0], inplace=True)
+#     for idx, row in df.iterrows():
+#         COMMENT_INFO[idx] = {
+#             "EZ": str(row["EZ_comment"]),
+#             "HD": str(row["HD_comment"]),
+#             "IN": str(row["IN_comment"]),
+#             "AT": str(row["AT_comment"]),
+#         }
+# except Exception:
+#     COMMENT_INFO = {}
 
-# End of consts.py
+
+# 获取评级
+def get_score_level(score: int, is_fc: bool = False) -> score_level_type:
+    if score == 1000000:
+        return score_level_type.phi
+    elif is_fc:
+        return score_level_type.VFC
+    elif score >= 960000:
+        return score_level_type.V
+    elif score >= 920000:
+        return score_level_type.S
+    elif score >= 880000:
+        return score_level_type.A
+    elif score >= 820000:
+        return score_level_type.B
+    elif score >= 600000:
+        return score_level_type.C
+    else:
+        return score_level_type.F
