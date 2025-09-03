@@ -2,6 +2,56 @@ from enum import Enum
 
 # import pandas as pd
 from PyQt5.QtGui import QFontDatabase
+import os
+import sys
+
+import os
+import sys
+from pathlib import Path
+
+# 定义路径
+# config_dir = Path("player_info")
+
+# # 如果目录不存在，就创建（包括父目录）
+# config_dir.mkdir(parents=True, exist_ok=True)
+# debug: bool = False
+debug: bool = True
+
+
+def appdata_path(relative_path=""):
+    """
+    获取可写的用户数据目录路径
+    用于保存配置、token、日志等可写文件
+    """
+    if debug:
+        return relative_path  # 调试状态
+
+    if sys.platform == "win32":
+        base = Path(os.environ["APPDATA"])  # C:\Users\...\AppData\Roaming
+
+    app_path = base / "PhiFilterTool"
+    # app_path.mkdir(parents=True, exist_ok=True)  # 自动创建目录
+    path_str = str(app_path / relative_path)
+    file_path = Path(app_path / relative_path)
+    print(f"这里的文件路径是:{file_path}")
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    if not file_path.exists():
+        file_path.touch(exist_ok=True)  # 创建空文件
+        # print(f"Created file: {app_path / relative_path}")
+    return path_str
+
+
+def resource_path(relative_path):
+    """
+    获取打包后资源的正确路径
+    用法: resource_path("images/avatar/1.png")
+    """
+    if debug:
+        base_path = os.path.abspath(".")
+    else:
+        # PyInstaller 会创建临时文件夹，并把路径存入 sys._MEIPASS
+        base_path = sys._MEIPASS
+    return os.path.join(base_path, relative_path)
 
 
 class score_level_type(Enum):
@@ -17,7 +67,10 @@ class score_level_type(Enum):
 
 # 默认路径
 # 整个文件的相对路径前缀
-FILE_PATH = "python/rhythmgame_database/"
+if debug:
+    FILE_PATH = "projects/PhiFilterTool/"
+else:
+    FILE_PATH = ""
 
 # 主文件夹下的文件可以直接写
 CODE_PATH = FILE_PATH + "main_code.py"
@@ -38,7 +91,9 @@ FONT_PREPATH = DEPENDENCES_PREPATH + "font/"
 EN_FONT1_PATH = FONT_PREPATH + "Playfair_Display/PlayfairDisplay-VariableFont_wght.ttf"
 NUM_FONT1_PATH = FONT_PREPATH + "Share_Tech_Mono/ShareTechMono-Regular.ttf"
 # CHI_FONT1 = FONT_PREPATH + "ZCOOLKuaiLe/ZCOOLKuaiLe-Regular.ttf"
-CHI_FONT1_PATH = FONT_PREPATH + "Source Han Sans & Saira Hybrid-Regular #5446.ttf"
+CHI_FONT1_PATH = resource_path(
+    FONT_PREPATH + "Source Han Sans & Saira Hybrid-Regular #5446.ttf"
+)
 
 FONT_FAMILY = {}
 font_id = QFontDatabase.addApplicationFont(CHI_FONT1_PATH)
@@ -53,7 +108,9 @@ else:
 # 玩家信息(player_info)文件夹下文件的路径前缀
 PLAYER_INFO_PREPATH = FILE_PATH + "player_info/"
 
-TOKEN_PATH = PLAYER_INFO_PREPATH + "session_token.txt"  # 玩家session_token存储路径
+# TOKEN_PATH = PLAYER_INFO_PREPATH + "session_token.txt"  # 玩家session_token存储路径
+TOKEN_PATH = "session_token.txt"  # 玩家session_token存储路径
+LOG_PATH = "PhiFilterTool_log.txt"
 GROUP_PATH = PLAYER_INFO_PREPATH + "group.csv"  # 玩家自定义分组信息存储路径
 COMMENT_PATH = PLAYER_INFO_PREPATH + "comment.csv"  # 玩家自定义简评信息存储路径
 
@@ -87,15 +144,16 @@ SCORE_LEVEL_PATH = {
 }
 
 # 各种背景
-BACKGROUND_IMG_PREPATH = IMAGES_PREPATH + "background/"
+BACKGROUND_IMG_PREPATH = "background/"
+READONLY_BACKGROUND_IMG_PREPATH = IMAGES_PREPATH + "background/"
 
 SONG_CARD_BACKGROUND = {  # 用途 作为背景区分不同难度 表示玩家挑战模式的等级
-    "EZ": BACKGROUND_IMG_PREPATH + "green-EZ.png",
-    "HD": BACKGROUND_IMG_PREPATH + "blue-HD.png",
-    "IN": BACKGROUND_IMG_PREPATH + "red-IN.png",
-    "AT": BACKGROUND_IMG_PREPATH + "gold-AT.png",
-    "white": BACKGROUND_IMG_PREPATH + "white.png",
-    "colorful": BACKGROUND_IMG_PREPATH + "colorful.png",
+    "EZ": READONLY_BACKGROUND_IMG_PREPATH + "green-EZ.png",
+    "HD": READONLY_BACKGROUND_IMG_PREPATH + "blue-HD.png",
+    "IN": READONLY_BACKGROUND_IMG_PREPATH + "red-IN.png",
+    "AT": READONLY_BACKGROUND_IMG_PREPATH + "gold-AT.png",
+    "white": READONLY_BACKGROUND_IMG_PREPATH + "white.png",
+    "colorful": READONLY_BACKGROUND_IMG_PREPATH + "colorful.png",
 }
 
 # 曲绘

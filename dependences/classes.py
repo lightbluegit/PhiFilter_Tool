@@ -280,7 +280,8 @@ class main_info_card(ElevatedCardWidget):
 
         # 评级图片
         self.level_img = ImageLabel(
-            SCORE_LEVEL_PATH[get_score_level(score, is_fc)], self.top_widget
+            resource_path(SCORE_LEVEL_PATH[get_score_level(score, is_fc)]),
+            self.top_widget,
         )
         # print(SCORE_LEVEL_PATH[score_level])
         self.level_img.scaledToHeight(80)
@@ -675,11 +676,11 @@ class song_info_card(QWidget):
         drawer_label.add_widget(drawer_content_elm)
         self.flow_layout.addWidget(drawer_label)
 
-        self.group_label = hint_and_frame_widget("分组:")
-        self.flow_layout.addWidget(self.group_label)
+        # self.group_label = hint_and_frame_widget("分组:")
+        # self.flow_layout.addWidget(self.group_label)
 
-        self.comment_label = hint_and_frame_widget("简评:")
-        self.flow_layout.addWidget(self.comment_label)
+        # self.comment_label = hint_and_frame_widget("简评:")
+        # self.flow_layout.addWidget(self.comment_label)
 
         self.scroll_content_widget.setUpdatesEnabled(True)
 
@@ -724,31 +725,31 @@ class song_info_card(QWidget):
             self.improve_advice,
         )
 
-    def set_edited_info(self, group: list[str], comment: str):
-        if not self._expanded_created:
-            self._ensure_expanded_created()
+    # def set_edited_info(self, group: list[str], comment: str):
+    #     if not self._expanded_created:
+    #         self._ensure_expanded_created()
 
-        # 批量添加时关闭更新以避免多次重绘
-        self.scroll_content_widget.setUpdatesEnabled(False)
+    #     # 批量添加时关闭更新以避免多次重绘
+    #     self.scroll_content_widget.setUpdatesEnabled(False)
 
-        self.group_label.clear_content_widget()
-        for groupi in group:
-            if not groupi:
-                continue
-            group_elm = BodyLabel(groupi)
-            # group_elm.setStyleSheet(self.label_style)
-            # group_elm.setWordWrap(True)
-            self.group_label.add_widget(group_elm)
+    #     self.group_label.clear_content_widget()
+    #     for groupi in group:
+    #         if not groupi:
+    #             continue
+    #         group_elm = BodyLabel(groupi)
+    #         # group_elm.setStyleSheet(self.label_style)
+    #         # group_elm.setWordWrap(True)
+    #         self.group_label.add_widget(group_elm)
 
-        # comment
-        self.comment_label.clear_content_widget()
-        if comment:
-            comment_elm = BodyLabel(comment)
-            comment_elm.setStyleSheet(self.label_style)
-            comment_elm.setWordWrap(True)
-            self.comment_label.add_widget(comment_elm)
+    #     # comment
+    #     self.comment_label.clear_content_widget()
+    #     if comment:
+    #         comment_elm = BodyLabel(comment)
+    #         comment_elm.setStyleSheet(self.label_style)
+    #         comment_elm.setWordWrap(True)
+    #         self.comment_label.add_widget(comment_elm)
 
-        self.scroll_content_widget.setUpdatesEnabled(True)
+    #     self.scroll_content_widget.setUpdatesEnabled(True)
 
 
 # 可折叠的主控件
@@ -867,6 +868,7 @@ class filter_obj(QWidget):
         self.flow_layout = flow_layout
         # 主布局
         self.setMaximumHeight(40)
+        self.setFixedWidth(880)
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(2)
@@ -1560,6 +1562,7 @@ class SongListViewWidget(QWidget):
                 # groups = group_info.get(combine_name, "").split("`")
                 # comment = comment_info.get(combine_name, {}).get(diffi, "")
                 # 构造 SongItem，并加入 model
+                # print(f"模型正在写入{combine_name}")
                 item = SongItem(
                     combine_name=combine_name,
                     diff=diffi,
