@@ -1255,12 +1255,14 @@ class MainWindow(FramelessWindow):
             if conditioni is None:
                 return
             if logical_link == "并且(与)":
-                result_list = self.filte_with_condition(self.filter_result, conditioni)
+                result_list = self.filt_with_condition(self.filter_result, conditioni)
                 self.filter_result = set(result_list)
             else:
-                self.filter_result = self.filte_with_condition(
+                filt_result = self.filt_with_condition(
                     set(i for i in range(model.rowCount())), conditioni
                 )
+                for resulti in filt_result:
+                    self.filter_result.add(resulti)
 
         self.place_record()
 
@@ -1321,10 +1323,10 @@ class MainWindow(FramelessWindow):
             conditioni = filter_obji.get_all_condition()
             if logical_link == "并且(与)":
                 self.filter_result = set(
-                    self.filte_with_condition(self.filter_result, conditioni)
+                    self.filt_with_condition(self.filter_result, conditioni)
                 )  # 把自己放进去筛 然后覆盖自己
             else:
-                result_list = self.filte_with_condition(
+                result_list = self.filt_with_condition(
                     filter_result_copy, conditioni
                 )  # 重复把备份放进去筛
                 for resulti in result_list:
@@ -1333,7 +1335,7 @@ class MainWindow(FramelessWindow):
         self.place_record()
 
     # 从给定的序号中筛选出符合条件的序号并返回
-    def filte_with_condition(
+    def filt_with_condition(
         self, song_info: set[int], condition: tuple[str, str, str]
     ) -> set[int]:
         """
@@ -2092,11 +2094,11 @@ class MainWindow(FramelessWindow):
         INclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INclear_label, 5, 5, 1, 1)
 
-        INFC_label = label(self.HD_statistical_data[1], summary_label_style)
+        INFC_label = label(self.IN_statistical_data[1], summary_label_style)
         INFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INFC_label, 5, 6, 1, 1)
 
-        INAP_label = label(self.HD_statistical_data[2], summary_label_style)
+        INAP_label = label(self.IN_statistical_data[2], summary_label_style)
         INAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INAP_label, 5, 7, 1, 1)
 
