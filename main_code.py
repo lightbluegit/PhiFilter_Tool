@@ -27,6 +27,8 @@ from qfluentwidgets import (
     InfoBarPosition,
     AvatarWidget,
     HorizontalSeparator,
+    IndeterminateProgressRing,
+    Action,
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
@@ -39,7 +41,7 @@ from math import sqrt
 import copy
 import random
 
-
+# pypy3 -m pip install pandas, qfluentwidgets, requests, PyQt5
 # 设置高 DPI 渲染策略，保证在高分辨率屏幕上界面清晰
 QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -58,7 +60,23 @@ class MainWindow(FramelessWindow):
 
     def __init__(self):
         super().__init__()
-        self.log_write(f"日志文件的地址是{appdata_path(LOG_PATH)}")
+
+        # ---------------- 预启动窗口设置 ----------------
+        self.open_window = FramelessWindow()
+        self.open_window.show()
+        open_widget = QWidget()
+        layout = QHBoxLayout(open_widget)
+        self.spinner = IndeterminateProgressRing()
+        layout.addWidget(self.spinner)
+
+        # 调整大小
+        self.spinner.setFixedSize(300, 300)
+
+        # 调整厚度
+        self.spinner.setStrokeWidth(4)
+        self.spinner.start()
+        # self.log_write(f"日志文件的地址是{appdata_path(LOG_PATH)}")
+        # ---------------- 初始化变量 ----------------
         self.widgets: dict[str, dict] = (
             {}
         )  # 按照页面分类存储各个控件 方便 不同页面重复使用同样的变量名 及 在类的各个地方调用任意控件
@@ -88,6 +106,7 @@ class MainWindow(FramelessWindow):
         datetime.now()
         self.log_write("变量初始化完成")
         self.preinit()  # 并行预处理图片
+
         # ---------------- 主窗口设置 ----------------
         # 设置窗口标题
         self.setTitleBar(StandardTitleBar(self))
@@ -133,6 +152,8 @@ class MainWindow(FramelessWindow):
             with open(appdata_path(TOKEN_PATH), "w") as token_file:
                 pass  # 创建空文件
         self.song_list_widget = SongListViewWidget()
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.showContextMenu)
 
     # 初始化各种与账号相关的变量
     def init_variable(self):
@@ -278,17 +299,9 @@ class MainWindow(FramelessWindow):
 
         # --------- 控件图标缓存 ---------
         #  生成rks组成卡片
-        max_try_count = 1
-        for _ in range(max_try_count):
-            rks_conpone_card_bg_path = self.get_acg_image(
-                ACG_PPIMAGE_URL, "rks_conpone_card_bg"
-            )
-            if rks_conpone_card_bg_path is not None:
-                break
-        if rks_conpone_card_bg_path is None:  # 5次尝试都失败了 用默认图片
-            rks_conpone_card_bg_path = resource_path(
-                READONLY_BACKGROUND_IMG_PREPATH + "default_rks_conpone_card_bg.png"
-            )
+        rks_conpone_card_bg_path = resource_path(
+            READONLY_BACKGROUND_IMG_PREPATH + "default_rks_conpone_card_bg.png"
+        )
         self.loader.add_task(
             rks_conpone_card_bg_path,
             "rks_conpone_card_bg",
@@ -297,19 +310,23 @@ class MainWindow(FramelessWindow):
         )
 
         # 更新卡片
-        for _ in range(max_try_count):
-            rks_conpone_card_bg_path = self.get_acg_image(
-                ACG_PPIMAGE_URL, "update_card_bg"
-            )
-            if rks_conpone_card_bg_path is not None:
-                break
-        if rks_conpone_card_bg_path is None:  # 5次尝试都失败了 用默认图片
-            rks_conpone_card_bg_path = resource_path(
-                READONLY_BACKGROUND_IMG_PREPATH + "default_update_card_bg.png"
-            )
+        rks_conpone_card_bg_path = resource_path(
+            READONLY_BACKGROUND_IMG_PREPATH + "default_update_card_bg.png"
+        )
         self.loader.add_task(
             rks_conpone_card_bg_path,
             "update_card_bg",
+            self.page_icon_cache,
+            250,
+        )
+
+        # 计算卡片
+        calculate_score_card_bg_path = resource_path(
+            READONLY_BACKGROUND_IMG_PREPATH + "calculate_score_card_bg.png"
+        )
+        self.loader.add_task(
+            calculate_score_card_bg_path,
+            "calculate_score_card_bg",
             self.page_icon_cache,
             250,
         )
@@ -334,8 +351,8 @@ class MainWindow(FramelessWindow):
         else:
             self.switch_to(self.account_page)
 
+        self.open_window.deleteLater()
         self.show()
-
         end_time = datetime.now()
         time_difference = end_time - self.time_record
 
@@ -344,6 +361,60 @@ class MainWindow(FramelessWindow):
         microseconds = time_difference.microseconds
 
         self.log_write(f"预处理用时:{seconds:02d}s.{microseconds:06d}")
+
+    def find_parent_widget(self, widget, target_class):
+        """
+        从 widget 开始，向上查找第一个是 target_class 类型的父控件
+        """
+        current = widget
+        while current is not None:
+            if isinstance(current, target_class):
+                return current
+            current = current.parent()
+        return None
+
+    def showContextMenu(self, pos):
+        # pos 是相对于当前控件的坐标（比如 centralWidget）
+        # 转换为全局坐标，再转回当前控件的坐标系（确保准确）
+        global_pos = self.mapToGlobal(pos)
+
+        # 使用 childAt 找到该位置的直接子控件
+        clicked_widget = self.childAt(pos)  # pos 是相对于 self 的坐标
+        target_card = self.find_parent_widget(clicked_widget, song_info_card)
+        # 创建菜单
+        menu = RoundMenu("菜单", self)
+
+        if target_card is None:
+            menu.addAction(Action(FIF.COPY, "空白区域"))
+        else:
+            widget_type = type(target_card).__name__
+            # object_name = target_card.objectName()
+            current_page = self.widgets["basepage"]["content_widget"].currentWidget()
+            if current_page:
+                object_name = current_page.objectName()
+                # print("当前页面的 objectName:", object_name)
+            # 示例：根据不同控件类型，添加不同菜单项
+            if isinstance(target_card, song_info_card) and object_name == "search_page":
+                menu.addAction(
+                    Action(
+                        FIF.EDIT,
+                        f"编辑{target_card.combine_name}相关信息",
+                        triggered=lambda: self.link_and_show(target_card),
+                    )
+                )
+                menu.addAction(
+                    Action(
+                        FIF.FILTER,
+                        f"查找{target_card.combine_name}是否可达指定分数",
+                        triggered=lambda: self.link_and_show_score_page(target_card),
+                    )
+                )
+            else:
+                menu.addAction(Action(FIF.COPY, f"控件类型: {widget_type}"))
+                # menu.addAction(f"对象名: {object_name}")
+
+        # 在右键位置弹出菜单
+        menu.exec_(global_pos)
 
     # 生成组合名称与其对应名称 曲师等信息对照
     def generate_cname_to_name_info(self):
@@ -519,6 +590,10 @@ class MainWindow(FramelessWindow):
         self.log_write("初始化place_b27_phi3_page完成")
         self.place_b27_phi3_page.setObjectName("place_b27_phi3_page")
 
+        self.score_calculate_page = self.init_score_calculate_page()
+        self.log_write("初始化score_calculate_page完成")
+        self.score_calculate_page.setObjectName("score_calculate_page")
+
         self.search_page = self.init_search_page()
         self.log_write("初始化search_page完成")
         self.search_page.setObjectName("search_page")
@@ -562,6 +637,15 @@ class MainWindow(FramelessWindow):
             icon=(FIF.ALBUM),
             text="rks组成页",
             onClick=lambda: self.switch_to(self.place_b27_phi3_page),
+            parentRouteKey=self.home_page.objectName(),
+        )
+
+        calculate_icon = QIcon(resource_path(ICON_PREPATH + "calculate_icon.png"))
+        navigation_interface.addItem(
+            routeKey=self.score_calculate_page.objectName(),
+            icon=calculate_icon,
+            text="计算分数是否可达",
+            onClick=lambda: self.switch_to(self.score_calculate_page),
             parentRouteKey=self.home_page.objectName(),
         )
 
@@ -695,6 +779,20 @@ class MainWindow(FramelessWindow):
         update_savedata_card.left_func = self.update_data
         flow_layout.addWidget(update_savedata_card)
 
+        calculate_score_card = quick_function_card(
+            self.page_icon_cache["calculate_score_card_bg"],
+            "计算分数是否可达",
+            "设置歌曲及难度之后右键连接到本页面 输入期望达到的分数 给出达到需要的各项数据",
+            card_title_style,
+            card_content_style,
+        )
+        self.widgets["home_page"]["calculate_score_card"] = calculate_score_card
+        calculate_score_card.left_func = lambda: self.switch_to(
+            self.score_calculate_page
+        )
+        flow_layout.addWidget(calculate_score_card)
+
+        # --------------- 左下角提示 ---------------
         tip_layout = QHBoxLayout()
         self.widgets["home_page"]["tip_layout"] = tip_layout
         main_layout.addLayout(tip_layout)
@@ -719,7 +817,7 @@ class MainWindow(FramelessWindow):
 
         return widget
 
-    # 初始化rks组成页
+    # -----------初始化rks组成页-----------
     def init_place_b27_phi3_page(self) -> QWidget:
         """初始化 rks 组成页面"""
         self.widgets["place_b27_phi3_page"] = {}
@@ -935,7 +1033,7 @@ class MainWindow(FramelessWindow):
                 #     cardi.diff, ""
                 # )
                 # cardi.set_edited_info(selected_group,  now_comment)
-                cardi.right_func = self.link_and_show
+                # cardi.right_func = self.link_and_show
                 b27_folder.add_widget(cardi)
         layout.addWidget(b27_folder)
 
@@ -952,7 +1050,7 @@ class MainWindow(FramelessWindow):
                 #     cardi.diff, ""
                 # )
                 # cardi.set_edited_info(selected_group, now_comment)
-                cardi.right_func = self.link_and_show
+                # cardi.right_func = self.link_and_show
                 phi3_folder.add_widget(cardi)
         layout.addWidget(phi3_folder)
 
@@ -1006,6 +1104,343 @@ class MainWindow(FramelessWindow):
             self.widgets["account_page"]["layout"],
         )
         self.switch_to(self.home_page)  # 不写会跳转到编辑页面(link_and_show干的)
+
+    # -----------初始化 可达分数计算 页面-----------
+    def init_score_calculate_page(self) -> QWidget:
+        """初始化可达分数计算页面"""
+        self.widgets["score_calculate_page"] = {}
+        widget = QWidget()
+        self.widgets["score_calculate_page"]["widget"] = widget
+
+        main_layout = QHBoxLayout(widget)
+        self.widgets["score_calculate_page"]["main_layout"] = main_layout
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(1)
+
+        # ------------------ 左边 分数输入及可能性展示 ------------------
+        left_widget = QWidget()
+        self.widgets["score_calculate_page"]["left_widget"] = left_widget
+        main_layout.addWidget(left_widget)
+
+        left_layout = QVBoxLayout(left_widget)
+        self.widgets["score_calculate_page"]["left_layout"] = left_layout
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(1)
+
+        # 分数输入框
+        score_input_elm = input_line("", "输入目标分数")
+        self.widgets["score_calculate_page"]["score_input_elm"] = score_input_elm
+        left_layout.addWidget(score_input_elm)
+
+        # -------------排序依据及顺序选择框--------------
+        sort_rely_widget = QWidget()
+        self.widgets["score_calculate_page"]["sort_rely_widget"] = sort_rely_widget
+        left_layout.addWidget(sort_rely_widget)
+
+        sort_rely_layout = QHBoxLayout(sort_rely_widget)
+        self.widgets["score_calculate_page"]["sort_rely_layout"] = sort_rely_layout
+
+        # 排序顺序转换按钮
+        sort_result_reverse_btn = SwitchButton()
+        self.widgets["score_calculate_page"][
+            "sort_result_reverse_btn"
+        ] = sort_result_reverse_btn
+        sort_result_reverse_btn.setOffText("当前:从小到大")
+        sort_result_reverse_btn.setOnText("当前:从大到小")
+        sort_result_reverse_btn.setChecked(True)  # 默认从大到小
+        sort_result_reverse_btn.setStyleSheet(get_switch_button_style())
+        sort_result_reverse_btn.label.setStyleSheet(
+            f"""
+            font-size: 23px;
+            font-family: "{FONT_FAMILY["chi"]}";
+            """
+        )
+        sort_result_reverse_btn.checkedChanged.connect(
+            self.place_calculate_result
+        )  # 每次改变都会重新布局
+        sort_rely_layout.addWidget(sort_result_reverse_btn)  # 右侧控件
+
+        # 排序依据选择框
+        group_by_style = {
+            "min_height": 24,
+            "max_height": 35,
+            "max_width": 130,
+            "min_width": 130,
+        }
+        group_by_hint_style = {
+            "font_size": 23,
+            "min_width": 110,
+            "max_width": 110,
+        }
+        sort_by_list = ["perfect数", "great数", "bad+miss数", "最大连击数"]
+        sort_by = combobox(
+            sort_by_list, "排序依据", group_by_style, group_by_hint_style
+        )
+        self.widgets["score_calculate_page"]["sort_by"] = sort_by
+        sort_rely_layout.addWidget(sort_by)
+        sort_by.bind_react_click_func(
+            self.place_calculate_result
+        )  # 每次切换的时候都重新布局
+
+        # 表头
+        label_title = score_display_widget(
+            "Perfect数", "Great数", "bad+miss数", "最大连击数"
+        )
+        self.widgets["score_calculate_page"]["label_title"] = label_title
+        left_layout.addWidget(label_title)
+
+        # -------------- 结果布局部分 --------------
+        result_display_scroll = SmoothScrollArea()
+        self.widgets["score_calculate_page"][
+            "result_display_scroll"
+        ] = result_display_scroll
+        left_layout.addWidget(result_display_scroll)
+        result_display_scroll.setStyleSheet(
+            "QScrollArea{background: transparent; border: none}"
+        )
+        result_display_scroll.setWidgetResizable(True)
+
+        result_display_content = QWidget()
+        self.widgets["score_calculate_page"][
+            "result_display_content"
+        ] = result_display_content
+        result_display_scroll.setWidget(result_display_content)
+
+        result_display_flow = FlowLayout(result_display_content)
+        self.widgets["score_calculate_page"][
+            "result_display_flow"
+        ] = result_display_flow
+        result_display_flow.setSpacing(0)
+        result_display_flow.setContentsMargins(0, 0, 0, 0)
+
+        start_calculate_btn = button("开始计算!")
+        self.widgets["score_calculate_page"][
+            "start_calculate_btn"
+        ] = start_calculate_btn
+        start_calculate_btn.bind_click_func(self.start_calculate)
+        left_layout.addWidget(start_calculate_btn)
+
+        # -------------- 右边 歌曲卡片部分 --------------
+        right_widget = QWidget()
+        self.widgets["score_calculate_page"]["right_widget"] = right_widget
+        main_layout.addWidget(right_widget)
+
+        display_layout = QVBoxLayout(right_widget)
+        self.widgets["score_calculate_page"]["display_layout"] = display_layout
+
+        top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        display_layout.addItem(top_spacer)
+
+        example_song = song_info_card(
+            self.illustration_cache["introduction"],
+            self.page_bg_cache["EZ"],  # 作为背景 这里的键就是跟难度相关
+            "introduction",
+            "00.0000",
+            "00.000",
+            "00.0",
+            "EZ",
+            True,
+            1000000,
+            0,
+            "曲师名称",
+            "谱师名称",
+            "画师名称",
+            True,
+            "introduction",
+        )
+        display_layout.addWidget(example_song)
+        self.widgets["score_calculate_page"]["song_info_card"] = example_song
+        self.widgets["score_calculate_page"]["example_song"] = example_song
+
+        bottom_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        display_layout.addItem(bottom_spacer)
+        self.widgets["score_calculate_page"]["spacer"] = [bottom_spacer, top_spacer]
+
+        self.widgets["score_calculate_page"]["score_display_widget_list"] = []
+        return widget
+
+    # 在分数可达页面显示指定的 song_info_card
+    def link_and_show_score_page(self, info_card: song_info_card):
+        """在分数可达页面显示指定的 song_info_card"""
+        info_card_copy = info_card.copy()  # 自己写的深拷贝
+        self.switch_to(self.score_calculate_page)
+        self.widgets["score_calculate_page"]["song_info_card"].deleteLater()
+        self.widgets["score_calculate_page"]["song_info_card"] = info_card_copy
+        display_layout: QVBoxLayout = self.widgets["score_calculate_page"][
+            "display_layout"
+        ]
+        spacer: QSpacerItem = self.widgets["score_calculate_page"]["spacer"]
+        for spaceri in spacer:
+            display_layout.removeItem(spaceri)
+
+        top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        display_layout.addItem(top_spacer)
+
+        display_layout.addWidget(info_card_copy)
+
+        bottom_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        display_layout.addItem(bottom_spacer)
+        self.widgets["edit_info_page"]["spacer"] = [top_spacer, bottom_spacer]
+
+        # 同步编辑区的控件状态
+        # group_ccb: CheckableComboBox = self.widgets["edit_info_page"]["group_ccb"]
+        # selected_group = GROUP_INFO.get(info_card_copy.combine_name, "").split("`")
+        # group_ccb.setSelectedItems(selected_group)
+
+        # comment_label: multiline_text = self.widgets["edit_info_page"]["comment_label"]
+        # now_comment = COMMENT_INFO.get(info_card_copy.combine_name, {}).get(
+        #     info_card_copy.diff, ""
+        # )
+        # comment_label.set_text(now_comment)
+
+        # 把这些元数据写到展开区（展开区会在需要时创建）
+        # info_card_copy.set_edited_info(selected_group, now_comment)
+
+    # 布局可以达成目标分数的各项参数
+    def place_calculate_result(self):
+        """布局可以达成目标分数的各项参数"""
+
+        # 清除前面的布局
+        for score_resulti in self.widgets["score_calculate_page"][
+            "score_display_widget_list"
+        ]:
+            try:
+                score_resulti.deleteLater()
+            except Exception:
+                pass
+        self.widgets["score_calculate_page"]["score_display_widget_list"] = []
+        result_list: list[tuple[int, int, int, int]] = self.widgets[
+            "score_calculate_page"
+        ]["result_list"]
+        result_display_flow: FlowLayout = self.widgets["score_calculate_page"][
+            "result_display_flow"
+        ]
+
+        sort_result_reverse_btn: SwitchButton = self.widgets["score_calculate_page"][
+            "sort_result_reverse_btn"
+        ]
+        sort_order = sort_result_reverse_btn.isChecked()  # checked 从大到小
+        sort_by: combobox = self.widgets["score_calculate_page"]["sort_by"]
+        sort_by = sort_by.get_content()
+        link_map = {"perfect数": 0, "great数": 1, "bad+miss数": 2, "最大连击数": 3}
+        result_list = sorted(
+            result_list, key=lambda x: x[link_map[sort_by]], reverse=sort_order
+        )
+        for datai in result_list:
+            perfect, great, bad_and_miss, max_count = datai
+            score_display_widgeti = score_display_widget(
+                perfect, great, bad_and_miss, max_count
+            )
+            self.widgets["score_calculate_page"]["score_display_widget_list"].append(
+                score_display_widgeti
+            )
+            result_display_flow.addWidget(score_display_widgeti)
+        InfoBar.success(
+            title="计算完成",
+            content=f"共有{len(result_list)}种可能!",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=3000,
+            parent=window,
+        )
+
+    # 计算如何分配perfect great bad+miss max_count可以达到指定分数
+    def start_calculate(self):
+        """计算如何分配perfect great bad+miss max_count可以达到指定分数"""
+        self.widgets["score_calculate_page"]["result_list"] = []  # 重置合法结果集
+
+        try:
+            aim_score = int(
+                self.widgets["score_calculate_page"]["score_input_elm"].text()
+            )  # 获取用户输入值并尝试int
+
+        except:
+            InfoBar.warning(
+                title="无效分数",
+                content=f"分数不应该是{aim_score}喵!",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            return
+
+        if aim_score < 0 or aim_score > 1e6:  # 检查是否越界
+            InfoBar.warning(
+                title="无效分数",
+                content=f"分数应该在0到100 0000内 而不是{aim_score}喵!",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            return
+
+        # 根据卡片获取在csv文件里用到的歌曲对应的键
+        card: song_info_card = self.widgets["score_calculate_page"]["song_info_card"]
+        song_key = f"{card.combine_name}.{card.diff}"
+
+        df = pd.read_csv(
+            resource_path(NOTE_COUNT_PATH),
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=["tap", "hold", "drag", "flip", "sum"],
+            index_col=0,
+        )
+        df = df.fillna("")
+        # print(f"关键词是:{song_key}")
+        row = df.loc[song_key]
+        tap = int(row["tap"])
+        hold = int(row["hold"])
+        drag = int(row["drag"])
+        flip = int(row["flip"])
+        total_note = int(row["sum"])
+        # total_note: int = tap + hold + drag + flip  # 总note数
+        max_great: int = tap + hold  # 最多能great的数量
+        result = []
+        for bm in range(0, total_note + 1, 1):  # bad+miss数
+            for g in range(
+                0, min(max_great, total_note - bm) + 1
+            ):  # great数 必定 <= perfect 数 小剪枝
+                note_score: int = round(
+                    (9e5 * (total_note - bm - g) + 585e3 * g) / total_note, 0
+                )  # 判定分
+                # mc = mac_count 最大连击数
+                l: int = total_note // (bm + 1)
+                r: int = total_note - bm
+                need_score: int = aim_score - note_score
+                while l <= r:  # 二分找max_count数
+                    mid = l + ((r - l) >> 1)  # 连击数
+                    mc_score = round((mid * 1e5) / total_note, 0)
+                    if mc_score == need_score:
+                        # print(total_note - bm - g, g, bm, mid)
+                        # print(bm, g, mid)
+                        result.append((total_note - bm - g, g, bm, mid))
+
+                    if mc_score > need_score:
+                        r = mid - 1
+                    else:
+                        l = mid + 1
+        if not result:
+            InfoBar.info(
+                title="无解喵",
+                content=f"{song_key}无法达到{aim_score}分(",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            return
+        self.widgets["score_calculate_page"]["result_list"] = result
+
+        self.place_calculate_result()
+        # for i in result:
+        #     print(i)
 
     # -------------------搜索页面-------------------
     def init_search_page(self) -> QWidget:
@@ -1202,6 +1637,7 @@ class MainWindow(FramelessWindow):
         result_display_flow.setSpacing(0)
         result_display_flow.setContentsMargins(0, 0, 0, 0)
 
+        self.widgets["search_page"]["result_list"] = []
         return widget
 
     # 从全部歌曲中筛选符合条件的歌曲
@@ -1555,7 +1991,7 @@ class MainWindow(FramelessWindow):
             cardi = self.song_list_widget.build_card(row, is_expanded=False)
             if cardi is None:
                 continue
-            cardi.right_func = self.link_and_show
+            # cardi.right_func = self.link_and_show
             self.widgets["search_page"]["card_and_folder"].append(cardi)
 
             # 玩家个人编辑的部分

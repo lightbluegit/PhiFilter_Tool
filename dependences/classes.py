@@ -56,6 +56,7 @@ from qfluentwidgets import (
     ListWidget,
     ScrollArea,
     CardWidget,
+    SearchLineEdit,
 )
 from dataclasses import dataclass
 from dependences.consts import *
@@ -219,6 +220,17 @@ class multiline_text(TextEdit):
 
     def get_plain_text(self):
         return self.toPlainText()
+
+
+class input_line(SearchLineEdit):
+
+    def __init__(
+        self, default_text: str = "", place_holder: str = "", parent: QWidget = None
+    ):
+        super().__init__(parent)
+        self.setClearButtonEnabled(True)
+        self.setPlaceholderText(place_holder)
+        self.setText(default_text)
 
 
 # 不被折叠的主要信息部分
@@ -1610,3 +1622,34 @@ class SongListViewWidget(QWidget):
         )
 
         return card
+
+
+# 分数计算结果展示控件 四个文字槽位 横向
+class score_display_widget(QWidget):
+    def __init__(
+        self,
+        perfect_num: str = "",
+        great_num: str = "",
+        bad_and_miss_num: str = "",
+        max_count_num: str = "",
+    ):
+        super().__init__()
+        self.setFixedWidth(600)
+        layout = QHBoxLayout(self)
+        label_list = [None, None, None, None]
+
+        perfect_label = label(perfect_num)
+        label_list[0] = perfect_label
+        layout.addWidget(perfect_label)
+
+        great_label = label(great_num)
+        label_list[1] = great_label
+        layout.addWidget(great_label)
+
+        bad_and_miss_label = label(bad_and_miss_num)
+        label_list[2] = bad_and_miss_label
+        layout.addWidget(bad_and_miss_label)
+
+        max_count_label = label(max_count_num)
+        label_list[3] = max_count_label
+        layout.addWidget(max_count_label)

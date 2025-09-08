@@ -14,8 +14,8 @@ from pathlib import Path
 
 # # 如果目录不存在，就创建（包括父目录）
 # config_dir.mkdir(parents=True, exist_ok=True)
-# debug: bool = False
-debug: bool = True
+debug: bool = False
+# debug: bool = True
 
 
 def appdata_path(relative_path=""):
@@ -81,6 +81,9 @@ DEPENDENCES_PREPATH = FILE_PATH + "dependences/"
 DIFFICULTY_PATH = DEPENDENCES_PREPATH + "difficulty.tsv"  # 各个歌曲难度文件
 INFO_PATH = DEPENDENCES_PREPATH + "info.tsv"  # 组合名称与拆分名称对应关系文件
 AVATAR_PATH = DEPENDENCES_PREPATH + "avatar.txt"  # 头像名称
+NOTE_COUNT_PATH = (
+    DEPENDENCES_PREPATH + "note_count.csv"
+)  # 每个歌曲及难度对应的各种键型数量及总合
 
 UPDATE_PREPATH = DEPENDENCES_PREPATH + "update/"
 OUTPUT_PATH = UPDATE_PREPATH + "output.txt"
