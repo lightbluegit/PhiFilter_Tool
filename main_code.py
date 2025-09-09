@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
     QStackedWidget,
     QDesktopWidget,
     QSizePolicy,
-    QSpacerItem,
+    QStackedLayout,
 )
 from qframelesswindow import FramelessWindow, StandardTitleBar
 from PyQt5.QtCore import Qt, QUrl
@@ -29,6 +29,7 @@ from qfluentwidgets import (
     HorizontalSeparator,
     IndeterminateProgressRing,
     Action,
+    SegmentedWidget,
 )
 from qfluentwidgets import FluentIcon as FIF
 import sys
@@ -40,6 +41,7 @@ from datetime import datetime
 from math import sqrt
 import copy
 import random
+import json
 
 # pypy3 -m pip install pandas, qfluentwidgets, requests, PyQt5
 # 设置高 DPI 渲染策略，保证在高分辨率屏幕上界面清晰
@@ -62,19 +64,19 @@ class MainWindow(FramelessWindow):
         super().__init__()
 
         # ---------------- 预启动窗口设置 ----------------
-        self.open_window = FramelessWindow()
-        self.open_window.show()
-        open_widget = QWidget()
-        layout = QHBoxLayout(open_widget)
-        self.spinner = IndeterminateProgressRing()
-        layout.addWidget(self.spinner)
+        # self.open_window = FramelessWindow()
+        # self.open_window.show()
+        # open_widget = QWidget()
+        # layout = QHBoxLayout(open_widget)
+        # self.spinner = IndeterminateProgressRing()
+        # layout.addWidget(self.spinner)
 
-        # 调整大小
-        self.spinner.setFixedSize(300, 300)
+        # # 调整大小
+        # self.spinner.setFixedSize(300, 300)
 
-        # 调整厚度
-        self.spinner.setStrokeWidth(4)
-        self.spinner.start()
+        # # 调整厚度
+        # self.spinner.setStrokeWidth(4)
+        # self.spinner.start()
         # self.log_write(f"日志文件的地址是{appdata_path(LOG_PATH)}")
         # ---------------- 初始化变量 ----------------
         self.widgets: dict[str, dict] = (
@@ -101,6 +103,8 @@ class MainWindow(FramelessWindow):
             "所有歌曲卡片都可以左键展开详细信息 右键跳转编辑页面",
             "由于找不到合适的图标索性就用二次元头像做icon了(",
         ]
+
+        self.get_setting()
         self.init_variable()  # 初始化各种变量
 
         datetime.now()
@@ -154,6 +158,47 @@ class MainWindow(FramelessWindow):
         self.song_list_widget = SongListViewWidget()
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showContextMenu)
+
+    # 获取用户设置
+    def get_setting(self):
+        """获取用户设置"""
+        # 检查文件是否存在
+        setting_file_path = appdata_path(SETTING_PATH)
+        path_obj = Path(setting_file_path)
+        if not path_obj.exists() or path_obj.stat().st_size == 0:
+            # 如果不存在，创建默认设置并保存
+            default_setting = {
+                "main_setting": {
+                    "always_update": False,
+                    "default_open_page": "home_page",
+                },
+                "search_page_setting": {
+                    "default_filter": {
+                        "attribution": "acc",
+                        "limit": "大于等于",
+                        "value": "99.3",
+                    }
+                },
+            }
+
+            # 写入默认配置到文件
+            with open(setting_file_path, "w", encoding="utf-8") as f:
+                json.dump(default_setting, f, ensure_ascii=False, indent=4)
+            # print(f"初始化配置文件: {setting_file_path}")
+
+        with open(appdata_path(SETTING_PATH), "r", encoding="utf-8") as f:
+            setting_file = json.load(f)
+            # 读取主设置
+            main_setting: dict = setting_file["main_setting"]
+            self.always_update: bool = main_setting["always_update"]
+            self.log_write(f"是否自动更新:{self.always_update}")
+            # 读取默认开屏页设置
+            self.default_open_page: str = main_setting["default_open_page"]
+
+            # 读取搜索页设置
+            search_page_setting: dict = setting_file["search_page_setting"]
+            # print(f"读取搜索页设置{search_page_setting}")
+            self.default_filter: dict[str, str] = search_page_setting["default_filter"]
 
     # 初始化各种与账号相关的变量
     def init_variable(self):
@@ -341,17 +386,20 @@ class MainWindow(FramelessWindow):
         """预处理结束后执行的操作"""
         if self.token:
             self.log_write("预处理结束了 有token")
+            # 常更新的话生成rks组成的时候会自动更新一次 这里再更新就重复了
             self.get_save_data()
         self.init_all_pages()
         self.init_navigation()
         self.generate_b27_phi3()  # 先预生成 后续
         if self.token:
-            self.switch_to(self.home_page)
+            self.switch_to(
+                self.widgets[self.default_open_page]["widget"]
+            )  # 切换到指定的起始页面
             # self.switch_to(self.account_page)
         else:
             self.switch_to(self.account_page)
 
-        self.open_window.deleteLater()
+        # self.open_window.deleteLater()
         self.show()
         end_time = datetime.now()
         time_difference = end_time - self.time_record
@@ -362,6 +410,7 @@ class MainWindow(FramelessWindow):
 
         self.log_write(f"预处理用时:{seconds:02d}s.{microseconds:06d}")
 
+    # 从widget开始向上查找第一个是target_class类型的父控件
     def find_parent_widget(self, widget, target_class):
         """
         从 widget 开始，向上查找第一个是 target_class 类型的父控件
@@ -373,6 +422,7 @@ class MainWindow(FramelessWindow):
             current = current.parent()
         return None
 
+    # 显示菜单
     def showContextMenu(self, pos):
         # pos 是相对于当前控件的坐标（比如 centralWidget）
         # 转换为全局坐标，再转回当前控件的坐标系（确保准确）
@@ -602,6 +652,10 @@ class MainWindow(FramelessWindow):
         self.log_write("初始化edit_info_page完成")
         self.edit_info_page.setObjectName("edit_info_page")
 
+        self.setting_page = self.init_setting_page()
+        self.log_write("初始化setting_page完成")
+        self.setting_page.setObjectName("setting_page")
+
     # 切换到指定页面
     def switch_to(self, widget: QWidget):
         """
@@ -667,6 +721,14 @@ class MainWindow(FramelessWindow):
             icon=account_icon,
             text="账号管理",
             onClick=lambda: self.switch_to(self.account_page),
+            position=(NavigationItemPosition.BOTTOM),
+        )
+
+        navigation_interface.addItem(
+            routeKey=self.setting_page.objectName(),
+            icon=FIF.SETTING,
+            text="设置",
+            onClick=lambda: self.switch_to(self.setting_page),
             position=(NavigationItemPosition.BOTTOM),
         )
 
@@ -771,7 +833,7 @@ class MainWindow(FramelessWindow):
         update_savedata_card = quick_function_card(
             self.page_icon_cache["update_card_bg"],
             "更新一下数据~",
-            "初始化记录数据后使用的就是存储的数据 也可以在设置中改为自动更新(TODO) 但是会很慢",
+            "初始化记录数据后使用的存储数据 也可以在设置中改为常更新 但常更新会导致运行速度变慢",
             card_title_style,
             card_content_style,
         )
@@ -836,10 +898,15 @@ class MainWindow(FramelessWindow):
         """
         使用model中的整合数据计算b27与phi3及其提升可能 存储并布局
         """
-        if self.is_updated:  # 最新的版本已经布局过了 直接跳转即可
+        if (
+            not self.always_update and self.is_updated
+        ):  # 懒更新 且 最新的版本已经布局过了 直接跳转即可
             self.switch_to(self.place_b27_phi3_page)
             # self.log_write('最新最热rks')
             return
+
+        if self.always_update:
+            self.get_save_data()
 
         if not self.token:
             InfoBar.warning(
@@ -1068,7 +1135,7 @@ class MainWindow(FramelessWindow):
         self.is_updated = True  # 更新完就是最新的啦
         self.switch_to(self.place_b27_phi3_page)
 
-    # 更新信息
+    # -----------更新信息卡片-----------
     def update_data(self):
         """更新数据"""
         if self.token == "":
@@ -1085,13 +1152,32 @@ class MainWindow(FramelessWindow):
             return
 
         self.get_save_data()  # 更新存档数据
+
         # 还原搜索页面
-        self.reset_filter_result()
+        # self.reset_filter_result()
+        self.place_record()  # 用更新过的数据重绘一遍搜索页面的数据
 
         # 还原编辑页面
-        self.link_and_show(
-            self.widgets["edit_info_page"]["song_info_card"]
-        )  # 自己show自己!
+        model = self.song_list_widget.model
+        now_edit_card: song_info_card = self.widgets["edit_info_page"]["song_info_card"]
+        new_songitem: SongItem = model.item_dict[
+            f"{now_edit_card.combine_name}.{now_edit_card.diff}"
+        ]
+        new_card_in_edit: song_info_card = self.song_list_widget.build_card(
+            new_songitem
+        )
+        self.link_and_show(new_card_in_edit)  # 自己show自己!
+
+        now_calculate_card: song_info_card = self.widgets["score_calculate_page"][
+            "song_info_card"
+        ]
+        new_songitem: SongItem = model.item_dict[
+            f"{now_calculate_card.combine_name}.{now_calculate_card.diff}"
+        ]
+        new_card_in_edit: song_info_card = self.song_list_widget.build_card(
+            new_songitem
+        )
+        self.link_and_show_score_page(new_card_in_edit)
 
         # 还原账号页面
         self.widgets["account_page"]["widget"].deleteLater()
@@ -1228,9 +1314,6 @@ class MainWindow(FramelessWindow):
         display_layout = QVBoxLayout(right_widget)
         self.widgets["score_calculate_page"]["display_layout"] = display_layout
 
-        top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(top_spacer)
-
         example_song = song_info_card(
             self.illustration_cache["introduction"],
             self.page_bg_cache["EZ"],  # 作为背景 这里的键就是跟难度相关
@@ -1248,13 +1331,9 @@ class MainWindow(FramelessWindow):
             True,
             "introduction",
         )
-        display_layout.addWidget(example_song)
+        display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["score_calculate_page"]["song_info_card"] = example_song
         self.widgets["score_calculate_page"]["example_song"] = example_song
-
-        bottom_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(bottom_spacer)
-        self.widgets["score_calculate_page"]["spacer"] = [bottom_spacer, top_spacer]
 
         self.widgets["score_calculate_page"]["score_display_widget_list"] = []
         return widget
@@ -1264,23 +1343,14 @@ class MainWindow(FramelessWindow):
         """在分数可达页面显示指定的 song_info_card"""
         info_card_copy = info_card.copy()  # 自己写的深拷贝
         self.switch_to(self.score_calculate_page)
+        # print(f'现存卡片{self.widgets["score_calculate_page"]["song_info_card"].name}')
         self.widgets["score_calculate_page"]["song_info_card"].deleteLater()
         self.widgets["score_calculate_page"]["song_info_card"] = info_card_copy
+        # print(f'新卡片{self.widgets["score_calculate_page"]["song_info_card"].name}')
         display_layout: QVBoxLayout = self.widgets["score_calculate_page"][
             "display_layout"
         ]
-        spacer: QSpacerItem = self.widgets["score_calculate_page"]["spacer"]
-        for spaceri in spacer:
-            display_layout.removeItem(spaceri)
-
-        top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(top_spacer)
-
-        display_layout.addWidget(info_card_copy)
-
-        bottom_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(bottom_spacer)
-        self.widgets["edit_info_page"]["spacer"] = [top_spacer, bottom_spacer]
+        display_layout.addWidget(info_card_copy, 0, Qt.AlignCenter)
 
         # 同步编辑区的控件状态
         # group_ccb: CheckableComboBox = self.widgets["edit_info_page"]["group_ccb"]
@@ -1388,7 +1458,7 @@ class MainWindow(FramelessWindow):
             sep=",",
             header=None,
             encoding="utf-8",
-            names=["tap", "hold", "drag", "flip", "sum"],
+            names=["tap", "hold", "drag", "flick", "sum"],
             index_col=0,
         )
         df = df.fillna("")
@@ -1397,9 +1467,9 @@ class MainWindow(FramelessWindow):
         tap = int(row["tap"])
         hold = int(row["hold"])
         drag = int(row["drag"])
-        flip = int(row["flip"])
+        flick = int(row["flick"])
         total_note = int(row["sum"])
-        # total_note: int = tap + hold + drag + flip  # 总note数
+        # total_note: int = tap + hold + drag + flick  # 总note数
         max_great: int = tap + hold  # 最多能great的数量
         result = []
         for bm in range(0, total_note + 1, 1):  # bad+miss数
@@ -1478,6 +1548,17 @@ class MainWindow(FramelessWindow):
 
         # 初始化第一个 filter_obj并加入逻辑链接选项
         filter_widget = filter_obj(0, filter_obj_list, flow_layout)
+        filter_widget.attribution_choose_cbb.set_current_choose(
+            filter_widget.filter_attribution_list.index(
+                self.default_filter["attribution"]
+            )
+        )
+        filter_widget.limit_choose_cbb.set_current_choose(
+            filter_widget.filter_limit_list.index(self.default_filter["limit"])
+        )
+        filter_widget.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
+        filter_widget.limit_val_cbb.set_text(self.default_filter["value"])
+
         filter_widget.logical_cbb = combobox(
             ["", "并且(与)", "或者(或)"],
             "",
@@ -1547,7 +1628,8 @@ class MainWindow(FramelessWindow):
 
         group_layout = QHBoxLayout(group_widget)
         self.widgets["search_page"]["group_layout"] = group_layout
-        group_layout.setContentsMargins(0, 0, 20, 0)
+        group_layout.setContentsMargins(0, 0, 5, 0)
+        group_layout.setSpacing(6)
 
         # 重置按钮
         reset_page_btn_style = {
@@ -1562,24 +1644,31 @@ class MainWindow(FramelessWindow):
         reset_page_btn.bind_click_func(self.reset_filter_result)
         group_layout.addWidget(reset_page_btn)
 
+        # 个数限制输入
+        display_num_input = input_line(place_holder="个数限制")
+        display_num_input.setFixedWidth(140)
+        self.widgets["search_page"]["display_num_input"] = display_num_input
+        group_layout.addWidget(display_num_input)
+
         # 排序顺序转换按钮
         sort_result_reverse_btn = SwitchButton()
+        # sort_result_reverse_btn.hBox.setSpacing(0)
         self.widgets["search_page"]["sort_result_reverse_btn"] = sort_result_reverse_btn
+        # sort_result_reverse_btn.setFixedWidth(10)
         sort_result_reverse_btn.setOffText("当前:从小到大")
         sort_result_reverse_btn.setOnText("当前:从大到小")
         sort_result_reverse_btn.setChecked(True)  # 默认从大到小
         sort_result_reverse_btn.setStyleSheet(get_switch_button_style())
         sort_result_reverse_btn.label.setStyleSheet(
             f"""
-            font-size: 26px;
+            font-size: 23px;
             font-family: "{FONT_FAMILY["chi"]}";
             """
         )
         sort_result_reverse_btn.checkedChanged.connect(
             self.place_record
         )  # 每次改变都会重新布局
-        group_layout.addStretch(1)  # 空出一点距离
-        group_layout.addWidget(sort_result_reverse_btn)  # 右侧控件
+        group_layout.addWidget(sort_result_reverse_btn)
 
         # 排序依据选择框
         group_by_style = {
@@ -1589,9 +1678,9 @@ class MainWindow(FramelessWindow):
             "min_width": 80,
         }
         group_by_hint_style = {
-            "font_size": 26,
-            "min_width": 110,
-            "max_width": 110,
+            "font_size": 23,
+            "min_width": 100,
+            "max_width": 100,
         }
         sort_by_list = ["无", "acc", "单曲rks", "得分", "定数"]
         sort_by = combobox(
@@ -1655,6 +1744,9 @@ class MainWindow(FramelessWindow):
             )
             self.switch_to(self.account_page)
             return
+
+        if self.always_update:
+            self.update_data()
 
         filter_obj_list: list[filter_obj] = self.widgets["search_page"][
             "filter_obj_list"
@@ -1728,6 +1820,9 @@ class MainWindow(FramelessWindow):
                 parent=window,
             )
             return
+
+        if self.always_update:
+            self.update_data()
 
         filter_obj_list: list[filter_obj] = self.widgets["search_page"][
             "filter_obj_list"
@@ -1938,6 +2033,15 @@ class MainWindow(FramelessWindow):
             return
 
         self.time_record = datetime.now()
+        # 获取个数限制
+        display_num: str = self.widgets["search_page"]["display_num_input"].text()
+        if display_num.isdigit():
+            display_num = int(display_num)
+        elif display_num == "":
+            display_num = 1e9
+        else:
+            self.log_write(f"个数限制 非法输入{display_num}")
+            return
         # 获取 分组/排序 依据
         group_by = self.widgets["search_page"]["group_by"].get_content()
         sort_by = self.widgets["search_page"]["sort_by"].get_content()
@@ -2050,15 +2154,25 @@ class MainWindow(FramelessWindow):
                     visited_folder[group_rely][1].append((sort_rely, cardi))
             else:  # 不需要分组 直接加到列表里就行
                 empty_sort_list.append((sort_rely, cardi))
-                result_display_flow.addWidget(cardi)
-
+                # result_display_flow.addWidget(cardi)
+        card_count = 0
         if group_by != "无":  # 需要分组
+            # print("个数", min(display_num, len(visited_folder)))
             for folderi, cards in visited_folder.values():  # folder内排序
+                cards = cards[: min(display_num, len(cards)) :]
+                card_count += len(cards)
+                # print(f"最后的结果是{cards}")
+
                 if cards and cards[0][0] is not None:
                     cards = sorted(cards, key=lambda x: x[0], reverse=is_reversed)
                 for _, cardi in cards:
                     folderi.add_widget(cardi)
         else:
+            empty_sort_list = empty_sort_list[
+                : min(display_num, len(empty_sort_list)) :
+            ]
+            # print(f"最后的结果是{empty_sort_list}")
+            card_count = len(empty_sort_list)
             if empty_sort_list and empty_sort_list[0][0] is not None:
                 empty_sort_list = sorted(
                     empty_sort_list, key=lambda x: x[0], reverse=is_reversed
@@ -2077,7 +2191,7 @@ class MainWindow(FramelessWindow):
         microseconds = time_difference.microseconds
         InfoBar.info(
             title="布局完成",
-            content=f"成功布局{len(self.filter_result)}个控件\n用时:{seconds:02d}.{microseconds:06d}s",
+            content=f"成功布局{card_count}个控件\n用时:{seconds:02d}.{microseconds:06d}s",
             orient=Qt.Horizontal,
             isClosable=True,
             position=InfoBarPosition.TOP,
@@ -2137,9 +2251,6 @@ class MainWindow(FramelessWindow):
         display_layout = QVBoxLayout(display_widget)
         self.widgets["edit_info_page"]["display_layout"] = display_layout
 
-        top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(top_spacer)
-
         example_song = song_info_card(
             self.illustration_cache["introduction"],
             self.page_bg_cache["EZ"],  # 作为背景 这里的键就是跟难度相关
@@ -2157,13 +2268,9 @@ class MainWindow(FramelessWindow):
             True,
             "introduction",
         )
-        display_layout.addWidget(example_song)
+        display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["edit_info_page"]["song_info_card"] = example_song
         self.widgets["edit_info_page"]["example_song"] = example_song
-
-        bottom_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(bottom_spacer)
-        self.widgets["edit_info_page"]["spacer"] = [bottom_spacer, top_spacer]
 
         # ----------------右侧：编辑信息----------------
         edit_widget = QWidget()
@@ -2208,18 +2315,7 @@ class MainWindow(FramelessWindow):
         self.widgets["edit_info_page"]["song_info_card"].deleteLater()
         self.widgets["edit_info_page"]["song_info_card"] = info_card_copy
         display_layout: QVBoxLayout = self.widgets["edit_info_page"]["display_layout"]
-        spacer: QSpacerItem = self.widgets["edit_info_page"]["spacer"]
-        for spaceri in spacer:
-            display_layout.removeItem(spaceri)
-
-        top_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(top_spacer)
-
-        display_layout.addWidget(info_card_copy)
-
-        bottom_spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
-        display_layout.addItem(bottom_spacer)
-        self.widgets["edit_info_page"]["spacer"] = [top_spacer, bottom_spacer]
+        display_layout.addWidget(info_card_copy, 0, Qt.AlignCenter)
 
         # 同步编辑区的控件状态
         # group_ccb: CheckableComboBox = self.widgets["edit_info_page"]["group_ccb"]
@@ -2653,6 +2749,178 @@ class MainWindow(FramelessWindow):
     def log_write(self, text: str):
         with open(appdata_path(LOG_PATH), "a+", encoding="utf-8") as f:
             f.write(text + "\n")
+
+    # --------------- 设置页面 -------------------
+    def init_setting_page(self) -> QWidget:
+        self.widgets["setting_page"] = {}
+        widget = QWidget()
+        self.widgets["setting_page"]["widget"] = widget
+
+        main_layout = QVBoxLayout(widget)
+        self.widgets["setting_page"]["main_layout"] = main_layout
+
+        segment = SegmentedWidget(widget)
+        self.widgets["setting_page"]["segment"] = segment
+        main_layout.addWidget(segment)
+        segment.setFixedHeight(25)
+        segment.currentItemChanged.connect(self.on_segment_changed)
+
+        segment.addItem("main_setting_widget", "总设置")
+        segment.addItem("search_setting_widget", "搜索页设置")
+
+        # ============= 使用 QStackedLayout 来管理页面 =============
+        self.stacked_layout = QStackedLayout()
+        main_layout.addLayout(self.stacked_layout)
+
+        # -------------- 主设置页面 --------------
+        main_setting_widget = QWidget()
+        self.widgets["setting_page"]["main_setting_widget"] = main_setting_widget
+
+        main_setting_layout = QVBoxLayout(main_setting_widget)
+        self.widgets["setting_page"]["main_setting_layout"] = main_setting_layout
+
+        # 常更新切换按钮
+        always_update_sbtn = SwitchButton()
+        self.widgets["setting_page"]["always_update_sbtn"] = always_update_sbtn
+        always_update_sbtn.setOffText("当前:懒更新")
+        always_update_sbtn.setOnText("当前:常更新")
+        always_update_sbtn.setChecked(self.always_update)
+        always_update_sbtn.setStyleSheet(get_switch_button_style())
+        always_update_sbtn.label.setStyleSheet(
+            f"""
+            font-size: 23px;
+            font-family: "{FONT_FAMILY["chi"]}";
+            """
+        )
+        # always_update_sbtn.checkedChanged.connect(
+        #     lambda checked: setattr(self, "always_update", checked)
+        # )
+        main_setting_layout.addWidget(always_update_sbtn)
+
+        # 设置默认启动页面
+        cbb_style = {
+            "max_width": 110,
+            "min_width": 110,
+            "min_height": 35,
+            "max_height": 35,
+            "font_size": 20,
+        }
+        label_style = {"min_width": 210, "max_width": 210, "font_size": 24}
+        default_open_page = combobox(
+            [
+                "主页",
+                "rks组成页",
+                "分数计算页",
+                "搜索页面",
+                "编辑页面",
+                "账号页面",
+                "设置页面",
+            ],
+            "设置默认启动页面",
+            cbb_style,
+            label_style,
+        )
+        self.widgets["setting_page"]["default_open_page"] = default_open_page
+        main_setting_layout.addWidget(default_open_page)
+        main_setting_layout.setAlignment(Qt.AlignLeft)
+
+        main_setting_layout.addStretch(1)
+
+        self.stacked_layout.addWidget(main_setting_widget)  # index 0
+
+        # -------------- 搜索设置页面 --------------
+        search_setting_widget = QWidget()
+        self.widgets["setting_page"]["search_setting_widget"] = search_setting_widget
+
+        search_setting_layout = QVBoxLayout(search_setting_widget)
+        self.widgets["setting_page"]["search_setting_layout"] = search_setting_layout
+
+        default_filter_obj = filter_obj(0, [], FlowLayout)
+        self.widgets["setting_page"]["default_filter_obj"] = default_filter_obj
+        default_filter_obj.add_btn.hide()
+        default_filter_obj.delete_btn.hide()
+        default_filter_obj.attribution_choose_cbb.set_hint_text("设置默认筛选条件")
+        # default_filter_obj.attribution_choose_cbb.setMaximumWidth(160)
+        default_filter_obj.setFixedHeight(65)
+        search_setting_layout.addWidget(default_filter_obj)
+
+        search_setting_layout.addStretch(1)
+
+        self.stacked_layout.addWidget(search_setting_widget)  # index 1
+
+        # ------------------ 保存按钮 ------------------
+        confirm_btn = button("保存更改", iconpath=resource_path(SAVE_ICON_PATH))
+        self.widgets["setting_page"]["confirm_btn"] = confirm_btn
+        main_layout.addWidget(confirm_btn)
+        confirm_btn.set_icon_size(30, 30)
+        confirm_btn.bind_click_func(self.save_user_setting)
+
+        # 默认显示第一个页面
+        self.stacked_layout.setCurrentIndex(0)
+
+        return widget
+
+    def save_user_setting(self):
+        setting_file_path = appdata_path(SETTING_PATH)
+
+        # 1. 读取现有设置
+        with open(setting_file_path, "r", encoding="utf-8") as f:
+            setting_file = json.load(f)
+
+        # 2. 修改设置
+        main_setting = setting_file["main_setting"]
+
+        # 常更新写入
+        always_update_sbtn: SwitchButton = self.widgets["setting_page"][
+            "always_update_sbtn"
+        ]
+        main_setting["always_update"] = always_update_sbtn.isChecked()
+
+        # 默认开屏页面写入
+        default_open_page: combobox = self.widgets["setting_page"]["default_open_page"]
+        default_open_page_text = default_open_page.get_content()
+
+        page_map = {
+            "主页": "home_page",
+            "rks组成页": "place_b27_phi3_page",
+            "分数计算页": "score_calculate_page",
+            "搜索页面": "search_page",
+            "编辑页面": "edit_info_page",
+            "账号页面": "account_page",
+            "设置页面": "setting_page",
+        }
+        main_setting["default_open_page"] = page_map[default_open_page_text]
+
+        # 搜索页默认筛选条件写入
+        search_page_setting = setting_file["search_page_setting"]
+        default_filter = search_page_setting["default_filter"]
+        default_filter_obj: filter_obj = self.widgets["setting_page"][
+            "default_filter_obj"
+        ]
+        attribution, limit, value = default_filter_obj.get_all_condition()
+        default_filter["attribution"] = attribution
+        default_filter["limit"] = limit
+        default_filter["value"] = value
+
+        with open(setting_file_path, "w", encoding="utf-8") as f:
+            json.dump(
+                setting_file,  # 要写入的数据
+                f,  # 文件对象
+                ensure_ascii=False,  # 支持中文
+                indent=4,  # 格式化缩进，便于阅读
+            )
+
+        print("用户设置已保存")
+
+    def on_segment_changed(self):
+        segment: SegmentedWidget = self.widgets["setting_page"]["segment"]
+        route_key = segment.currentRouteKey()
+
+        # 获取页面索引
+        if route_key == "main_setting_widget":
+            self.stacked_layout.setCurrentIndex(0)
+        elif route_key == "search_setting_widget":
+            self.stacked_layout.setCurrentIndex(1)
 
 
 # ---------- 程序入口 ----------

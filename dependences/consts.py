@@ -113,7 +113,8 @@ PLAYER_INFO_PREPATH = FILE_PATH + "player_info/"
 
 # TOKEN_PATH = PLAYER_INFO_PREPATH + "session_token.txt"  # 玩家session_token存储路径
 TOKEN_PATH = "session_token.txt"  # 玩家session_token存储路径
-LOG_PATH = "PhiFilterTool_log.txt"
+LOG_PATH = "PhiFilterTool_log.txt"  # 日志文件
+SETTING_PATH = "PhiFilterTool_setting.json"  # 玩家设置
 GROUP_PATH = PLAYER_INFO_PREPATH + "group.csv"  # 玩家自定义分组信息存储路径
 COMMENT_PATH = PLAYER_INFO_PREPATH + "comment.csv"  # 玩家自定义简评信息存储路径
 
@@ -328,8 +329,8 @@ def get_input_box_style(
 
 def get_switch_button_style(
     font_family: str = FONT_FAMILY["chi"],
-    max_width: str = 250,
-    min_width: str = 250,
+    max_width: str = 210,
+    min_width: str = 210,
     min_height: str = 30,
     max_height: str = 30,
 ):

@@ -77,11 +77,12 @@ class combobox(QWidget):  # 重写combobox控件
         super().__init__()
         self.editor_layout = QHBoxLayout(self)
         self.editor_layout.setContentsMargins(0, 0, 0, 0)
+        self.editor_layout.setSpacing(5)
 
         # 左侧提示标签
-        if hint_label:
-            self.hint_label = label(hint_label, label_style)
-            self.editor_layout.addWidget(self.hint_label)
+        self.hint_label = label(hint_label, label_style)
+        self.hint_label.adjustSize()
+        self.editor_layout.addWidget(self.hint_label)
 
         self.cbb = ComboBox()
         self.cbb.addItems(content)
@@ -101,6 +102,10 @@ class combobox(QWidget):  # 重写combobox控件
     def set_current_choose(self, index: int):
         self.cbb.setCurrentIndex(index)
 
+    def set_hint_text(self, text: str):
+        """设置提示文本"""
+        self.hint_label.setText(text)
+
 
 class editable_combobox(QWidget):
     def __init__(
@@ -115,9 +120,8 @@ class editable_combobox(QWidget):
         self.editor_layout.setContentsMargins(0, 0, 0, 0)
 
         # 左侧提示标签
-        if hint_label:
-            self.hint_label = label(hint_label, label_style)
-            self.editor_layout.addWidget(self.hint_label)
+        self.hint_label = label(hint_label, label_style)
+        self.editor_layout.addWidget(self.hint_label)
 
         self.cbb = EditableComboBox()
         self.cbb.addItems(content)
@@ -139,15 +143,18 @@ class editable_combobox(QWidget):
         # self.group_info_completer = QStringListModel(self.groups)
         # self.comment_info_completer = QStringListModel(self.comments)
 
-    def set_content(self, new_content):
+    def set_content_list(self, content_list):
         self.cbb.clear()
-        self.cbb.addItems(new_content)
+        self.cbb.addItems(content_list)
 
     def get_content(self):
         return self.cbb.currentText()
 
     def clear_text(self):
         self.cbb.setText("")
+
+    def set_text(self, text: str):
+        self.cbb.setText(text)
 
     def bind_react_click_func(self, func):
         self.cbb.currentTextChanged.connect(func)
@@ -163,6 +170,10 @@ class editable_combobox(QWidget):
 
     def clear_completer(self):
         self.cbb.setCompleter(None)
+
+    def set_hint_text(self, text: str):
+        """设置提示文本"""
+        self.hint_label.setText(text)
 
 
 class button(PrimaryPushButton):
@@ -320,23 +331,26 @@ class main_info_card(ElevatedCardWidget):
         self.bottom_layout.setSpacing(2)  # 取消控件之间的间距
 
         # 推分建议
-        if improve_advice is not None:
+        self.improve_advice_label = label(
+            "",
+            {
+                "font_size": 23,
+                "font_color": (188, 188, 188, 1),
+                "max_width": 150,
+                "min_height": 26,
+            },
+        )
 
-            self.improve_advice_label = label(
-                f"推分->{improve_advice}",
-                {
-                    "font_size": 23,
-                    "font_color": (188, 188, 188, 1),
-                    "max_width": 150,
-                    "min_height": 26,
-                },
-            )
-            # self.improve_advice_label.setWordWrap(True)
-            self.bottom_layout.addWidget(
-                self.improve_advice_label, 0, 1, 1, 2
-            )  # (行, 列, 行跨度, 列跨度)
-            self.improve_advice_label.setAlignment(Qt.AlignCenter | Qt.AlignBottom)
-            self.improve_advice_label.setContentsMargins(10, 0, 0, 0)
+        if improve_advice is not None:
+            self.improve_advice_label.setText(f"推分->{improve_advice}")
+        else:
+            self.improve_advice_label.setText("无法推分")
+        # self.improve_advice_label.setWordWrap(True)
+        self.bottom_layout.addWidget(
+            self.improve_advice_label, 0, 1, 1, 2
+        )  # (行, 列, 行跨度, 列跨度)
+        self.improve_advice_label.setAlignment(Qt.AlignCenter | Qt.AlignBottom)
+        self.improve_advice_label.setContentsMargins(10, 0, 0, 0)
 
         # 单曲rks
         rks_text = f"""
@@ -898,6 +912,7 @@ class filter_obj(QWidget):
         self.attribution_choose_cbb = combobox(
             self.filter_attribution_list, "筛选条件:", cbb_style, label_style
         )
+
         self.attribution_choose_cbb.setContentsMargins(0, 0, 0, 0)
         self.attribution_choose_cbb.bind_react_click_func(self.adapt_limit_option)
         self.main_layout.addWidget(self.attribution_choose_cbb)
@@ -982,17 +997,19 @@ class filter_obj(QWidget):
 
         elif self.attribution_choose_cbb.get_content() == "评级":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content(["phi", "蓝V", "V", "S", "A", "B", "C", "F"])
+            self.limit_val_cbb.set_content_list(
+                ["phi", "蓝V", "V", "S", "A", "B", "C", "F"]
+            )
             self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "难度":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content(["AT", "IN", "HD", "EZ"])
+            self.limit_val_cbb.set_content_list(["AT", "IN", "HD", "EZ"])
             self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "曲名":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content(
+            self.limit_val_cbb.set_content_list(
                 SONG_NAME_LIST
             )  # 曲名这里直接提供info.tsv里面的东西就好了 具体的区分(Another Me) 再加一个曲师就好了
             self.limit_val_cbb.set_completer(self.limit_val_cbb.song_name_completer)
@@ -1002,27 +1019,27 @@ class filter_obj(QWidget):
 
         elif self.attribution_choose_cbb.get_content() == "曲师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content(COMPOSER_LIST)
+            self.limit_val_cbb.set_content_list(COMPOSER_LIST)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.composer_completer)
 
         elif self.attribution_choose_cbb.get_content() == "谱师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content(CHARTER_LIST)
+            self.limit_val_cbb.set_content_list(CHARTER_LIST)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.charter_completer)
 
         elif self.attribution_choose_cbb.get_content() == "画师":
             self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
-            self.limit_val_cbb.set_content(DRAWER_NAME_LIST)
+            self.limit_val_cbb.set_content_list(DRAWER_NAME_LIST)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.drawer_completer)
 
         elif self.attribution_choose_cbb.get_content() == "分组":
             self.limit_choose_cbb.set_content(["包含", "不包含"])
-            self.limit_val_cbb.set_content(self.limit_val_cbb.groups)
+            self.limit_val_cbb.set_content_list(self.limit_val_cbb.groups)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.group_info_completer)
 
         elif self.attribution_choose_cbb.get_content() == "简评":
             self.limit_choose_cbb.set_content(["包含", "不包含"])
-            self.limit_val_cbb.set_content(self.limit_val_cbb.comments)
+            self.limit_val_cbb.set_content_list(self.limit_val_cbb.comments)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.comment_info_completer)
 
     def input_val_check(self, attribution, value) -> tuple[bool, str]:
@@ -1118,6 +1135,7 @@ class filter_obj(QWidget):
         attribution = self.attribution_choose_cbb.get_content()
         limit = self.limit_choose_cbb.get_content()
         limit_val = self.limit_val_cbb.get_content()
+        print(attribution, limit, limit_val)
         check_result = self.input_val_check(attribution, limit_val)
         if check_result[0] == False:
             return None
@@ -1512,6 +1530,10 @@ class SongListModel(QAbstractListModel):
     def __init__(self, items: list[SongItem] = None):
         super().__init__()
         self.items = [] if items is None else items
+        self.item_dict = {}  # {组合名称.难度 : SongItem}
+        if items is not None:
+            for itemi in items:
+                self.item_dict[f"{itemi.combine_name}.{itemi.diff}"] = itemi
 
     def rowCount(
         self, parent=QModelIndex()
@@ -1523,6 +1545,7 @@ class SongListModel(QAbstractListModel):
         # 向模型尾部插入一行
         self.beginInsertRows(QModelIndex(), len(self.items), len(self.items))
         self.items.append(item)
+        self.item_dict[f"{item.combine_name}.{item.diff}"] = item
         self.endInsertRows()
 
     def get_item(self, row: int) -> SongItem | None:
@@ -1596,9 +1619,16 @@ class SongListViewWidget(QWidget):
                 self.model.add_item(item)
                 row += 1
 
-    def build_card(self, row: int, is_expanded: bool = False):
+    def build_card(
+        self, data: int | SongItem, is_expanded: bool = False
+    ) -> song_info_card:
         """根据存储的数据构建卡片并返回"""
-        item = self.model.get_item(row)
+        if isinstance(data, int):
+            item = self.model.get_item(data)
+        elif isinstance(data, SongItem):
+            item = data
+        else:
+            return None
         if not item:
             return None
 
