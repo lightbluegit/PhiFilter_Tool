@@ -39,7 +39,6 @@ from PyQt5.QtGui import (
 )
 from qfluentwidgets import (
     PrimaryPushButton,
-    LineEdit,
     ComboBox,
     EditableComboBox,
     FlowLayout,
@@ -61,6 +60,7 @@ from qfluentwidgets import (
 from dataclasses import dataclass
 from dependences.consts import *
 import re
+import pandas as pd
 
 # ------------------------- 这里是重写的控件 -------------------------
 
@@ -279,18 +279,11 @@ class main_info_card(ElevatedCardWidget):
         self.top_layout.setSpacing(0)  # 设置控件之间的间距
 
         # 曲名
-        self.song_name_label = label(
-            name,
-            {
-                "font_size": 29,
-                "max_width": 230,
-                "min_width": 230,
-                "min_height": 30,
-                "max_height": 100,
-                "font_color": (255, 255, 255, 1),
-            },
+        rks_text = f"""<span style="line-height: 4px;font-family: '{FONT_FAMILY["chi"]}'; font-size: 29px;color: #ffffff">{name}</span>"""
+        self.song_name_label = body_label(
+            rks_text,
         )
-        self.song_name_label.setWordWrap(True)  # 允许曲名自动换行
+        self.song_name_label.setMaximumWidth(230)
         self.top_layout.addWidget(
             self.song_name_label, 0, 1, 1, 4
         )  # (行, 列, 行跨度, 列跨度)
@@ -298,7 +291,7 @@ class main_info_card(ElevatedCardWidget):
             QSizePolicy.Expanding, QSizePolicy.Preferred
         )  # 水平扩展，垂直自适应
         self.song_name_label.setAlignment(
-            Qt.AlignCenter
+            Qt.AlignVCenter
         )  # 居中对齐 否则与评级图片高度不一致很难看
 
         # 评级图片
@@ -486,8 +479,6 @@ class main_info_card(ElevatedCardWidget):
 
 
 # 左侧有底板背景作为提示 右侧可以任意填充内容的控件 hint_and_frame_widget
-
-
 class hint_and_frame_widget(QFrame):
     def __init__(self, title: str):
         super().__init__()
@@ -570,6 +561,7 @@ class hint_and_frame_widget(QFrame):
 
 # 歌曲信息卡片
 class song_info_card(QWidget):
+
     def __init__(  # 更改入参的时候记得把.copy方法的参数也改掉喵
         self,
         imgpath: QPixmap,
@@ -588,6 +580,8 @@ class song_info_card(QWidget):
         is_expended: bool = False,
         combine_name: str = "",
         improve_advice: float | None = None,
+        comment: str = "",
+        group: list[str] = "",
     ):
         super().__init__()
         # 保存数据
@@ -606,6 +600,8 @@ class song_info_card(QWidget):
         self.combine_name = combine_name
         self.improve_advice = improve_advice
         self.diff_bg_path = diff_bg_path
+        self.comment = comment
+        self.group = group
 
         self.right_func = None
         self.setContentsMargins(0, 0, 0, 0)
@@ -702,11 +698,15 @@ class song_info_card(QWidget):
         drawer_label.add_widget(drawer_content_elm)
         self.flow_layout.addWidget(drawer_label)
 
-        # self.group_label = hint_and_frame_widget("分组:")
-        # self.flow_layout.addWidget(self.group_label)
+        self.group_label = hint_and_frame_widget("分组:")
+        self.group_content_label = label("、".join(self.group))
+        self.group_label.add_widget(self.group_content_label)
+        self.flow_layout.addWidget(self.group_label)
 
-        # self.comment_label = hint_and_frame_widget("简评:")
-        # self.flow_layout.addWidget(self.comment_label)
+        self.comment_label = hint_and_frame_widget("简评:")
+        self.comment_content_label = label(self.comment)
+        self.comment_label.add_widget(self.comment_content_label)
+        self.flow_layout.addWidget(self.comment_label)
 
         self.scroll_content_widget.setUpdatesEnabled(True)
 
@@ -749,33 +749,9 @@ class song_info_card(QWidget):
             True,  # 默认展开相关信息
             self.combine_name,
             self.improve_advice,
+            self.comment,
+            self.group,
         )
-
-    # def set_edited_info(self, group: list[str], comment: str):
-    #     if not self._expanded_created:
-    #         self._ensure_expanded_created()
-
-    #     # 批量添加时关闭更新以避免多次重绘
-    #     self.scroll_content_widget.setUpdatesEnabled(False)
-
-    #     self.group_label.clear_content_widget()
-    #     for groupi in group:
-    #         if not groupi:
-    #             continue
-    #         group_elm = BodyLabel(groupi)
-    #         # group_elm.setStyleSheet(self.label_style)
-    #         # group_elm.setWordWrap(True)
-    #         self.group_label.add_widget(group_elm)
-
-    #     # comment
-    #     self.comment_label.clear_content_widget()
-    #     if comment:
-    #         comment_elm = BodyLabel(comment)
-    #         comment_elm.setStyleSheet(self.label_style)
-    #         comment_elm.setWordWrap(True)
-    #         self.comment_label.add_widget(comment_elm)
-
-    #     self.scroll_content_widget.setUpdatesEnabled(True)
 
 
 # 可折叠的主控件
@@ -1143,13 +1119,12 @@ class filter_obj(QWidget):
         return (attribution, limit, limit_val)
 
 
-# 可以多选的下拉菜单(暂时用不到)
+# 可以多选的下拉菜单
 class multi_check_combobox(EditableComboBox):
     selectionChanged = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._selected_items = []
         self.setMaximumWidth(300)
         # 创建自定义下拉菜单
         self.dropdown_menu = RoundMenu()
@@ -1221,7 +1196,6 @@ class multi_check_combobox(EditableComboBox):
     def clear(self):
         """清除所有选项"""
         self.list_widget.clear()
-        self._selected_items = []
         self.setText("")
 
 
@@ -1519,8 +1493,8 @@ class SongItem:  # 存储单个歌曲的信息
     drawer: str
     illustration: QPixmap
     bg_path: str
-    # groups: List[str]
-    # comment: str
+    groups: list[str]
+    comment: str
     bg_pixmap: QPixmap | None = None
 
 
@@ -1569,14 +1543,63 @@ class SongListViewWidget(QWidget):
         save_dict: dict,
         diff_map_result: dict,
         cname_to_name: dict,
-        # group_info: dict,
-        # comment_info: dict,
         illustration_cache: dict[str, QPixmap],
         bg_cache: dict[str, QPixmap],
     ):
         """从存档中构建数据"""
         self.model = SongListModel()
         self.view.setModel(self.model)
+        # ----- 获取分组信息 -----
+        self.GROUP_INFO = {}
+        self.COMMENT_INFO = {}
+
+        df = pd.read_csv(
+            appdata_path(GROUP_PATH),
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=["c_name", "group"],
+        )
+        df = df.fillna("")
+        df.set_index(df.columns[0], inplace=True)
+        # used_group = set()
+        for idx, rowi in df.iterrows():
+            group_raw = str(rowi["group"])  # 组合名称 : 分组
+            if group_raw:
+                group_raw = group_raw.split("`")
+            self.GROUP_INFO[idx] = group_raw
+            # print('GROUP_INFO是',GROUP_INFO)
+
+            #     group_raw = str(rowi["group"]).strip()
+            #     for groupi in group_raw.split("`"):
+            #         if groupi:
+            #             used_group.add(groupi)
+            # used_group = list(used_group)
+
+        # ----- 获取简评信息 -----
+        df = pd.read_csv(
+            appdata_path(COMMENT_PATH),
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=[
+                "c_name",
+                "EZ_comment",
+                "HD_comment",
+                "IN_comment",
+                "AT_comment",
+            ],
+        )
+        df = df.fillna("")
+        df.set_index(df.columns[0], inplace=True)
+        for idx, rowi in df.iterrows():
+            self.COMMENT_INFO[idx] = {
+                "EZ": str(rowi["EZ_comment"]),
+                "HD": str(rowi["HD_comment"]),
+                "IN": str(rowi["IN_comment"]),
+                "AT": str(rowi["AT_comment"]),
+            }
+
         row = 0
         for combine_name, all_diff_dic in save_dict["gameRecord"].items():
             for diffi, items in all_diff_dic.items():
@@ -1594,8 +1617,8 @@ class SongListViewWidget(QWidget):
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
                 illustration = illustration_cache[combine_name]
                 bg_path = bg_cache[diffi]
-                # groups = group_info.get(combine_name, "").split("`")
-                # comment = comment_info.get(combine_name, {}).get(diffi, "")
+                groups = self.GROUP_INFO.get(combine_name, "")
+                comment = self.COMMENT_INFO.get(combine_name, {}).get(diffi, "")
                 # 构造 SongItem，并加入 model
                 # print(f"模型正在写入{combine_name}")
                 item = SongItem(
@@ -1613,8 +1636,8 @@ class SongListViewWidget(QWidget):
                     drawer=drawer,
                     illustration=illustration,
                     bg_path=bg_path,
-                    # groups=groups,
-                    # comment=comment,
+                    groups=groups,
+                    comment=comment,
                 )
                 self.model.add_item(item)
                 row += 1
@@ -1649,6 +1672,8 @@ class SongListViewWidget(QWidget):
             is_expanded,
             item.combine_name,
             item.improve_advice,
+            item.comment,
+            item.groups,
         )
 
         return card

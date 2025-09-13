@@ -15,7 +15,7 @@ from pathlib import Path
 # # 如果目录不存在，就创建（包括父目录）
 # config_dir.mkdir(parents=True, exist_ok=True)
 debug: bool = False
-# debug: bool = True
+debug: bool = True
 
 
 def appdata_path(relative_path=""):
@@ -112,11 +112,11 @@ else:
 PLAYER_INFO_PREPATH = FILE_PATH + "player_info/"
 
 # TOKEN_PATH = PLAYER_INFO_PREPATH + "session_token.txt"  # 玩家session_token存储路径
-TOKEN_PATH = "session_token.txt"  # 玩家session_token存储路径
+TOKEN_PATH = "session_token.json"  # 玩家session_token存储路径
 LOG_PATH = "PhiFilterTool_log.txt"  # 日志文件
 SETTING_PATH = "PhiFilterTool_setting.json"  # 玩家设置
-GROUP_PATH = PLAYER_INFO_PREPATH + "group.csv"  # 玩家自定义分组信息存储路径
-COMMENT_PATH = PLAYER_INFO_PREPATH + "comment.csv"  # 玩家自定义简评信息存储路径
+GROUP_PATH = "group.csv"  # 玩家自定义分组信息存储路径
+COMMENT_PATH = "comment.csv"  # 玩家自定义简评信息存储路径
 
 # 图片素材(images)文件夹下文件的路径前缀
 IMAGES_PREPATH = FILE_PATH + "images/"
@@ -1940,60 +1940,6 @@ COMBINE_NAME: list[str] = [
     """DerRichter.Ωμεγα""",
     """ATHAZA.LeaF""",
 ]
-
-# ----- 获取分组信息 -----
-# GROUP_INFO = {}
-# COMMENT_INFO = {}
-
-# try:
-#     df = pd.read_csv(
-#         GROUP_PATH,
-#         sep=",",
-#         header=None,
-#         encoding="utf-8",
-#         names=["c_name", "group"],
-#     )
-#     df = df.fillna("")
-#     df.set_index(df.columns[0], inplace=True)
-#     used_group = set()
-#     for idx, row in df.iterrows():
-#         GROUP_INFO[idx] = str(row["group"])
-#         group_raw = str(row["group"]).strip()
-#         for groupi in group_raw.split("`"):
-#             if groupi:
-#                 used_group.add(groupi)
-#     used_group = list(used_group)
-# except Exception:
-#     GROUP_INFO = {}
-#     used_group = []
-
-
-# # ----- 获取简评信息 -----
-# try:
-#     df = pd.read_csv(
-#         COMMENT_PATH,
-#         sep=",",
-#         header=None,
-#         encoding="utf-8",
-#         names=[
-#             "c_name",
-#             "EZ_comment",
-#             "HD_comment",
-#             "IN_comment",
-#             "AT_comment",
-#         ],
-#     )
-#     df = df.fillna("")
-#     df.set_index(df.columns[0], inplace=True)
-#     for idx, row in df.iterrows():
-#         COMMENT_INFO[idx] = {
-#             "EZ": str(row["EZ_comment"]),
-#             "HD": str(row["HD_comment"]),
-#             "IN": str(row["IN_comment"]),
-#             "AT": str(row["AT_comment"]),
-#         }
-# except Exception:
-#     COMMENT_INFO = {}
 
 
 # 获取评级

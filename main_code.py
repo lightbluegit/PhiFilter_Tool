@@ -16,7 +16,6 @@ from PyQt5.QtGui import (
     QPixmap,
     QDesktopServices,
 )
-import requests
 from qfluentwidgets import (
     NavigationInterface,
     NavigationItemPosition,
@@ -27,7 +26,6 @@ from qfluentwidgets import (
     InfoBarPosition,
     AvatarWidget,
     HorizontalSeparator,
-    IndeterminateProgressRing,
     Action,
     SegmentedWidget,
 )
@@ -104,7 +102,6 @@ class MainWindow(FramelessWindow):
             "由于找不到合适的图标索性就用二次元头像做icon了(",
         ]
 
-        self.get_setting()
         self.init_variable()  # 初始化各种变量
 
         datetime.now()
@@ -149,12 +146,6 @@ class MainWindow(FramelessWindow):
         self.widgets["basepage"]["content_widget"] = content_widget
         main_layout.addWidget(content_widget, 1)  # 额外空间全给内容页面
 
-        if os.path.exists(appdata_path(TOKEN_PATH)):  # 尝试获取已存储的token
-            with open(appdata_path(TOKEN_PATH), "r") as token_file:
-                self.token = token_file.readline().strip()
-        else:  # TOKEN_PATH 不存在
-            with open(appdata_path(TOKEN_PATH), "w") as token_file:
-                pass  # 创建空文件
         self.song_list_widget = SongListViewWidget()
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showContextMenu)
@@ -165,9 +156,8 @@ class MainWindow(FramelessWindow):
         # 检查文件是否存在
         setting_file_path = appdata_path(SETTING_PATH)
         path_obj = Path(setting_file_path)
-        if not path_obj.exists() or path_obj.stat().st_size == 0:
-            # 如果不存在，创建默认设置并保存
-            default_setting = {
+        default_setting = {
+            self.user_name: {
                 "main_setting": {
                     "always_update": False,
                     "default_open_page": "home_page",
@@ -179,24 +169,43 @@ class MainWindow(FramelessWindow):
                         "value": "99.3",
                     }
                 },
-            }
-
+            },
+        }
+        if not path_obj.exists() or path_obj.stat().st_size == 0:
+            # 如果不存在，创建默认设置并保存
             # 写入默认配置到文件
             with open(setting_file_path, "w", encoding="utf-8") as f:
                 json.dump(default_setting, f, ensure_ascii=False, indent=4)
             # print(f"初始化配置文件: {setting_file_path}")
 
-        with open(appdata_path(SETTING_PATH), "r", encoding="utf-8") as f:
+        with open(setting_file_path, "r", encoding="utf-8") as f:
             setting_file = json.load(f)
             # 读取主设置
-            main_setting: dict = setting_file["main_setting"]
+            if self.user_name not in setting_file.keys():
+                setting_file[self.user_name] = {
+                    "main_setting": {
+                        "always_update": False,
+                        "default_open_page": "home_page",
+                    },
+                    "search_page_setting": {
+                        "default_filter": {
+                            "attribution": "acc",
+                            "limit": "大于等于",
+                            "value": "99.3",
+                        }
+                    },
+                }
+                with open(setting_file_path, "w", encoding="utf-8") as ff:
+                    json.dump(setting_file, ff, ensure_ascii=False, indent=4)
+            user_setting = setting_file[self.user_name]
+            main_setting: dict = user_setting["main_setting"]
             self.always_update: bool = main_setting["always_update"]
             self.log_write(f"是否自动更新:{self.always_update}")
             # 读取默认开屏页设置
             self.default_open_page: str = main_setting["default_open_page"]
 
             # 读取搜索页设置
-            search_page_setting: dict = setting_file["search_page_setting"]
+            search_page_setting: dict = user_setting["search_page_setting"]
             # print(f"读取搜索页设置{search_page_setting}")
             self.default_filter: dict[str, str] = search_page_setting["default_filter"]
 
@@ -217,7 +226,7 @@ class MainWindow(FramelessWindow):
         self.AT_statistical_data: list[int] = [-1, -1, -1]
         self.rks: float = 0  # 玩家的rks
         self.money: tuple[int] = (0, 0, 0, 0, 0)  # KB MB GB TB PB
-        self.challengemode_rank: str = ""  # (待完善)
+        self.challengemode_rank: str = ""  #
         self.user_introduction: str = ""  # 用户自我介绍
         self.user_name: str = ""  # 用户名
         self.token: str = ""  # 用户 session_token
@@ -245,39 +254,9 @@ class MainWindow(FramelessWindow):
 
         self.filter_result = None  # 筛选结果
 
-    # 调用API获取二次元图片并按照名称存储
-    def get_acg_image(self, url: str, img_save_name: str) -> str | None:
-        """
-        入参:
-            url: 请求地址
-            img_save_name: 存储时图片的名称
-
-        返回值:
-            请求成功 返回图片路径
-            请求失败或超时 返回None
-        """
-        return None  # 调试状态 不获取
-        try:
-            # 设置1秒超时
-            response = requests.get(url, timeout=0.4)
-            response.raise_for_status()  # 检查请求是否成功
-
-            img_path = f"{BACKGROUND_IMG_PREPATH}{img_save_name}.png"
-            path = appdata_path(img_path)
-            with open(path, "wb") as f:
-                f.write(response.content)
-
-            return path  # 写入信息 要用appdata_path
-
-        except requests.exceptions.Timeout:
-            self.log_write(f"{img_save_name}请求超时")
-            return None
-        except requests.exceptions.RequestException as e:
-            self.log_write(f"{img_save_name}请求失败 ({url}): {e}")
-            return None
-        except Exception as e:
-            self.log_write(f"处理{img_save_name}图片时发生错误 ({url}): {e}")
-            return None
+    def log_write(self, text: str):
+        with open(appdata_path(LOG_PATH), "a+", encoding="utf-8") as f:
+            f.write(text + "\n")
 
     # 多线程预处理函数
     def preinit(self):
@@ -296,52 +275,12 @@ class MainWindow(FramelessWindow):
         for keyi, pathi in SONG_CARD_BACKGROUND.items():  # 背景卡片
             self.loader.add_task(resource_path(pathi), keyi, self.page_bg_cache, 250)
 
-        self.loader.add_task(  # introduction(新手教学背景) 不在combine_name列表中 需要单独处理喵
-            resource_path(rf"{ILLUSTRATION_PREPATH}introduction.png"),
-            "introduction",
-            self.illustration_cache,
-            400,
-        )
-
         self.loader.add_task(  # 空二维码
             resource_path(QRCODE_EMPTY_IMG_PATH),
             "QRcode_empty",
             self.illustration_cache,
             410,
         )
-        # --------- 各个页面背景图缓存 ---------
-        # max_try_count: int = 3  # 每个图片最大尝试次数
-
-        # for _ in range(max_try_count):
-        #     home_image_path = self.get_acg_image(ACG_IMAGE_URL, "homepage_bg")
-        #     if home_image_path is not None:
-        #         break
-        # if home_image_path is None:  # 5次尝试都失败了 用默认图片
-        #     home_image_path = resource_path(  # 默认图片是在默认路径下的 只读
-        #         READONLY_BACKGROUND_IMG_PREPATH + "default_homepage_bg.png"
-        #     )
-        # self.loader.add_task(
-        #     home_image_path,
-        #     "home",
-        #     self.page_bg_cache,
-        #     self.width(),
-        # )
-
-        # for _ in range(max_try_count):
-        #     edit_image_path = self.get_acg_image(ACG_IMAGE_URL, "editpage_bg")
-        #     if edit_image_path is not None:
-        #         break
-        # if edit_image_path is None:  # 5次尝试都失败了 用默认图片
-        #     edit_image_path = resource_path(
-        #         READONLY_BACKGROUND_IMG_PREPATH + "default_editpage_bg.png"
-        #     )
-        # self.loader.add_task(
-        #     edit_image_path,
-        #     "edit",
-        #     self.page_bg_cache,
-        #     self.width(),
-        # )
-
         # --------- 控件图标缓存 ---------
         #  生成rks组成卡片
         rks_conpone_card_bg_path = resource_path(
@@ -384,10 +323,24 @@ class MainWindow(FramelessWindow):
     # 预处理结束后执行的操作
     def on_all_finished(self):
         """预处理结束后执行的操作"""
+
+        if os.path.exists(appdata_path(TOKEN_PATH)):  # 尝试获取已存储的token
+            with open(appdata_path(TOKEN_PATH), "r", encoding="utf-8") as token_file:
+                self.token_file = json.load(token_file)
+                last_user = self.token_file["last_user"]
+                if last_user:
+                    self.token = self.token_file[last_user]  # 获取上一次登录时的账号
+
+        else:  # TOKEN_PATH 不存在
+            with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as token_file:
+                self.token_file = {"last_user": ""}
+                json.dump(self.token_file, token_file, ensure_ascii=False, indent=4)
         if self.token:
             self.log_write("预处理结束了 有token")
             # 常更新的话生成rks组成的时候会自动更新一次 这里再更新就重复了
             self.get_save_data()
+
+        self.get_setting()
         self.init_all_pages()
         self.init_navigation()
         self.generate_b27_phi3()  # 先预生成 后续
@@ -554,7 +507,7 @@ class MainWindow(FramelessWindow):
                 save_dict = decryptSave(save_dict)
                 save_dict = formatSaveDict(save_dict)
                 self.save_dict = save_dict
-                self.log_write(f"存档文件是这个喵{save_dict}")
+                # self.log_write(f"存档文件是这个喵{save_dict}")
 
                 self.background_name = save_dict["user"]["background"]
                 self.log_write(f"你的背景名称是{self.background_name}")
@@ -1159,6 +1112,7 @@ class MainWindow(FramelessWindow):
 
         # 还原编辑页面
         model = self.song_list_widget.model
+        # print(model.item_dict)
         now_edit_card: song_info_card = self.widgets["edit_info_page"]["song_info_card"]
         new_songitem: SongItem = model.item_dict[
             f"{now_edit_card.combine_name}.{now_edit_card.diff}"
@@ -1315,21 +1269,24 @@ class MainWindow(FramelessWindow):
         self.widgets["score_calculate_page"]["display_layout"] = display_layout
 
         example_song = song_info_card(
-            self.illustration_cache["introduction"],
-            self.page_bg_cache["EZ"],  # 作为背景 这里的键就是跟难度相关
-            "introduction",
-            "00.0000",
-            "00.000",
-            "00.0",
-            "EZ",
-            True,
-            1000000,
-            0,
-            "曲师名称",
-            "谱师名称",
-            "画师名称",
-            True,
-            "introduction",
+            imgpath = self.illustration_cache["云女孩.符白牙SiYFics"],
+            diff_bg_path = self.page_bg_cache["IN"],  # 作为背景 这里的键就是跟难度相关
+            name = "云女孩",
+            singal_rks = "00.0000",
+            acc = "00.000",
+            level = "00.0",
+            diff="IN",
+            is_fc=True,
+            score=1000000,
+            index = 0,
+            composer="曲师名称",
+            chapter="谱师名称",
+            drawer="画师名称",
+            is_expended=True,
+            combine_name="云女孩.符白牙SiYFics",
+            improve_advice=None,
+            comment = '豪庭好玩',
+            group = ['好歌!', '初见杀'],
         )
         display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["score_calculate_page"]["song_info_card"] = example_song
@@ -1355,7 +1312,7 @@ class MainWindow(FramelessWindow):
         # 同步编辑区的控件状态
         # group_ccb: CheckableComboBox = self.widgets["edit_info_page"]["group_ccb"]
         # selected_group = GROUP_INFO.get(info_card_copy.combine_name, "").split("`")
-        # group_ccb.setSelectedItems(selected_group)
+        # group_ccb.set_selected_items(selected_group)
 
         # comment_label: multiline_text = self.widgets["edit_info_page"]["comment_label"]
         # now_comment = COMMENT_INFO.get(info_card_copy.combine_name, {}).get(
@@ -1419,7 +1376,7 @@ class MainWindow(FramelessWindow):
     def start_calculate(self):
         """计算如何分配perfect great bad+miss max_count可以达到指定分数"""
         self.widgets["score_calculate_page"]["result_list"] = []  # 重置合法结果集
-
+        aim_score = ""
         try:
             aim_score = int(
                 self.widgets["score_calculate_page"]["score_input_elm"].text()
@@ -1452,7 +1409,6 @@ class MainWindow(FramelessWindow):
         # 根据卡片获取在csv文件里用到的歌曲对应的键
         card: song_info_card = self.widgets["score_calculate_page"]["song_info_card"]
         song_key = f"{card.combine_name}.{card.diff}"
-
         df = pd.read_csv(
             resource_path(NOTE_COUNT_PATH),
             sep=",",
@@ -2031,7 +1987,7 @@ class MainWindow(FramelessWindow):
         """根据各种条件布局筛选结果"""
         if not self.filter_result:
             return
-
+        # print(f'搜索结果是{self.filter_result}')
         self.time_record = datetime.now()
         # 获取个数限制
         display_num: str = self.widgets["search_page"]["display_num_input"].text()
@@ -2159,25 +2115,25 @@ class MainWindow(FramelessWindow):
         if group_by != "无":  # 需要分组
             # print("个数", min(display_num, len(visited_folder)))
             for folderi, cards in visited_folder.values():  # folder内排序
-                cards = cards[: min(display_num, len(cards)) :]
-                card_count += len(cards)
                 # print(f"最后的结果是{cards}")
-
                 if cards and cards[0][0] is not None:
                     cards = sorted(cards, key=lambda x: x[0], reverse=is_reversed)
+                    cards = cards[: min(display_num, len(cards)) :]
+                    card_count += len(cards)
                 for _, cardi in cards:
                     folderi.add_widget(cardi)
         else:
-            empty_sort_list = empty_sort_list[
-                : min(display_num, len(empty_sort_list)) :
-            ]
             # print(f"最后的结果是{empty_sort_list}")
-            card_count = len(empty_sort_list)
             if empty_sort_list and empty_sort_list[0][0] is not None:
                 empty_sort_list = sorted(
                     empty_sort_list, key=lambda x: x[0], reverse=is_reversed
                 )
-            for _, cardi in empty_sort_list:
+                empty_sort_list = empty_sort_list[
+                    : min(display_num, len(empty_sort_list)) :
+                ]
+            card_count += min(display_num, len(empty_sort_list))
+
+            for _, cardi in empty_sort_list[: min(display_num, len(empty_sort_list)) :]:
                 result_display_flow.addWidget(cardi)
 
         # 恢复滚动内容更新并完成布局
@@ -2252,13 +2208,13 @@ class MainWindow(FramelessWindow):
         self.widgets["edit_info_page"]["display_layout"] = display_layout
 
         example_song = song_info_card(
-            self.illustration_cache["introduction"],
-            self.page_bg_cache["EZ"],  # 作为背景 这里的键就是跟难度相关
-            "introduction",
+            self.illustration_cache["云女孩.符白牙SiYFics"],
+            self.page_bg_cache["IN"],  # 作为背景 这里的键就是跟难度相关
+            "云女孩",
             "00.0000",
             "00.000",
             "00.0",
-            "EZ",
+            "IN",
             True,
             1000000,
             0,
@@ -2266,7 +2222,9 @@ class MainWindow(FramelessWindow):
             "谱师名称",
             "画师名称",
             True,
-            "introduction",
+            "云女孩.符白牙SiYFics",
+            comment ='豪庭好玩',
+            group = ['好歌!', '初见杀'],
         )
         display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["edit_info_page"]["song_info_card"] = example_song
@@ -2285,14 +2243,8 @@ class MainWindow(FramelessWindow):
         group_ccb = multi_check_combobox()
         self.widgets["edit_info_page"]["group_ccb"] = group_ccb
 
-        # 这两行是测试用的
-        group_ccb.addItems(
-            ["底力", "热身", "爆发", "耐力", "4K", "难打", "技巧", "好听"]
-        )
-        group_ccb.set_selected_items(["底力", "4K", "难打"])
-        # group_ccb.addItems(
-        #     used_group
-        # )  # used_group 是由 consts 读取 GROUP_PATH 得到的集合
+        self.get_userd_group()
+        group_ccb.addItems(self.used_group)
         edit_layout.addWidget(group_ccb)
 
         comment_label = multiline_text()
@@ -2318,32 +2270,38 @@ class MainWindow(FramelessWindow):
         display_layout.addWidget(info_card_copy, 0, Qt.AlignCenter)
 
         # 同步编辑区的控件状态
-        # group_ccb: CheckableComboBox = self.widgets["edit_info_page"]["group_ccb"]
-        # selected_group = GROUP_INFO.get(info_card_copy.combine_name, "").split("`")
-        # group_ccb.setSelectedItems(selected_group)
+        group_ccb: multi_check_combobox = self.widgets["edit_info_page"]["group_ccb"]
+        selected_group = info_card_copy.group
+        group_ccb.set_selected_items(selected_group)
 
-        # comment_label: multiline_text = self.widgets["edit_info_page"]["comment_label"]
-        # now_comment = COMMENT_INFO.get(info_card_copy.combine_name, {}).get(
-        #     info_card_copy.diff, ""
-        # )
-        # comment_label.set_text(now_comment)
+        comment_label: multiline_text = self.widgets["edit_info_page"]["comment_label"]
+        now_comment = info_card_copy.comment
+        comment_label.set_text(now_comment)
 
-        # 把这些元数据写到展开区（展开区会在需要时创建）
-        # info_card_copy.set_edited_info(selected_group, now_comment)
+    def get_userd_group(self):
+        '''获取已经存在的分组'''
+        df = pd.read_csv(
+            appdata_path(GROUP_PATH),
+            sep=",",
+            header=None,
+            encoding="utf-8",
+            names=["c_name", "group"],
+        )
+        df = df.fillna("")
+        df.set_index(df.columns[0], inplace=True)
+        # used_group = set()
+        self.used_group = set()
+        for idx, rowi in df.iterrows():
+            group_raw = str(rowi["group"])  # 组合名称 : 分组
+            if group_raw:
+                group_raw = group_raw.split("`")
+                for i in group_raw:
+                    self.used_group.add(i)
+        print(f'已经使用过的分组是{self.used_group}')
 
     # 保存用户编辑后的信息
     def save_user_edit(self):
         """保存用户编辑后的信息"""
-        InfoBar.info(
-            title="敬请期待",
-            content="v2.1再做这个功能吧( 暂时不知道为什么加上这部分之后布局效率特别慢...",
-            orient=Qt.Horizontal,
-            isClosable=True,
-            position=InfoBarPosition.TOP,
-            duration=3000,
-            parent=window,
-        )
-        return
 
         if not self.token:
             InfoBar.warning(
@@ -2362,14 +2320,27 @@ class MainWindow(FramelessWindow):
         # 从编辑控件读取新值
         song_combine_name = now_card.combine_name
         diff = now_card.diff
+        group_ccb: multi_check_combobox = self.widgets["edit_info_page"]["group_ccb"]
         new_group = "`".join(
-            self.widgets["edit_info_page"]["group_ccb"].selectedItems()
+            group_ccb.get_selected_items()
         )
         new_comment = self.widgets["edit_info_page"]["comment_label"].get_plain_text()
+        model = self.song_list_widget.model
+        item: SongItem = model.item_dict[f"{now_card.combine_name}.{now_card.diff}"]
+        item.comment = new_comment
+        item.groups = group_ccb.get_selected_items()
+        now_card.comment = new_comment
+        now_card.group = item.groups
+        self.song_list_widget.GROUP_INFO[now_card.combine_name] = item.groups
+        self.song_list_widget.COMMENT_INFO[now_card.combine_name][now_card.diff] = new_comment
 
+        for i in range(model.rowCount()):
+            if model.items[i].combine_name == now_card.combine_name:
+                model.items[i] = item
+                break
         try:
             df = pd.read_csv(
-                GROUP_PATH,
+                appdata_path(GROUP_PATH),
                 sep=",",
                 header=None,
                 encoding="utf-8",
@@ -2377,15 +2348,14 @@ class MainWindow(FramelessWindow):
                 index_col=0,
             )
             df = df.fillna("")
-            GROUP_INFO[song_combine_name] = new_group
             df.at[song_combine_name, "group"] = new_group
-            df.to_csv(GROUP_PATH, header=False, encoding="utf-8", index=True)
+            df.to_csv(appdata_path(GROUP_PATH), header=False, encoding="utf-8", index=True)
         except Exception:
             pass
 
         try:
             df = pd.read_csv(
-                COMMENT_PATH,
+                appdata_path(COMMENT_PATH),
                 sep=",",
                 header=None,
                 encoding="utf-8",
@@ -2399,40 +2369,43 @@ class MainWindow(FramelessWindow):
                 index_col=0,
             )
             df = df.fillna("")
-            if COMMENT_INFO.get(song_combine_name) is None:
-                COMMENT_INFO[song_combine_name] = {}
-            COMMENT_INFO[song_combine_name][diff] = new_comment
             colname = f"{diff}_comment"
-            if colname not in df.columns:
-                df.at[song_combine_name, f"{diff}_comment"] = new_comment
-            else:
-                df.at[song_combine_name, colname] = new_comment
-            df.to_csv(COMMENT_PATH, header=False, encoding="utf-8", index=True)
+            df.at[song_combine_name, colname] = new_comment
+            df.to_csv(
+                appdata_path(COMMENT_PATH), header=False, encoding="utf-8", index=True
+            )
         except Exception:
             pass
-        if (
-            song_combine_name in self.all_song_card
-        ):  #! self.all_song_card已经被删掉了 换一个遍历方式
-            for diff_key, row in self.all_song_card[song_combine_name].items():
-                if diff_key == diff:
-                    item = self.song_list_widget.model.get_item(row)
-                    if item:
-                        item.groups = new_group.split("`")
-                        item.comment = new_comment
-                        idx = self.song_list_widget.model.index(row)
-                        self.song_list_widget.model.dataChanged.emit(
-                            idx, idx, [ROLE_COMBINE]
-                        )
+
+        self.get_userd_group()
+        # print(f'玩家选择了的分组是{item.groups}')
+        group_ccb.clear()
+        group_ccb.addItems(self.used_group)
+        group_ccb.set_selected_items(item.groups)
+
+        self.place_b27_phi3()
+        self.place_record() # 更新搜索页面
+        self.link_and_show(now_card)  # 自己show自己!
+        now_card_in_edit: song_info_card = self.widgets["score_calculate_page"]["song_info_card"]
+        if now_card_in_edit.combine_name == now_card.combine_name and now_card_in_edit.diff == now_card.diff: # 同一个卡片内容 需要更新
+            self.link_and_show_score_page(now_card)  # 自己show自己!
+        self.switch_to(self.edit_info_page) # 否则会跳到分数可达页面
 
     # --------------- 账号页面 -------------------
     def transform_bakcground_name(self, text: str) -> str:
-        if text[-2] == ".":
-            try:
-                int(text[-1])
-                text = text[:-2:]
-            except:
-                pass
-        return text
+        if '.' in text: # 新版本背景 带点的
+            if text[-2] == ".":
+                try:
+                    int(text[-1])
+                    text = text[:-2:]
+                except:
+                    pass
+            return text
+        else: # 旧版本的背景只有名称 需要遍历组合名称切换成新版的对应关系
+            for combine_namei in COMBINE_NAME:
+                name, composer = combine_namei.split('.')
+                if name == text:
+                    return combine_namei
 
     def init_account_page(self) -> QWidget:
         """生成账号页面的基本布局"""
@@ -2691,8 +2664,14 @@ class MainWindow(FramelessWindow):
 
             # 保存token
             self.token = Token["sessionToken"]
-            with open(appdata_path(TOKEN_PATH), "w") as file:
-                file.write(Token["sessionToken"])
+            self.token_file[self.user_name] = self.token
+            with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as f:
+                json.dump(  # dump是写回
+                    self.token_file,
+                    f,
+                    ensure_ascii=False,  # 支持中文
+                    indent=4,  # 格式化缩进 便于阅读
+                )
 
             self.get_save_data()  # 获取存档数据并初始化变量
 
@@ -2726,13 +2705,40 @@ class MainWindow(FramelessWindow):
     # 玩家登出后还原页面及变量
     def log_out(self):
         """玩家登出后还原页面及变量"""
-        with open(appdata_path(TOKEN_PATH), "w") as _:  # 清空tokn记录
+        with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as f:  # 清空tokn记录
+            self.token_file[self.user_name] = ""
+            json.dump(
+                self.token_file, f, ensure_ascii=False, indent=4  # 支持中文
+            )  # 格式化缩进 便于阅读)
             self.init_variable()  # 还原所有与账号相关的变量
 
             # 还原主页
             self.widgets["place_b27_phi3_page"]["player_rks_label"].deleteLater()
             self.widgets["place_b27_phi3_page"]["b27_folder"].deleteLater()
             self.widgets["place_b27_phi3_page"]["phi3_folder"].deleteLater()
+
+            # 还原分数可达页面
+            self.link_and_show_score_page(
+                self.widgets["score_calculate_page"]["example_song"]
+            )
+            self.widgets["score_calculate_page"]["result_list"] = []  # 还原合法结果
+            result_display_flow: FlowLayout = self.widgets["score_calculate_page"][
+                "result_display_flow"
+            ]
+            while result_display_flow.count():  # 删掉所有展示的结果
+                print("删除结果1个")
+                item = result_display_flow.takeAt(0)
+                widget = item.widget()
+
+                if widget is not None:
+                    widget.deleteLater()
+
+            self.widgets["score_calculate_page"]["example_song"]
+
+            score_input_elm: input_line = self.widgets["score_calculate_page"][
+                "score_input_elm"
+            ]
+            score_input_elm.clear()
 
             # 还原搜索页面
             self.reset_filter_result()
@@ -2745,10 +2751,6 @@ class MainWindow(FramelessWindow):
             self.account_page = self.init_account_page()
 
             self.switch_to(self.account_page)
-
-    def log_write(self, text: str):
-        with open(appdata_path(LOG_PATH), "a+", encoding="utf-8") as f:
-            f.write(text + "\n")
 
     # --------------- 设置页面 -------------------
     def init_setting_page(self) -> QWidget:
@@ -2763,14 +2765,15 @@ class MainWindow(FramelessWindow):
         self.widgets["setting_page"]["segment"] = segment
         main_layout.addWidget(segment)
         segment.setFixedHeight(25)
-        segment.currentItemChanged.connect(self.on_segment_changed)
 
+        self.stacked_layout = QStackedLayout()
+        self.widgets["setting_page"]["stacked_layout"] = self.stacked_layout
+        main_layout.addLayout(self.stacked_layout)
+
+        segment.currentItemChanged.connect(self.on_segment_changed)
         segment.addItem("main_setting_widget", "总设置")
         segment.addItem("search_setting_widget", "搜索页设置")
-
-        # ============= 使用 QStackedLayout 来管理页面 =============
-        self.stacked_layout = QStackedLayout()
-        main_layout.addLayout(self.stacked_layout)
+        segment.setCurrentItem("main_setting_widget")
 
         # -------------- 主设置页面 --------------
         main_setting_widget = QWidget()
@@ -2792,9 +2795,6 @@ class MainWindow(FramelessWindow):
             font-family: "{FONT_FAMILY["chi"]}";
             """
         )
-        # always_update_sbtn.checkedChanged.connect(
-        #     lambda checked: setattr(self, "always_update", checked)
-        # )
         main_setting_layout.addWidget(always_update_sbtn)
 
         # 设置默认启动页面
@@ -2840,6 +2840,17 @@ class MainWindow(FramelessWindow):
         default_filter_obj.add_btn.hide()
         default_filter_obj.delete_btn.hide()
         default_filter_obj.attribution_choose_cbb.set_hint_text("设置默认筛选条件")
+
+        default_filter_obj.attribution_choose_cbb.set_current_choose(
+            default_filter_obj.filter_attribution_list.index(
+                self.default_filter["attribution"]
+            )
+        )
+        default_filter_obj.limit_choose_cbb.set_current_choose(
+            default_filter_obj.filter_limit_list.index(self.default_filter["limit"])
+        )
+        default_filter_obj.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
+        default_filter_obj.limit_val_cbb.set_text(self.default_filter["value"])
         # default_filter_obj.attribution_choose_cbb.setMaximumWidth(160)
         default_filter_obj.setFixedHeight(65)
         search_setting_layout.addWidget(default_filter_obj)
@@ -2860,15 +2871,30 @@ class MainWindow(FramelessWindow):
 
         return widget
 
+    # 保存用户设置
     def save_user_setting(self):
+        if not self.token:
+            InfoBar.warning(
+                title="用户未登录",
+                content="请先回到账号页面进行授权喵！",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=window,
+            )
+            self.switch_to(self.account_page)
+            return
+
         setting_file_path = appdata_path(SETTING_PATH)
 
-        # 1. 读取现有设置
+        # 读取现有设置
         with open(setting_file_path, "r", encoding="utf-8") as f:
             setting_file = json.load(f)
 
-        # 2. 修改设置
-        main_setting = setting_file["main_setting"]
+        # 修改设置
+        user_setting = setting_file[self.user_name]
+        main_setting = user_setting["main_setting"]
 
         # 常更新写入
         always_update_sbtn: SwitchButton = self.widgets["setting_page"][
@@ -2892,7 +2918,7 @@ class MainWindow(FramelessWindow):
         main_setting["default_open_page"] = page_map[default_open_page_text]
 
         # 搜索页默认筛选条件写入
-        search_page_setting = setting_file["search_page_setting"]
+        search_page_setting = user_setting["search_page_setting"]
         default_filter = search_page_setting["default_filter"]
         default_filter_obj: filter_obj = self.widgets["setting_page"][
             "default_filter_obj"
@@ -2902,16 +2928,26 @@ class MainWindow(FramelessWindow):
         default_filter["limit"] = limit
         default_filter["value"] = value
 
+        # 写回文件
         with open(setting_file_path, "w", encoding="utf-8") as f:
-            json.dump(
-                setting_file,  # 要写入的数据
-                f,  # 文件对象
+            json.dump(  # dump是写回
+                setting_file,
+                f,
                 ensure_ascii=False,  # 支持中文
-                indent=4,  # 格式化缩进，便于阅读
+                indent=4,  # 格式化缩进 便于阅读
             )
 
-        print("用户设置已保存")
+        InfoBar.success(
+            title="成功保存",
+            content="用户设置已保存",
+            orient=Qt.Horizontal,
+            isClosable=True,
+            position=InfoBarPosition.TOP,
+            duration=2000,
+            parent=window,
+        )
 
+    # 响应设置页切换
     def on_segment_changed(self):
         segment: SegmentedWidget = self.widgets["setting_page"]["segment"]
         route_key = segment.currentRouteKey()
