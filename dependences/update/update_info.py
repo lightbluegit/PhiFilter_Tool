@@ -12,7 +12,7 @@ def update_note_count_csv():
     folder_path = "C:/Users/Administrator/Downloads/Phigros_Resource-master/Phigros_Resource-master/chart"  # 替换为Phigros_Resource-master/chart文件对应的地址
     folder = Path(folder_path)
 
-    csv_path = "projects/PhiFilterTool/dependences/note_count.csv"
+    csv_path = "E:/kafuyuno/code/python/rhythmgame_database/dependences/note_count.csv"
     df = pd.read_csv(
         csv_path,
         sep=",",
@@ -22,7 +22,7 @@ def update_note_count_csv():
         index_col=0,
     )
     df = df.fillna("")
-
+    print('开始了')
     for song_folderi in folder.glob("*"):  # rglob 递归，glob 非递归
         if song_folderi.is_dir():  # 依次选中所有文件夹 (暗夜苏醒REANIMATE.Warak.0)
             combine_name = song_folderi.name[
@@ -66,32 +66,33 @@ def update_note_count_csv():
 
     print(f"所有歌曲的note计数更新完成 用时{time.time() - start_time}")
 
-
+# update_note_count_csv()
 # 从info.tsv中读取新的信息
 df = pd.read_csv(
-    resource_path(INFO_PATH),
+    INFO_PATH,
     sep="\t",
     header=None,
     encoding="utf-8",
     names=["c_name", "name", "composer", "drawer", "EZ", "hd", "in", "at", "lgc"],
 )
 df = df.fillna("")
-with open(resource_path(OUTPUT_PATH), "w", encoding="utf-8") as f:
+with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
     # 一行一行输出 然后手动更新到consts的缓存里面
-    # for _, row in df.iterrows():
-    #     combine_name = row.iloc[0]
-    #     name = row.iloc[1]
-    #     composer = row.iloc[2]
-    #     drawer = row.iloc[3]
-    #     f.write( # 三引号防止换行 单个  \  '  "  换成转义形式
-    #         f'\"\"\"{drawer.replace("\\", "\\\\").replace("\'", "\\'").replace('\"', '\\"')}\"\"\",\n')
-
-    # 更新谱师列表
-    chapter = set()
-    for idx in range(4, 9):
-        for _, row in df.iterrows():
-            chapter.add(row.iloc[idx])
-    for chapteri in chapter:
-        f.write(
-            f'\"\"\"{chapteri.replace("\\", "\\\\").replace("\'", "\\'").replace('\"', '\\"')}\"\"\",\n'
+    for _, row in df.iterrows():
+        combine_name = row.iloc[0]
+        name = row.iloc[1]
+        composer = row.iloc[2]
+        drawer = row.iloc[3]
+        f.write(  # 三引号防止换行 单个  \  '  "  换成转义形式
+            f'\"\"\"{combine_name.replace("\\", "\\\\").replace("\'", "\\'").replace('\"', '\\"')}\"\"\",\n'
         )
+
+# 更新谱师列表
+# chapter = set()
+# for idx in range(4, 9):
+#     for _, row in df.iterrows():
+#         chapter.add(row.iloc[idx])
+# for chapteri in chapter:
+#     f.write(
+#         f'\"\"\"{chapteri.replace("\\", "\\\\").replace("\'", "\\'").replace('\"', '\\"')}\"\"\",\n'
+#     )
