@@ -2685,7 +2685,11 @@ class MainWindow(FramelessWindow):
 
             # 保存token
             self.token = Token["sessionToken"]
+
+            self.get_save_data()  # 获取存档数据并初始化变量
             self.token_file[self.user_name] = self.token
+            self.token_file["last_user"] = self.user_name
+            print("token文件内容是", self.token_file)
             with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as f:
                 json.dump(  # dump是写回
                     self.token_file,
@@ -2693,8 +2697,6 @@ class MainWindow(FramelessWindow):
                     ensure_ascii=False,  # 支持中文
                     indent=4,  # 格式化缩进 便于阅读
                 )
-
-            self.get_save_data()  # 获取存档数据并初始化变量
 
             self.widgets["account_page"]["QRcode_img"].hide()
             self.widgets["account_page"]["login_confirm_btn"].hide()
