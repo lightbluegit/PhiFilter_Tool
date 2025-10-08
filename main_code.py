@@ -61,21 +61,6 @@ class MainWindow(FramelessWindow):
     def __init__(self):
         super().__init__()
 
-        # ---------------- 预启动窗口设置 ----------------
-        # self.open_window = FramelessWindow()
-        # self.open_window.show()
-        # open_widget = QWidget()
-        # layout = QHBoxLayout(open_widget)
-        # self.spinner = IndeterminateProgressRing()
-        # layout.addWidget(self.spinner)
-
-        # # 调整大小
-        # self.spinner.setFixedSize(300, 300)
-
-        # # 调整厚度
-        # self.spinner.setStrokeWidth(4)
-        # self.spinner.start()
-        # self.log_write(f"日志文件的地址是{appdata_path(LOG_PATH)}")
         # ---------------- 初始化变量 ----------------
         self.widgets: dict[str, dict] = (
             {}
@@ -155,6 +140,7 @@ class MainWindow(FramelessWindow):
         """获取用户设置"""
         # 检查文件是否存在
         setting_file_path = appdata_path(SETTING_PATH)
+        self.log_write(f"日志地址{setting_file_path}")
         path_obj = Path(setting_file_path)
         default_setting = {
             self.user_name: {
@@ -180,6 +166,8 @@ class MainWindow(FramelessWindow):
 
         with open(setting_file_path, "r", encoding="utf-8") as f:
             setting_file = json.load(f)
+            if not setting_file:
+                setting_file = default_setting
             # 读取主设置
             if self.user_name not in setting_file.keys():
                 setting_file[self.user_name] = {
@@ -323,10 +311,27 @@ class MainWindow(FramelessWindow):
     # 预处理结束后执行的操作
     def on_all_finished(self):
         """预处理结束后执行的操作"""
+        # 检查文件是否存在且不为空
+        if (
+            not os.path.exists(appdata_path(TOKEN_PATH))
+            or os.path.getsize(appdata_path(TOKEN_PATH)) == 0
+        ):
+            print("Token文件不存在或为空，创建新的token存储")
+            self.token_file = {"last_user": ""}  # 初始化为空字典
+            # 保存初始文件
+            with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as f:
+                json.dump(self.token_file, f, ensure_ascii=False, indent=4)
 
         if os.path.exists(appdata_path(TOKEN_PATH)):  # 尝试获取已存储的token
             with open(appdata_path(TOKEN_PATH), "r", encoding="utf-8") as token_file:
+                # content = token_file.read().strip()
+                # if not content:
+                #     print("文件为空，使用默认值")
+                #     self.token_file = {"last_user":''}
+                #     json.dump(self.token_file, token_file, ensure_ascii=False, indent=4)
+                # else:
                 self.token_file = json.load(token_file)
+
                 last_user = self.token_file["last_user"]
                 if last_user:
                     self.token = self.token_file[last_user]  # 获取上一次登录时的账号
@@ -335,6 +340,7 @@ class MainWindow(FramelessWindow):
             with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as token_file:
                 self.token_file = {"last_user": ""}
                 json.dump(self.token_file, token_file, ensure_ascii=False, indent=4)
+        # print('ok')
         if self.token:
             self.log_write("预处理结束了 有token")
             # 常更新的话生成rks组成的时候会自动更新一次 这里再更新就重复了
@@ -549,7 +555,7 @@ class MainWindow(FramelessWindow):
         # 使用委托式视图填充 model
         self.song_list_widget = SongListViewWidget()  # 覆盖掉之前的所有信息
         self.generate_cname_to_name_info()  # 重新登陆会洗掉cname_to_name原来的值
-        print("进入init_model_from_save_data")
+        self.log_write("进入init_model_from_save_data")
         self.song_list_widget.init_model_from_save_data(
             self.save_dict,
             self.diff_map_result,
@@ -558,6 +564,7 @@ class MainWindow(FramelessWindow):
             # COMMENT_INFO,
             self.illustration_cache,
             self.page_bg_cache,
+            self.user_name,
         )
         self.log_write("更新完成喵~")
 
@@ -1269,24 +1276,24 @@ class MainWindow(FramelessWindow):
         self.widgets["score_calculate_page"]["display_layout"] = display_layout
 
         example_song = song_info_card(
-            imgpath = self.illustration_cache["云女孩.符白牙SiYFics"],
-            diff_bg_path = self.page_bg_cache["IN"],  # 作为背景 这里的键就是跟难度相关
-            name = "云女孩",
-            singal_rks = "00.0000",
-            acc = "00.000",
-            level = "00.0",
+            imgpath=self.illustration_cache["云女孩.符白牙SiYFics"],
+            diff_bg_path=self.page_bg_cache["IN"],  # 作为背景 这里的键就是跟难度相关
+            name="云女孩",
+            singal_rks="00.0000",
+            acc="00.000",
+            level="00.0",
             diff="IN",
             is_fc=True,
             score=1000000,
-            index = 0,
+            index=0,
             composer="曲师名称",
             chapter="谱师名称",
             drawer="画师名称",
             is_expended=True,
             combine_name="云女孩.符白牙SiYFics",
             improve_advice=None,
-            comment = '豪庭好玩',
-            group = ['好歌!', '初见杀'],
+            comment="豪庭好玩",
+            group=["好歌!", "初见杀"],
         )
         display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["score_calculate_page"]["song_info_card"] = example_song
@@ -2223,8 +2230,8 @@ class MainWindow(FramelessWindow):
             "画师名称",
             True,
             "云女孩.符白牙SiYFics",
-            comment ='豪庭好玩',
-            group = ['好歌!', '初见杀'],
+            comment="豪庭好玩",
+            group=["好歌!", "初见杀"],
         )
         display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["edit_info_page"]["song_info_card"] = example_song
@@ -2279,9 +2286,13 @@ class MainWindow(FramelessWindow):
         comment_label.set_text(now_comment)
 
     def get_userd_group(self):
-        '''获取已经存在的分组'''
+        """获取已经存在的分组"""
+        group_path = appdata_path(f"{self.user_name}_{GROUP_PATH}")
+        if not os.path.exists(group_path) or os.path.getsize(group_path) == 0:
+            shutil.copy2(resource_path(DEFUALT_GROUP), group_path)
+
         df = pd.read_csv(
-            appdata_path(GROUP_PATH),
+            group_path,
             sep=",",
             header=None,
             encoding="utf-8",
@@ -2297,7 +2308,7 @@ class MainWindow(FramelessWindow):
                 group_raw = group_raw.split("`")
                 for i in group_raw:
                     self.used_group.add(i)
-        print(f'已经使用过的分组是{self.used_group}')
+        print(f"已经使用过的分组是{self.used_group}")
 
     # 保存用户编辑后的信息
     def save_user_edit(self):
@@ -2321,9 +2332,7 @@ class MainWindow(FramelessWindow):
         song_combine_name = now_card.combine_name
         diff = now_card.diff
         group_ccb: multi_check_combobox = self.widgets["edit_info_page"]["group_ccb"]
-        new_group = "`".join(
-            group_ccb.get_selected_items()
-        )
+        new_group = "`".join(group_ccb.get_selected_items())
         new_comment = self.widgets["edit_info_page"]["comment_label"].get_plain_text()
         model = self.song_list_widget.model
         item: SongItem = model.item_dict[f"{now_card.combine_name}.{now_card.diff}"]
@@ -2332,15 +2341,18 @@ class MainWindow(FramelessWindow):
         now_card.comment = new_comment
         now_card.group = item.groups
         self.song_list_widget.GROUP_INFO[now_card.combine_name] = item.groups
-        self.song_list_widget.COMMENT_INFO[now_card.combine_name][now_card.diff] = new_comment
+        self.song_list_widget.COMMENT_INFO[now_card.combine_name][
+            now_card.diff
+        ] = new_comment
 
         for i in range(model.rowCount()):
             if model.items[i].combine_name == now_card.combine_name:
                 model.items[i] = item
                 break
         try:
+            group_path = appdata_path(f"{self.user_name}_{GROUP_PATH}")
             df = pd.read_csv(
-                appdata_path(GROUP_PATH),
+                group_path,
                 sep=",",
                 header=None,
                 encoding="utf-8",
@@ -2349,13 +2361,19 @@ class MainWindow(FramelessWindow):
             )
             df = df.fillna("")
             df.at[song_combine_name, "group"] = new_group
-            df.to_csv(appdata_path(GROUP_PATH), header=False, encoding="utf-8", index=True)
+            df.to_csv(
+                group_path,
+                header=False,
+                encoding="utf-8",
+                index=True,
+            )
         except Exception:
             pass
 
         try:
+            comment_path = appdata_path(f"{self.user_name}_{COMMENT_PATH}")
             df = pd.read_csv(
-                appdata_path(COMMENT_PATH),
+                comment_path,
                 sep=",",
                 header=None,
                 encoding="utf-8",
@@ -2371,9 +2389,7 @@ class MainWindow(FramelessWindow):
             df = df.fillna("")
             colname = f"{diff}_comment"
             df.at[song_combine_name, colname] = new_comment
-            df.to_csv(
-                appdata_path(COMMENT_PATH), header=False, encoding="utf-8", index=True
-            )
+            df.to_csv(comment_path, header=False, encoding="utf-8", index=True)
         except Exception:
             pass
 
@@ -2384,16 +2400,21 @@ class MainWindow(FramelessWindow):
         group_ccb.set_selected_items(item.groups)
 
         self.place_b27_phi3()
-        self.place_record() # 更新搜索页面
+        self.place_record()  # 更新搜索页面
         self.link_and_show(now_card)  # 自己show自己!
-        now_card_in_edit: song_info_card = self.widgets["score_calculate_page"]["song_info_card"]
-        if now_card_in_edit.combine_name == now_card.combine_name and now_card_in_edit.diff == now_card.diff: # 同一个卡片内容 需要更新
+        now_card_in_edit: song_info_card = self.widgets["score_calculate_page"][
+            "song_info_card"
+        ]
+        if (
+            now_card_in_edit.combine_name == now_card.combine_name
+            and now_card_in_edit.diff == now_card.diff
+        ):  # 同一个卡片内容 需要更新
             self.link_and_show_score_page(now_card)  # 自己show自己!
-        self.switch_to(self.edit_info_page) # 否则会跳到分数可达页面
+        self.switch_to(self.edit_info_page)  # 否则会跳到分数可达页面
 
     # --------------- 账号页面 -------------------
     def transform_bakcground_name(self, text: str) -> str:
-        if '.' in text: # 新版本背景 带点的
+        if "." in text:  # 新版本背景 带点的
             if text[-2] == ".":
                 try:
                     int(text[-1])
@@ -2401,9 +2422,9 @@ class MainWindow(FramelessWindow):
                 except:
                     pass
             return text
-        else: # 旧版本的背景只有名称 需要遍历组合名称切换成新版的对应关系
+        else:  # 旧版本的背景只有名称 需要遍历组合名称切换成新版的对应关系
             for combine_namei in COMBINE_NAME:
-                name, composer = combine_namei.split('.')
+                name, composer = combine_namei.split(".")
                 if name == text:
                     return combine_namei
 

@@ -61,6 +61,7 @@ from dataclasses import dataclass
 from dependences.consts import *
 import re
 import pandas as pd
+import shutil
 
 # ------------------------- 这里是重写的控件 -------------------------
 
@@ -1421,6 +1422,11 @@ class ImageLoaderWorker(QRunnable):
         # print("finish了喵")
 
 
+def log_write(text: str):
+    with open(appdata_path(LOG_PATH), "a+", encoding="utf-8") as f:
+        f.write(text + "\n")
+
+
 # 任务管理器类
 class ImageLoader(QObject):  # 继承 QObject 以支持信号
     all_tasks_finished = pyqtSignal()  # 全部任务都完成了
@@ -1472,7 +1478,7 @@ class ImageLoader(QObject):  # 继承 QObject 以支持信号
         """处理单个任务完成"""
         self.active_workers.remove(worker)  # 移除已完成的处理器
         if self.active_workers == []:
-            # print(f"{self.total_tasks}个任务完成了!")
+            log_write(f"{self.total_tasks}个任务完成了!")
             self.all_tasks_finished.emit()  # 发射总完成信号
 
 
@@ -1545,6 +1551,7 @@ class SongListViewWidget(QWidget):
         cname_to_name: dict,
         illustration_cache: dict[str, QPixmap],
         bg_cache: dict[str, QPixmap],
+        user_name: str,
     ):
         """从存档中构建数据"""
         self.model = SongListModel()
@@ -1552,9 +1559,12 @@ class SongListViewWidget(QWidget):
         # ----- 获取分组信息 -----
         self.GROUP_INFO = {}
         self.COMMENT_INFO = {}
+        group_path = appdata_path(f"{user_name}_{GROUP_PATH}")
+        if not os.path.exists(group_path) or os.path.getsize(group_path) == 0:
+            shutil.copy2(resource_path(DEFUALT_GROUP), group_path)
 
         df = pd.read_csv(
-            appdata_path(GROUP_PATH),
+            group_path,
             sep=",",
             header=None,
             encoding="utf-8",
@@ -1577,8 +1587,12 @@ class SongListViewWidget(QWidget):
             # used_group = list(used_group)
 
         # ----- 获取简评信息 -----
+        comment_path = appdata_path(f"{user_name}_{COMMENT_PATH}")
+        if not os.path.exists(comment_path) or os.path.getsize(comment_path) == 0:
+            shutil.copy2(resource_path(DEFUALT_COMMENT), comment_path)
+
         df = pd.read_csv(
-            appdata_path(COMMENT_PATH),
+            comment_path,
             sep=",",
             header=None,
             encoding="utf-8",

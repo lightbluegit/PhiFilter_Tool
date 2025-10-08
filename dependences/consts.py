@@ -37,7 +37,7 @@ def appdata_path(relative_path=""):
     file_path.parent.mkdir(parents=True, exist_ok=True)
     if not file_path.exists():
         file_path.touch(exist_ok=True)  # 创建空文件
-        # print(f"Created file: {app_path / relative_path}")
+        print(f"Created file: {app_path / relative_path}")
     return path_str
 
 
@@ -52,6 +52,11 @@ def resource_path(relative_path):
         # PyInstaller 会创建临时文件夹，并把路径存入 sys._MEIPASS
         base_path = sys._MEIPASS
     return os.path.join(base_path, relative_path)
+
+
+def log_write(text: str):
+    with open(appdata_path(LOG_PATH), "a+", encoding="utf-8") as f:
+        f.write(text + "\n")
 
 
 class score_level_type(Enum):
@@ -84,6 +89,8 @@ AVATAR_PATH = DEPENDENCES_PREPATH + "avatar.txt"  # 头像名称
 NOTE_COUNT_PATH = (
     DEPENDENCES_PREPATH + "note_count.csv"
 )  # 每个歌曲及难度对应的各种键型数量及总合
+DEFUALT_COMMENT = DEPENDENCES_PREPATH + "defualt_comment.csv"  # 空白简评文件
+DEFUALT_GROUP = DEPENDENCES_PREPATH + "defualt_group.csv"
 
 UPDATE_PREPATH = DEPENDENCES_PREPATH + "update/"
 OUTPUT_PATH = UPDATE_PREPATH + "output.txt"
@@ -115,6 +122,7 @@ PLAYER_INFO_PREPATH = FILE_PATH + "player_info/"
 TOKEN_PATH = "session_token.json"  # 玩家session_token存储路径
 LOG_PATH = "PhiFilterTool_log.txt"  # 日志文件
 SETTING_PATH = "PhiFilterTool_setting.json"  # 玩家设置
+
 GROUP_PATH = "group.csv"  # 玩家自定义分组信息存储路径
 COMMENT_PATH = "comment.csv"  # 玩家自定义简评信息存储路径
 
