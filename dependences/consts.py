@@ -15,30 +15,43 @@ from pathlib import Path
 # # 如果目录不存在，就创建（包括父目录）
 # config_dir.mkdir(parents=True, exist_ok=True)
 debug: bool = False
-debug: bool = True
+# debug: bool = True
 
 
-def appdata_path(relative_path=""):
+def appdata_path(relative_path="", create_file=True):
     """
     获取可写的用户数据目录路径
-    用于保存配置、token、日志等可写文件
+
+    Args:
+        relative_path: 相对路径，空字符串返回文件夹路径
+        create_file: 是否创建文件（当relative_path不为空时）
     """
     if debug:
-        return relative_path  # 调试状态
+        base_path = Path.cwd()
+    else:
+        if sys.platform == "win32":
+            base = Path(os.environ["APPDATA"])
 
-    if sys.platform == "win32":
-        base = Path(os.environ["APPDATA"])  # C:\Users\...\AppData\Roaming
+            base_path = base / "PhiFilterTool"
 
-    app_path = base / "PhiFilterTool"
-    # app_path.mkdir(parents=True, exist_ok=True)  # 自动创建目录
-    path_str = str(app_path / relative_path)
-    file_path = Path(app_path / relative_path)
-    print(f"这里的文件路径是:{file_path}")
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    if not file_path.exists():
-        file_path.touch(exist_ok=True)  # 创建空文件
-        print(f"Created file: {app_path / relative_path}")
-    return path_str
+    # 确保基础目录存在
+    base_path.mkdir(parents=True, exist_ok=True)
+
+    if not relative_path:
+        # 返回文件夹路径
+        return str(base_path)
+
+    # 处理文件路径
+    file_path = base_path / relative_path
+
+    if create_file:
+        # 确保父目录存在
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        if not file_path.exists():
+            file_path.touch()  # 创建空文件
+            print(f"创建文件: {file_path}")
+
+    return str(file_path)
 
 
 def resource_path(relative_path):
@@ -55,6 +68,8 @@ def resource_path(relative_path):
 
 
 def log_write(text: str):
+    if not isinstance(text, str):  # 防止入参不是str
+        return
     with open(appdata_path(LOG_PATH), "a+", encoding="utf-8") as f:
         f.write(text + "\n")
 
@@ -100,7 +115,6 @@ FONT_PREPATH = DEPENDENCES_PREPATH + "font/"
 
 EN_FONT1_PATH = FONT_PREPATH + "Playfair_Display/PlayfairDisplay-VariableFont_wght.ttf"
 NUM_FONT1_PATH = FONT_PREPATH + "Share_Tech_Mono/ShareTechMono-Regular.ttf"
-# CHI_FONT1 = FONT_PREPATH + "ZCOOLKuaiLe/ZCOOLKuaiLe-Regular.ttf"
 CHI_FONT1_PATH = resource_path(
     FONT_PREPATH + "Source Han Sans & Saira Hybrid-Regular #5446.ttf"
 )
@@ -199,10 +213,6 @@ NUMERIC_COMPARATORS: list[str] = [
 
 # 精确 模糊比较
 LOGICAL_OPERATORS: list[str] = ["等于", "不等于", "包含", "不包含"]
-
-# ACG图片获取API
-ACG_PPIMAGE_URL = "https://www.loliapi.com/acg/pp/"  # 头像获取
-ACG_IMAGE_URL = "https://www.loliapi.com/acg/"  # 图片获取
 
 MAX_LEVEL: float = 17.6  # 当前版本最高定数
 
