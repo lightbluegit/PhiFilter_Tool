@@ -1,4 +1,3 @@
-"""该文件复制自 千柒 的 Phi-CloudAction-python-master 项目"""
 from typing import Any, Optional, Union
 from base64 import b64decode
 from requests import Session
@@ -20,7 +19,9 @@ import pandas as pd
 
 
 # ---------------------- 信息获取相关操作喵 ----------------------
-aes_key = b64decode("6Jaa0qVAJZuXkZCLiOa/Ax5tIZVu+taKUN1V1nqwkks=")
+aes_key = b64decode(
+    "6Jaa0qVAJZuXkZCLiOa/Ax5tIZVu+taKUN1V1nqwkks="
+)  # 解密存档文件需要用的参数
 aes_iv = b64decode("Kk/wisgNYwcAV8WVGMgyUw==")
 
 
@@ -422,8 +423,7 @@ class PhigrosCloud:
         self, url: Optional[str] = None, checksum: Optional[str] = None
     ) -> bytes:
         """
-        获取存档数据喵 (压缩包数据喵)
-
+        获取存档数据并进行校验喵 (压缩包数据喵)
         (返回的数据可用ReadGameSave()读取喵)
 
         参数:
@@ -446,6 +446,7 @@ class PhigrosCloud:
 
         # 请求存档文件并获取数据喵
         save_data = (self.request.get(url)).content  # type: ignore
+        # print(f"存档文件第一步输出是这个{save_data}")
         if len(save_data) <= 30:
             print(
                 f"严重警告喵！！！获取到的云存档大小不足 30 字节喵！当前大小喵：{len(save_data)}"
@@ -456,8 +457,8 @@ class PhigrosCloud:
             )
 
         save_md5 = md5()  # 创建一个md5对象，用来计算md5校验值喵
-        save_md5.update(save_data)  # 将存档数据更新进去喵
-        actual_checksum = save_md5.hexdigest()
+        save_md5.update(save_data)  # 将存档数据更新进去喵 传入哈希算法
+        actual_checksum = save_md5.hexdigest()  # 获取最终的 MD5 校验和
         if checksum != actual_checksum:  # 对比校验值喵，不正确则输出警告并等待喵
             print("严重警告喵！！！存档校验不通过喵！")
             print("这可能是因为不正确地上传存档导致的喵！")
@@ -609,13 +610,13 @@ class PhigrosCloud:
 
 def unzipSave(zip_data: bytes) -> dict[str, bytes]:
     """
-    读取存档压缩包
+    读取并解压存档压缩包 存档原始数据喵
 
     参数:
         zip_data (bytes): 压缩包数据喵
 
     返回:
-        (dict[str, bytes]): 存档原始数据喵
+        (dict[str, bytes]): 存档原始数据喵 {文件名1: 加密的文件内容, ...}
     """
     save_dict = {}
     # 打开存档文件喵(其实存档是个压缩包哦喵！)
@@ -643,7 +644,7 @@ def decrypt(data: bytes):
         (bytes): 解密后的数据
     """
     data = new(aes_key, MODE_CBC, aes_iv).decrypt(data)
-    return unpad(data, block_size)
+    return unpad(data, block_size)  # 移除填充
 
 
 class dataTypeAbstract:
@@ -1641,7 +1642,7 @@ def getStructure(file_head: dict[str, bytes]) -> dict[str, Any]:
     # user
     if file_head.get("user") == b"\x01":
         structure_list["user"] = user01
-        print("进入user页面", structure_list["user"])
+        # print("进入user页面", structure_list["user"])
 
     elif isinstance(file_head.get("user"), bytes):
         raise ValueError(
@@ -1664,13 +1665,14 @@ def decryptSave(save_dict: dict[str, Any]) -> dict[str, dict[str, Any]]:
     file_head = {}
     for key, value in save_dict.items():
         file_head[key] = value[0].to_bytes()
+        print(f"文件头为:{file_head}")
 
-    structure_list = getStructure(file_head)
+    structure_list = getStructure(file_head)  # 获取对应版本的对应文件的配置信息
 
     for key, value in save_dict.items():
         save_dict[key] = decrypt(
             value[1:]
-        )  # 键解密了(username) 但是值还是加密状态(b'\x01\x03KRK\x0)
+        )  # 键解密了(username) 但是值还是加密状态(b'\x01\x03KRK\x0) 第一个是文件头 后面才是信息
         # print(f"key:{key} val:{save_dict[key]}")
         reader = Reader(save_dict[key])
         save_dict[key] = reader.parseStructure(structure_list[key])

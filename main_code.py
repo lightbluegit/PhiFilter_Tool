@@ -512,9 +512,12 @@ class MainWindow(FramelessWindow):
                 log_write(f"你的名字是{self.user_name}")
 
                 save_data = cloud.getSave(summary_data["url"], summary_data["checksum"])
-                save_dict = unzipSave(save_data)
-                save_dict = decryptSave(save_dict)
-                save_dict = formatSaveDict(save_dict)
+                save_dict = unzipSave(save_data)  # 解压合法的存档压缩包
+                # print(f'解压之后的结果是{save_dict}')
+                save_dict = decryptSave(save_dict)  # 解密
+                # print(f'解密之后的结果是{save_dict}') #
+                save_dict = formatSaveDict(save_dict)  # 格式化
+                # print(f'格式化之后的结果是{save_dict}')
                 self.save_dict = save_dict
                 # log_write(f"存档文件是这个喵{save_dict}")
 
@@ -2853,7 +2856,7 @@ class MainWindow(FramelessWindow):
         )
         self.widgets["setting_page"]["default_open_page"] = default_open_page
         main_setting_layout.addWidget(default_open_page)
-        
+
         open_log_file_btn_style = {
             "max_width": 200,
             "min_width": 200,
@@ -2861,7 +2864,7 @@ class MainWindow(FramelessWindow):
             "max_height": 40,
             "font_size": 24,
         }
-        open_log_file_btn = button('打开日志文件位置', open_log_file_btn_style)
+        open_log_file_btn = button("打开日志文件位置", open_log_file_btn_style)
         self.widgets["setting_page"]["open_log_file_btn"] = open_log_file_btn
         main_setting_layout.addWidget(open_log_file_btn)
 
