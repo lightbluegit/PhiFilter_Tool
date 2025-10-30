@@ -1,130 +1,135 @@
 # PhiFilter_Tool
-一个筛选Phigros打歌数据的工具
+[中文](./README/README_zh-CN.md)
 
-## 快速开始
-下载release中的exe文件 点击后进入账号页面 开始授权(未登录时账号页面如下图所示)
+A tool for filtering rhythm game Phigros gameplay data
 
-<img src="./images/readme/account_page_no_token.png" alt="账号页面(未登录)" width="630px">
+## Quick Start
+Download the exe file from the release part and open it to enter the account page. Start authorization (the account page when not logged in is shown below).
 
-授权流程：
+<img src="./images/readme/account_page_no_token.png" alt="Account Page (Not Logged In)" width="630px">
 
-1. 点击按钮生成二维码
-2. 用TapTap扫描二维码并授权
+### Authorization Process:
+1. Click the button to generate a QR code
+2. Scan the QR code with TapTap and authorize
 
-账号页面在授权成功后将显示游戏中的头像 背景 rks等账号信息 之后可前往主页或搜索页开始使用
-<img src="./images/readme/account_page_token.png" alt="账号页面(登录)" width="630px">
+After successful authorization, the account page will display your in-game avatar, background, RKS, and other account information. You can then proceed to the home page or search page to start using the tool.
 
-## 详细介绍
-### 主页
+<img src="./images/readme/account_page_token.png" alt="Account Page (Logged In)" width="630px">
 
-提供快捷工具 鼠标悬浮在工具标题上可以展开详细介绍
-左下角有各个页面使用相关的tips 刷新主页随机加载
+## Detailed Introduction
+### Home Page
 
-<img src="./images/readme/home_page.png" alt="rks组成 页面" width="630px">
+Provides quick tools. Hover over the tool title to see detailed information.
+There are usage tips for each page in the bottom left corner, randomly loaded when refreshing the home page.
 
-#### 工具介绍:
-1. 生成rks组成图
+<img src="./images/readme/home_page.png" alt="rks Composition Page" width="630px">
 
-<img src="./images/readme/rks_display_page.png" alt="rks组成 页面" width="630px">
+#### Tool Introduction:
+1. **Generate rks Composition Chart**
 
-* 左键点击**phi3**、**b27**按钮可以切换 折叠/展开 模式  
-* 左键点击**歌曲卡片**可以切换详细信息(曲师 谱师 画师) 折叠/展开 模式 
+<img src="./images/readme/rks_display_page.png" alt="rks Composition Page" width="630px">
+
+* Left-click the **phi3**, **b27** buttons to toggle between collapsed/expanded modes
+* Left-click **song cards** to toggle detailed information (composer, Charter, illustrator) collapsed/expanded modes
 
 > [!tip]
 >
-> 所有的**歌曲卡片**都可以进行如上操作
+> All **song cards** support the above operation
 
-2. 更新数据
+2. **Update Data**
 
-* 懒加载(默认)状态下 应用启动时会自动更新一次 后续 筛选/生成rks组成 时复用储存的数据 如有更新(分数 头像 昵称等) 请在Phigros中同步之后在此点击更新
-* 常加载状态可在设置页面调整 此状态下每次 生成rks组成图或进行搜索时都会预先更新一遍数据 但是运行时间会变长
+* In lazy loading mode (default), the app automatically updates once at startup. Subsequent filtering and RKS chart generation operation will reuses stored data. If there are updates in your game(scores, avatar, nickname, etc.), please sync in Phigros first, then click update card here.
+* Constant loading mode can be adjusted in settings. In this mode, data is pre-updated each time you generate RKS charts or search, but runtime will be longer.
 
-3. 计算分数是否可达
-<img src="./images/readme/score_calculate_page.png" alt="分数是否可达 页面" width="630px">
+3. **Calculate If Score Is Achievable**
+<img src="./images/readme/score_calculate_page.png" alt="Score Achievement Page" width="630px">
 
-* 对于指定歌曲的指定难度 输入目标分数并判断是否可达 若可达 则会在下方依次展示达到目标分数所需的 Perfect数 Great数 bad+miss数和最大连击数
+* For a specified song and difficulty, input the target score to check if it's achievable. If achievable, it will display the required Perfect count, Great count, Bad+Miss count, and max combo needed.
 
-* 结果展示部分支持依据四个参数中的任何一个进行升序或降序排列结果
+* The results section supports sorting by any of the four parameters in ascending or descending order.
 
-### 筛选页面
-<img src="./images/readme/search_page.png" alt="筛选页面" width="630px">
+### Filter Page
+<img src="./images/readme/search_page.png" alt="Filter Page" width="630px">
 
-#### 筛选条件输入
-* 可供筛选的属性有:
-    * acc 
-    * 单曲rks 
-    * 得分 
-    * 定数 
-    * 评级 
-    * 难度 
-    * 曲名 
-    * 曲师 
-    * 谱师 
-    * 画师 
+#### Filter Condition Input
+* Available filter attributes:
+    * acc
+    * Single rks
+    * Score
+    * Chart level
+    * Grade 
+    * Difficulty
+    * Song Name
+    * Composer
+    * Charter
+    * Illustrator
 
-* 筛选值若可以枚举 (如筛选属性为 **评级 难度 曲名 曲师 谱师 画师** 时) 输入提供可选项列表以及自动补全
+* When filter values can be enumerated (e.g., Grade , Difficulty, Song Name, Composer, Charter, Illustrator), input provides option lists and auto-completion. Use the up/down arrow keys to navigate options and press Enter to confirm.
 
-* 点击加号可以增加一个筛选条件 在多个筛选条件下必须选择连接方式 (**并且(与)/或者(或)**) 所有条件必须有效 存在无效条件将不会进行筛选
+* Click the plus button to add a filter condition. With multiple conditions, you must select the connection method (**AND/OR**). All conditions must be valid; invalid conditions will prevent filtering.
 
-* 点击减号可以清楚选中的筛选条件 但是必须有至少1个筛选条件存在
+* Click the minus button to remove selected filter conditions, but at least one condition must remain.
 
-* 筛选条件输入完成后可以点击**从所有歌曲中筛一遍**按钮进行筛选 或是在已经有筛选结果的基础上点击**从结果中继续筛选**按钮
+* After entering filter conditions, click **Filter All Songs** to search, or click **Filter Within Results** to refine existing results.
 
-#### 筛选结果布局
-* 在搜索页面右键搜索结果的**歌曲卡片**将显示菜单 可跳转编辑页面编辑该歌曲 或 跳转 分数计算页面
+#### Search Result Layout
+* Right-click **song cards** in search results to show a menu for jumping to edit page or score calculation page.
 
-* 每次切换 **排序依据** **分组依据** 或 **排序顺序** 都会重新布局筛选结果 点击 **重置** 按钮可以刷新页面
+* Changing **Sort By**, **Group By**, or **Sort Order** will re-layout results. Click **Reset** to refresh the page.
 
-* **排序依据**可选值为: 
-    * 无(默认) 
-    * acc 
-    * 单曲rks 
-    * 得分 
-    * 定数
+* **Sort By** options:
+    * None (default)
+    * acc
+    * Single rks
+    * Score
+    * Chart Level
 
-* **排序顺序**默认从大到小(当排序依据不为 **无** 的时候才生效)
+* **Sort Order** defaults to descending (only effective when Sort By is not "None")
 
-* **分组依据**可选值为: 
-    * 无(默认) 
-    * 曲名
-    * 曲师 
-    * 谱师
-    * 画师 
-    * 难度 
-    * 评级 
+* **Group By** options:
+    * None (default)
+    * Song Name
+    * Composer
+    * Charter
+    * Illustrator
+    * Difficulty
+    * Grade
 
-分组依据为 **无** 的时候平铺所有筛选结果 否则按照分组依据以可折叠的样式分组
+When Group By is "None", all results are displayed flat. Otherwise, results are grouped in collapsible sections.
 
-* **歌曲展示个数** 限制的是每个分组中的最多歌曲数 如果没有分组 则限制所有歌曲的个数 此处歌曲个数的限制的逻辑是在搜索结果产生之后的 排序与分组限制的是整体的搜索结果 而在最终的排序后由**歌曲展示个数**参数控制最终展示的个数
+* **Number of Songs Displayed** limits the maximum songs per group (or total songs if no grouping). This limit applies after search results are generated.
+
 > [!tip]
 >
-> 如果找不到歌曲的某个难度 有可能是没有玩过该难度 因此存档中没有记录
+> If you can't find a specific difficulty for a song, it might because you haven't played that difficulty, so it's not recorded in your save data.
 
+### Edit Page
 
-### 编辑页面
+<img src="./images/readme/edit_page.png" alt="Edit Page" width="630px">
 
-<img src="./images/readme/edit_page.png" alt="编辑页面" width="630px">
+* Add/remove selected songs from groups or tags (multiple selection supported). Existing groups/tags appear in dropdown. To create new ones, input and save. Changes sync group selection status across all pages.
+* The blank area below is for brief comments - you can complain about abstract chart configurations or record gameplay feelings/difficult points for quick reference when returning to the game.
+* Comments and groups are account-associated. Switching accounts loads the corresponding files.
 
-* 可以在此将选中的歌曲 加入/移除 某个分组或标签 可多选 已存在的 分组/标签 会展示在下拉框中 如需新建 输入后保存更改即可 每次更改后都会同步分组选中状态 在每个页面同步更新该歌曲的信息
-* 下方空白处是简评输入栏 可以吐槽该难度下抽象的配置 也可以记录打歌感受或难点以便复健的时候快速找回记忆(
-* 简评和分组都是与账号相关联的 切换账号后会读取对应的文件
+### Account Page
+> Recommended to use at default size
 
-### 账号页面
-> 此页面建议以默认尺寸使用
+<img src="./images/readme/account_page_token.png" alt="Account Page" width="630px">
 
-<img src="./images/readme/account_page_token.png" alt="编辑页面" width="630px">
+Avatar and background match your in-game settings.
+Your in-game self-introduction appears above the logout button.
+The right side shows song counts for each difficulty and status.
 
-头像与背景与游戏中的设置相同 
-退出按钮上方显示游戏中的自我介绍 
-右侧显示每个难度不同状态的歌曲数量
+## Reference Projects
+User data acquisition and QR code generation use the following projects:
+- [Phi-CloudAction-python](https://github.com/wms26/Phi-CloudAction-python)
+- [Phi-GetSession-python](https://github.com/wms26/Phi-GetSession-python)
 
+Both are created by [wms26](https://github.com/wms26).
 
-## 参考项目
-本项目的 用户数据获取 二维码生成部分 分别用的是[Phi-CloudAction-python](https://github.com/wms26/Phi-CloudAction-python)项目以及[Phi-GetSession-python](https://github.com/wms26/Phi-GetSession-python)项目 都是[千柒](https://github.com/wms26)写的喵；
+Avatar, Chart Level, and illustration information uses [7aGiven](https://github.com/7aGiven)'s [Phigros_Resource](https://github.com/7aGiven/Phigros_Resource) project to update.
 
-头像 定数 曲绘等信息获取用的是[文酱](https://github.com/7aGiven)的[Phigros_Resource](https://github.com/7aGiven/Phigros_Resource?tab=readme-ov-file)项目
+Thanks to both masters!
 
-感谢两位大佬！
-
-## 正在做的东西
-- [ ] 懒加载的scrool(可能好久之后才会做了)
+## TODO List
+- [ ] Lazy loading scroll (might take a while...)
