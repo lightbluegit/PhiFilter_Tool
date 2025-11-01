@@ -1,14 +1,15 @@
 # PhiFilter_Tool
+![许可证](https://img.shields.io/badge/许可证-GPL3.0-blue) ![平台](https://img.shields.io/badge/平台-Windows-lightgrey)
 <p align="center">
-English | <a href="./README_zh-CN.md">简体中文</a>
+English | <a href="./README/README_zh-CN.md">简体中文</a>
 </p>
 
 A tool for filtering rhythm game Phigros gameplay data
 
-## Quick Start
+## ✨Quick Start
 Download the exe file from the release part and open it to enter the account page. Start authorization (the account page when not logged in is shown below).
 
-<img src="./README_img/account_page_no_token.png" alt="Account Page (Not Logged In)" width="630px">
+<img src="./README/README_img//account_page_no_token.png" alt="Account Page (Not Logged In)" width="630px">
 
 ### Authorization Process:
 1. Click the button to generate a QR code
@@ -16,20 +17,20 @@ Download the exe file from the release part and open it to enter the account pag
 
 After successful authorization, the account page will display your in-game avatar, background, RKS, and other account information. You can then proceed to the home page or search page to start using the tool.
 
-<img src="./README_img/account_page_token.png" alt="Account Page (Logged In)" width="630px">
+<img src="./README/README_img//account_page_token.png" alt="Account Page (Logged In)" width="630px">
 
-## Detailed Introduction
+## 📚Detailed Introduction
 ### Home Page
 
 Provides quick tools. Hover over the tool title to see detailed information.
 There are usage tips for each page in the bottom left corner, randomly loaded when refreshing the home page.
 
-<img src="./README_img/home_page.png" alt="rks Composition Page" width="630px">
+<img src="./README/README_img//home_page.png" alt="rks Composition Page" width="630px">
 
-#### Tool Introduction:
+#### 🔧Tool Introduction:
 1. **Generate rks Composition Chart**
 
-<img src="./README_img/rks_display_page.png" alt="rks Composition Page" width="630px">
+<img src="./README/README_img//rks_display_page.png" alt="rks Composition Page" width="630px">
 
 * Left-click the **phi3**, **b27** buttons to toggle between collapsed/expanded modes
 * Left-click **song cards** to toggle detailed information (composer, Charter, illustrator) collapsed/expanded modes
@@ -38,20 +39,20 @@ There are usage tips for each page in the bottom left corner, randomly loaded wh
 >
 > All **song cards** support the above operation
 
-2. **Update Data**
+2. 🔄**Update Data**
 
 * In lazy loading mode (default), the app automatically updates once at startup. Subsequent filtering and RKS chart generation operation will reuses stored data. If there are updates in your game(scores, avatar, nickname, etc.), please sync in Phigros first, then click update card here.
 * Constant loading mode can be adjusted in settings. In this mode, data is pre-updated each time you generate RKS charts or search, but runtime will be longer.
 
-3. **Calculate If Score Is Achievable**
-<img src="./README_img/score_calculate_page.png" alt="Score Achievement Page" width="630px">
+3. 📝**Calculate If Score Is Achievable**
+<img src="./README/README_img//score_calculate_page.png" alt="Score Achievement Page" width="630px">
 
 * For a specified song and difficulty, input the target score to check if it's achievable. If achievable, it will display the required Perfect count, Great count, Bad+Miss count, and max combo needed.
 
 * The results section supports sorting by any of the four parameters in ascending or descending order.
 
-### Filter Page
-<img src="./README_img/search_page.png" alt="Filter Page" width="630px">
+### ⌨️Filter Page
+<img src="./README/README_img//search_page.png" alt="Filter Page" width="630px">
 
 #### Filter Condition Input
 * Available filter attributes:
@@ -105,18 +106,18 @@ When Group By is "None", all results are displayed flat. Otherwise, results are 
 >
 > If you can't find a specific difficulty for a song, it might because you haven't played that difficulty, so it's not recorded in your save data.
 
-### Edit Page
+### 🖱️Edit Page
 
-<img src="./README_img/edit_page.png" alt="Edit Page" width="630px">
+<img src="./README/README_img//edit_page.png" alt="Edit Page" width="630px">
 
 * Add/remove selected songs from groups or tags (multiple selection supported). Existing groups/tags appear in dropdown. To create new ones, input and save. Changes sync group selection status across all pages.
 * The blank area below is for brief comments - you can complain about abstract chart configurations or record gameplay feelings/difficult points for quick reference when returning to the game.
 * Comments and groups are account-associated. Switching accounts loads the corresponding files.
 
-### Account Page
+### 💬Account Page
 > Recommended to use at default size
 
-<img src="./README_img/account_page_token.png" alt="Account Page" width="630px">
+<img src="./README/README_img//account_page_token.png" alt="Account Page" width="630px">
 
 Avatar and background match your in-game settings.
 Your in-game self-introduction appears above the logout button.
@@ -133,5 +134,5 @@ Avatar, Chart Level, and illustration information uses [7aGiven](https://github.
 
 Thanks to both masters!
 
-## TODO List
+## 🎮TODO List
 - [ ] Lazy loading scroll (might take a while...)

@@ -1,11 +1,12 @@
 # PhiFilter_Tool
+![许可证](https://img.shields.io/badge/许可证-GPL3.0-blue) ![平台](https://img.shields.io/badge/平台-Windows-lightgrey)
 <p align="center">
-<a href="./README.md">English</a> | 简体中文
+<a href="../README.md">English</a> | 简体中文
 </p>
 
 一个筛选Phigros打歌数据的工具
 
-## 快速开始
+## ✨快速开始
 下载release中的exe文件 点击后进入账号页面 开始授权(未登录时账号页面如下图所示)
 
 <img src="./README_img/account_page_no_token.png" alt="账号页面(未登录)" width="630px">
@@ -18,7 +19,7 @@
 账号页面在授权成功后将显示游戏中的头像 背景 rks等账号信息 之后可前往主页或搜索页开始使用
 <img src="./README_img/account_page_token.png" alt="账号页面(登录)" width="630px">
 
-## 详细介绍
+## 📚详细介绍
 ### 主页
 
 提供快捷工具 鼠标悬浮在工具标题上可以展开详细介绍
@@ -26,7 +27,7 @@
 
 <img src="./README_img/home_page.png" alt="rks组成 页面" width="630px">
 
-#### 工具介绍:
+#### 🔧工具介绍:
 1. **生成rks组成图**
 
 <img src="./README_img/rks_display_page.png" alt="rks组成 页面" width="630px">
@@ -38,19 +39,19 @@
 >
 > 所有的**歌曲卡片**都可以进行如上操作
 
-2. **更新数据**
+2. 🔄**更新数据**
 
 * 懒加载(默认)状态下 应用启动时会自动更新一次 后续 筛选/生成rks组成 时复用储存的数据 如有更新(分数 头像 昵称等) 请在Phigros中同步之后在此点击更新
 * 常加载状态可在设置页面调整 此状态下每次 生成rks组成图或进行搜索时都会预先更新一遍数据 但是运行时间会变长
 
-3. **计算分数是否可达**
+3. 📝**计算分数是否可达**
 <img src="./README_img/score_calculate_page.png" alt="分数是否可达 页面" width="630px">
 
 * 对于指定歌曲的指定难度 输入目标分数并判断是否可达 若可达 则会在下方依次展示达到目标分数所需的 Perfect数 Great数 bad+miss数和最大连击数
 
 * 结果展示部分支持依据四个参数中的任何一个进行升序或降序排列结果
 
-### 筛选页面
+### ⌨️筛选页面
 <img src="./README_img/search_page.png" alt="筛选页面" width="630px">
 
 #### 筛选条件输入
@@ -105,7 +106,7 @@
 > 如果找不到歌曲的某个难度 有可能是没有玩过该难度 因此存档中没有记录
 
 
-### 编辑页面
+### 🖱️编辑页面
 
 <img src="./README_img/edit_page.png" alt="编辑页面" width="630px">
 
@@ -113,7 +114,7 @@
 * 下方空白处是简评输入栏 可以吐槽该难度下抽象的配置 也可以记录打歌感受或难点以便复健的时候快速找回记忆(
 * 简评和分组都是与账号相关联的 切换账号后会读取对应的文件
 
-### 账号页面
+### 💬账号页面
 > 此页面建议以默认尺寸使用
 
 <img src="./README_img/account_page_token.png" alt="编辑页面" width="630px">
@@ -130,5 +131,5 @@
 
 感谢两位大佬！
 
-## 正在做的东西
+## 🎮正在做的东西
 - [ ] 懒加载的scrool(可能好久之后才会做了)
