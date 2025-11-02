@@ -13,9 +13,8 @@ ASSETS_PREPATH = FILE_PATH + "assets/"
 
 DATA_PREPATH = ASSETS_PREPATH + "data/"
 
-AVATAR_PATH = DATA_PREPATH + "avatar.txt"  # 头像名称
-DEFUALT_COMMENT = DATA_PREPATH + "defualt_comment.csv"  # 空白简评文件
-DEFUALT_GROUP = DATA_PREPATH + "defualt_group.csv"
+DEFAULT_COMMENT = DATA_PREPATH + "default_comment.csv"  # 空白简评文件
+DEFAULT_GROUP = DATA_PREPATH + "default_group.csv"
 DIFFICULTY_PATH = DATA_PREPATH + "difficulty.tsv"  # 各个歌曲难度文件
 INFO_PATH = DATA_PREPATH + "info.tsv"  # 组合名称与拆分名称对应关系文件
 NOTE_COUNT_PATH = (

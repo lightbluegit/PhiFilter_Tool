@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import time
 
+
 def update_note_count_csv():
     """根据文酱的Phigros_Resource-master获取的 谱面chart 文件更新note_count文件"""
     start_time = time.time()
@@ -83,6 +84,11 @@ preinfo_list: list[str] = [
     "# 画师\nDRAWER_NAME_LIST: list[str] = [",
     "# 谱师\nCHARTER_LIST: list[str] = [",
 ]
+dft_file = open(
+    "projects/PhiFilterTool/src/core/update/default_file.txt",
+    "w",
+    encoding="utf-8",
+)
 with open(
     "projects/PhiFilterTool/src/core/update/output.txt",
     "w",
@@ -96,10 +102,16 @@ with open(
             # name = row.iloc[1]
             # composer = row.iloc[2]
             # drawer = row.iloc[3]
-            f.write(  # 三引号防止换行 单个  \  '  "  换成转义形式
-                f'\"\"\"{row.iloc[i].replace("\\", "\\\\").replace("\'", "\\'").replace('\"', '\\"')}\"\"\",\n'
+            text = (
+                row.iloc[i]
+                .replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace('"', '\\"')
             )
-        f.write(']\n')
+            if not i:
+                dft_file.write(f"{text},\n")
+            f.write(f'"""{text}""",\n')  # 三引号防止换行 单个  \  '  "  换成转义形式
+        f.write("]\n")
 
     f.write(preinfo_list[4])
     # 更新谱师列表
@@ -113,3 +125,5 @@ with open(
                 f'\"\"\"{chapteri.replace("\\", "\\\\").replace("\'", "\\'").replace('\"', '\\"')}\"\"\",\n'
             )
     f.write("]\n")
+
+dft_file.close()

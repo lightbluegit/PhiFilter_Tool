@@ -1,5 +1,15 @@
-# PhiFilter_Tool
-![许可证](https://img.shields.io/badge/许可证-GPL3.0-blue) ![平台](https://img.shields.io/badge/平台-Windows-lightgrey)
+<h1 align="center">PhiFilter Tool</h1>
+
+<p align="center">
+ <img alt="版本" src="https://img.shields.io/badge/版本-v1.0.0-orange" />
+  <img alt="许可证" src="https://img.shields.io/badge/许可证-GPL3.0-blue" />
+  <img alt="平台" src="https://img.shields.io/badge/平台-Windows-lightgrey" />
+  </br>
+  <img alt="Stars" src="https://img.shields.io/github/stars/lightbluegit/PhiFilter_Tool" />
+  <img alt="Forks" src="https://img.shields.io/github/forks/lightbluegit/PhiFilter_Tool" />
+  <img alt="下载量" src="https://img.shields.io/github/downloads/lightbluegit/PhiFilter_Tool/total" />
+</p>
+
 <p align="center">
 <a href="../README.md">English</a> | 简体中文
 </p>
@@ -7,6 +17,8 @@
 一个筛选Phigros打歌数据的工具
 
 ## ✨快速开始
+若您是**开发者**，请移步[构建项目](#构建项目)
+若您是**用户**，请继续查看下面的流程：
 下载release中的exe文件 点击后进入账号页面 开始授权(未登录时账号页面如下图所示)
 
 <img src="./README_img/account_page_no_token.png" alt="账号页面(未登录)" width="630px">
@@ -123,6 +135,41 @@
 退出按钮上方显示游戏中的自我介绍 
 右侧显示每个难度不同状态的歌曲数量
 
+## 构建项目
+### 前置需求
+
+- Python 3.8+
+- Git
+- PyQt5 5.15.11
+- PyQt-Fluent-Widgets 1.8.3
+- pip install pandas 2.2.3
+- pip install requests 2.32.3
+- pip install pycryptodome 3.22.0
+- pip install qrcode 8.2
+
+### 步骤
+
+1. 克隆仓库
+```bash
+git clone https://github.com/lightbluegit/PhiFilter_Tool
+cd PhiFilter_Tool
+```
+
+2. 安装依赖
+```bash
+pip install -r requirements.txt
+```
+
+3. 运行项目
+
+使用命令行
+```bash
+python main.py
+```
+
+或 打开`main.py`文件并运行
+
+若您对本项目感兴趣，欢迎查看<a href="../Contribution/CONTRIBUTING.md">贡献</a>文档
 
 ## 参考项目
 本项目的 用户数据获取 二维码生成部分 分别用的是[Phi-CloudAction-python](https://github.com/wms26/Phi-CloudAction-python)项目以及[Phi-GetSession-python](https://github.com/wms26/Phi-GetSession-python)项目 都是[千柒](https://github.com/wms26)写的喵
