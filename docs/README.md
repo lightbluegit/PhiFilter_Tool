@@ -136,3 +136,4 @@ Thanks to both masters!
 
 ## 🎮TODO List
 - [ ] Lazy loading scroll (might take a while...)
+- [ ] Use the logging library to record log

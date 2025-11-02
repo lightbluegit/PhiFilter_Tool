@@ -1,4 +1,4 @@
-from ui.styles import*
+from src.ui.styles import *
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -59,7 +59,7 @@ from qfluentwidgets import (
     SearchLineEdit,
 )
 from dataclasses import dataclass
-from utils.consts import *
+from src.utils.consts import *
 import re
 import pandas as pd
 import shutil

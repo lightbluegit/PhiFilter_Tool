@@ -41,7 +41,6 @@ import copy
 import random
 import json
 
-# pypy3 -m pip install pandas, qfluentwidgets, requests, PyQt5
 # 设置高 DPI 渲染策略，保证在高分辨率屏幕上界面清晰
 QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
     Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -51,8 +50,9 @@ QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 #! 先创建 QApplication 实例再写窗口 否则初始化缓存图片的时候会失败
 app = QApplication(sys.argv)
-from core.phi_cloud.get_play_data import * # 获取用户信息
-from ui.widgets import *
+# from core.phi_cloud.get_play_data import * # 获取用户信息
+from src.ui.widgets import *
+from src.core.phi_cloud.get_play_data import *
 
 
 class MainWindow(FramelessWindow):

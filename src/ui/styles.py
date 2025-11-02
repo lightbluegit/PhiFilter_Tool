@@ -1,5 +1,5 @@
 from PyQt5.QtGui import QFontDatabase
-from utils.consts import CHI_FONT1_PATH
+from src.utils.consts import CHI_FONT1_PATH
 
 # ---------------默认样式表获取---------------
 

@@ -57,6 +57,8 @@ def resource_path(relative_path):
 
 
 LOG_PATH = "PhiFilterTool_log.txt"  # 日志文件
+
+
 def log_write(text: str):
     if not isinstance(text, str):  # 防止入参不是str
         return
