@@ -106,3 +106,99 @@
 
 ## 2.3 README.md
 英文版README文档(显示在主页的那版)
+
+# 3. src：源代码目录
+## 3.1 core
+存储实现特定功能的文件
+
+### 3.1.1 phi_cloud
+实现与TapTap的通信以及二维码生成功能
+
+#### 3.1.1.1 get_play_data.py
+整合了千柒的函数，待重写
+
+### 3.1.2 update
+快捷更新
+
+#### 3.1.2.1 default_file.txt
+默认文件(default_comment/default_group)内容输出位置
+
+#### 3.1.2.2 output.txt
+缓存内容(曲名 组合名称 曲师名称...)输出 直接缓存在consts文件里
+
+#### 3.1.2.3 update_info.py
+运行后自动根据 谱面chart 文件更新note_count文件
+将缓存输出至output.txt文件中
+将默认文件内容输出到default_file.txt文件中
+
+## 3.2 ui
+### 3.2.1 styles.py
+加载字体 将各个控件的样式配置封装为函数的模版
+
+### 3.2.2 widgets.py
+存储各个重写/组合的控件
+
+## 3.3 utils
+### 3.3.1 base.py
+存储通用函数 如日志输出及根据运行环境控制文件路径
+
+### 3.3.2 consts.py
+存储各种常量(路径 最高定数等) 和缓存内容
+
+# 4. main.py
+程序的入口 运行主文件以启动应用
+
+# 5. requirements.txt
+记录运行依赖
+
+# 6 记录文件
+## 6.1 (user_name)_comment.csv
+存放指定玩家对每个歌曲的评论
+
+| 结构  | 组合名称                | 对EZ难度的评论   | 对HD难度的评论 | 对IN难度的评论 | 对AT难度的评论 |
+| --- | ------------------- | ---------- | -------- | -------- | -------- |
+| 示例  | dBdoll.YUESTEVENuen | 万物起源(doge) |          |          |          |
+
+## 6.2 (user_name)_group.csv
+存放指定玩家对歌曲的分组
+同一难度的不同分组用 \` 隔开
+
+| 结构  | 组合名称                | 对EZ难度的分组 | 对HD难度的分组 | 对IN难度的分组 | 对AT难度的分组 |
+| --- | ------------------- | -------- | -------- | -------- | -------- |
+| 示例  | dBdoll.YUESTEVENuen | 好听\`练习曲  |          |          |          |
+
+
+## 6.3 PhiFilterTool_log.txt
+存放输出的日志
+
+## 6.4 session_token.json
+存放玩家的session_token
+last_user用于加载上一次使用的记录
+
+```json
+{
+    "last_user": "(user_name)",
+    "(user_name)": "(user_token)"
+}
+```
+
+## 6.5 PhiFilterTool_setting.json
+存储玩家的设置数据 可在设置页面进行更改
+
+```json
+{
+    "(user_name)": {
+        "main_setting": { // 主要设置
+            "always_update": false, // 是否常更新
+            "default_open_page": "home_page" // 开启时默认显示页面
+        },
+        "search_page_setting": { // 搜索页面设置
+            "default_filter": { // 默认搜索内容
+                "attribution": "acc",
+                "limit": "大于",
+                "value": "99.3"
+            }
+        }
+    }
+}
+```

@@ -1,5 +1,15 @@
-# PhiFilter_Tool
-![许可证](https://img.shields.io/badge/许可证-GPL3.0-blue) ![平台](https://img.shields.io/badge/平台-Windows-lightgrey)
+<h1 align="center">PhiFilter Tool</h1>
+
+<p align="center">
+ <img alt="版本" src="https://img.shields.io/badge/版本-v1.0.0-orange" />
+  <img alt="许可证" src="https://img.shields.io/badge/许可证-GPL3.0-blue" />
+  <img alt="平台" src="https://img.shields.io/badge/平台-Windows-lightgrey" />
+  </br>
+  <img alt="Stars" src="https://img.shields.io/github/stars/lightbluegit/PhiFilter_Tool" />
+  <img alt="Forks" src="https://img.shields.io/github/forks/lightbluegit/PhiFilter_Tool" />
+  <img alt="下载量" src="https://img.shields.io/github/downloads/lightbluegit/PhiFilter_Tool/total" />
+</p>
+
 <p align="center">
 English | <a href="./README/README_zh-CN.md">简体中文</a>
 </p>
@@ -7,6 +17,10 @@ English | <a href="./README/README_zh-CN.md">简体中文</a>
 A tool for filtering rhythm game Phigros gameplay data
 
 ## ✨Quick Start
+If you are a **developer**, please proceed to [Building the Project](#building-the-project).
+
+If you are an **end user**, please continue reading the instructions below.
+
 Download the exe file from the release part and open it to enter the account page. Start authorization (the account page when not logged in is shown below).
 
 <img src="./README/README_img//account_page_no_token.png" alt="Account Page (Not Logged In)" width="630px">
@@ -122,6 +136,42 @@ When Group By is "None", all results are displayed flat. Otherwise, results are 
 Avatar and background match your in-game settings.
 Your in-game self-introduction appears above the logout button.
 The right side shows song counts for each difficulty and status.
+
+## building-the-project
+### Prerequisites
+
+- Python 3.8+
+- Git
+- PyQt5 5.15.11
+- PyQt-Fluent-Widgets 1.8.3
+- pip install pandas 2.2.3
+- pip install requests 2.32.3
+- pip install pycryptodome 3.22.0
+- pip install qrcode 8.2
+
+### Steps
+
+1. Clone the repository
+```bash
+git clone https://github.com/lightbluegit/PhiFilter_Tool
+cd PhiFilter_Tool
+```
+
+2. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+3. Run the project
+
+Using command line:
+```bash
+python main.py
+```
+
+Or open and run the `main.py` file directly.
+
+If you're interested in contributing to this project, please check out our <a href="./CONTRIBUTING/CONTRIBUTING.md">contribution guidelines</a>.
 
 ## Reference Projects
 User data acquisition and QR code generation use the following projects:
