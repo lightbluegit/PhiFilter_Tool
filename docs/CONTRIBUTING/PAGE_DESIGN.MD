@@ -122,3 +122,5 @@ self.widgets = {
     }
 }
 ```
+
+<img src="./CONTRIBUTION_img/page_design.png" alt="Account Page" width="800px">

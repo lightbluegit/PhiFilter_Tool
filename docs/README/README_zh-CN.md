@@ -144,10 +144,10 @@
 - Git
 - PyQt5 5.15.11
 - PyQt-Fluent-Widgets 1.8.3
-- pip install pandas 2.2.3
-- pip install requests 2.32.3
-- pip install pycryptodome 3.22.0
-- pip install qrcode 8.2
+- pandas 2.2.3
+- requests 2.32.3
+- pycryptodome 3.22.0
+- qrcode 8.2
 
 ### 步骤
 
@@ -171,7 +171,7 @@ python main.py
 
 或 打开`main.py`文件并运行
 
-若您对本项目感兴趣，欢迎查看<a href="../Contribution/CONTRIBUTING.md">贡献</a>文档
+若您对本项目感兴趣，欢迎查看<a href="../CONTRIBUTING/CONTRIBUTING.md">贡献</a>文档
 
 ## 参考项目
 本项目的 用户数据获取 二维码生成部分 分别用的是[Phi-CloudAction-python](https://github.com/wms26/Phi-CloudAction-python)项目以及[Phi-GetSession-python](https://github.com/wms26/Phi-GetSession-python)项目 都是[千柒](https://github.com/wms26)写的

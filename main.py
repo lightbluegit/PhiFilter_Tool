@@ -2287,7 +2287,7 @@ class MainWindow(FramelessWindow):
         log_write("开始获取已经存在的分组")
         group_path = appdata_path(f"{self.user_name}_{GROUP_PATH}")
         if not os.path.exists(group_path) or os.path.getsize(group_path) == 0:
-            shutil.copy2(resource_path(DEFUALT_GROUP), group_path)
+            shutil.copy2(resource_path(DEFAULT_GROUP), group_path)
 
         df = pd.read_csv(
             group_path,
@@ -2863,7 +2863,7 @@ class MainWindow(FramelessWindow):
             "max_height": 40,
             "font_size": 24,
         }
-        open_log_file_btn = button("打开日志文件位置", open_log_file_btn_style)
+        open_log_file_btn = button("跳转日志文件位置", open_log_file_btn_style)
         self.widgets["setting_page"]["open_log_file_btn"] = open_log_file_btn
         main_setting_layout.addWidget(open_log_file_btn)
 

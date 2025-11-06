@@ -144,10 +144,10 @@ The right side shows song counts for each difficulty and status.
 - Git
 - PyQt5 5.15.11
 - PyQt-Fluent-Widgets 1.8.3
-- pip install pandas 2.2.3
-- pip install requests 2.32.3
-- pip install pycryptodome 3.22.0
-- pip install qrcode 8.2
+- pandas 2.2.3
+- requests 2.32.3
+- pycryptodome 3.22.0
+- qrcode 8.2
 
 ### Steps
 
