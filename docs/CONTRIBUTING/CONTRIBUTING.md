@@ -45,7 +45,8 @@ PhiFilterTool/
 PhiFilterTool/                 # 
 ├── username_comment.csv       # 玩家(username)对每首歌的简评
 ├── username_group.csv         # 玩家(username)对每首歌的分组
-├── PhiFilterTool_log.txt      # 日志文件
+├── PhiFilterTool_infolog.log  # 普通日志文件
+├── PhiFilterTool_log.log      # 反馈时建议提交的报错日志文件
 ├── PhiFilterTool_setting.json # 玩家配置文件
 └── session_token.json         # 存放玩家token
 ```

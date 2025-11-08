@@ -186,4 +186,5 @@ Thanks to both masters!
 
 ## 🎮TODO List
 - [ ] Lazy loading scroll (might take a while...)
-- [ ] Use the logging library to record log
+- [ ] draw the diagrammatic sketch of self-authored UI components to `PAGE_DESIGN.md` file
+- [x] ~~Use the logging library to record log~~

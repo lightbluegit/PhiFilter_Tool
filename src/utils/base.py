@@ -2,6 +2,8 @@ from pathlib import Path
 import os
 import sys
 from enum import Enum
+import logging
+from logging.handlers import RotatingFileHandler
 
 debug: bool = False
 debug: bool = True
@@ -56,14 +58,39 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-LOG_PATH = "PhiFilterTool_log.txt"  # 日志文件
+LOG_PATH = "PhiFilterTool_log.log"  # 日志文件
 
 
-def log_write(text: str):
-    if not isinstance(text, str):  # 防止入参不是str
-        return
-    with open(appdata_path(LOG_PATH), "a+", encoding="utf-8") as f:
-        f.write(text + "\n")
+# 记录器
+logger = logging.getLogger("PhiFilterTool_log")
+logger.setLevel(logging.INFO)
+
+# 创建处理器
+infofilehandler = RotatingFileHandler(
+    filename="PhiFilterTool_infolog.log",
+    maxBytes=15 * 1024 * 1024,  # 10 MB
+    backupCount=3,  # 保留3个备份文件
+)
+filehandler = logging.FileHandler(filename="PhiFilterTool_log.log")
+filehandler.setLevel(logging.WARNING)
+
+# 创建格式
+formatter = logging.Formatter(
+    "%(asctime)s|%(levelname)s|%(filename)s:%(lineno)s|%(message)s"
+)
+
+# 绑定格式
+infofilehandler.setFormatter(formatter)
+filehandler.setFormatter(formatter)
+# 记录器添加处理器
+logger.addHandler(infofilehandler)
+logger.addHandler(filehandler)
+
+debuglog = logger.debug
+infolog = logger.info
+warnlog = logger.warning
+errlog = logger.error
+crtclog = logger.critical
 
 
 class score_level_type(Enum):

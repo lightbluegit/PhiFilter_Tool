@@ -67,14 +67,14 @@ import shutil
 # ------------------------- 这里是重写的控件 -------------------------
 
 
-class combobox(QWidget):  # 重写combobox控件
+class combobox(QWidget):  # 重写combobox控件 选择框
 
     def __init__(
         self,
-        content: list[str],
-        hint_label: str = "",
-        cbb_style: dict[str, str] = {},
-        label_style: dict[str, str] = {},
+        content_list: list[str], # 选项列表
+        hint_label: str = "", # 提示文本
+        cbb_style: dict[str, str] = {}, # 选择框样式
+        label_style: dict[str, str] = {}, # 文本样式
     ):
         super().__init__()
         self.editor_layout = QHBoxLayout(self)
@@ -86,26 +86,51 @@ class combobox(QWidget):  # 重写combobox控件
         self.hint_label.adjustSize()
         self.editor_layout.addWidget(self.hint_label)
 
+        # 选择主控件
         self.cbb = ComboBox()
-        self.cbb.addItems(content)
+        self.cbb.addItems(content_list)
         self.cbb.setStyleSheet(get_combobox_style(**cbb_style))
         self.editor_layout.addWidget(self.cbb)
 
-    def set_content(self, new_content):
+    def set_content(self, new_content_list: list[str]):
+        '''设置为新的内容列表
+
+        入参：
+            new_content_list: 新的内容列表
+        '''
         self.cbb.clear()
-        self.cbb.addItems(new_content)
+        self.cbb.addItems(new_content_list)
 
     def get_content(self) -> str:
+        '''获取当前选中内容
+        
+        返回值:
+            str: 当前内容文本
+        '''
         return self.cbb.currentText()
 
     def bind_react_click_func(self, func):
+        '''绑定切换选项时执行的函数
+        
+        入参: 
+            func: 功能函数
+        '''
         self.cbb.currentTextChanged.connect(func)
 
     def set_current_choose(self, index: int):
+        '''设置当前选中内容
+        
+        入参: 
+            index: 设置的内容序号
+        '''
         self.cbb.setCurrentIndex(index)
 
     def set_hint_text(self, text: str):
-        """设置提示文本"""
+        """设置提示文本
+        
+        入参: 
+            text: 提示文本
+        """
         self.hint_label.setText(text)
 
 
@@ -153,7 +178,7 @@ class editable_combobox(QWidget):
         self.cbb.currentTextChanged.connect(func)
 
     def set_completer(self, model):
-        # log_write(model)
+        # infolog(model)
         completer = QCompleter()
         completer.setFilterMode(Qt.MatchContains)  # 包含匹配
         completer.setCaseSensitivity(Qt.CaseInsensitive)  # 不区分大小写
@@ -292,7 +317,7 @@ class main_info_card(ElevatedCardWidget):
             resource_path(SCORE_LEVEL_PATH[get_score_level(score, is_fc)]),
             self.top_widget,
         )
-        # log_write(SCORE_LEVEL_PATH[score_level])
+        # infolog(SCORE_LEVEL_PATH[score_level])
         self.level_img.scaledToHeight(80)
         self.level_img.setContentsMargins(0, 0, 20, 0)
         self.top_layout.addWidget(
@@ -431,7 +456,7 @@ class main_info_card(ElevatedCardWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            # log_write("左点击了!")
+            # infolog("左点击了!")
             self.left_func()
             self.clicked.emit()  # 需要先定义信号
         super().mousePressEvent(event)
@@ -521,7 +546,7 @@ class hint_and_frame_widget(QFrame):
 # 歌曲信息卡片
 class song_info_card(QWidget):
 
-    def __init__(  # 更改入参的时候记得把.copy方法的参数也改掉喵
+    def __init__(  # 更改入参的时候记得把.copy方法的参数也改掉
         self,
         imgpath: QPixmap,
         diff_bg_path: QPixmap,
@@ -650,7 +675,7 @@ class song_info_card(QWidget):
         try:
             drawer_content_elm = BodyLabel(self.drawer)
         except:
-            log_write(f"歌曲{self.name}出错了喵 得到的是{self.drawer}")
+            infolog(f"歌曲{self.name}出错了 得到的是{self.drawer}")
         drawer_content_elm.setStyleSheet(self.label_style)
         drawer_content_elm.setWordWrap(True)
         drawer_label = hint_and_frame_widget("画师:")
@@ -899,7 +924,7 @@ class filter_obj(QWidget):
         self.add_btn.clicked.connect(self.add_filter_obj)
 
     def add_filter_obj(self):
-        # log_write(self, self.filter_obj_list)
+        # infolog(self, self.filter_obj_list)
         filter_elm = filter_obj(
             len(self.filter_obj_list), self.filter_obj_list, self.flow_layout
         )
@@ -913,7 +938,7 @@ class filter_obj(QWidget):
     def delete_filter_obj(self):
         self.filter_obj_list.remove(self)
         self.deleteLater()
-        # log_write(self.filter_obj_list)
+        # infolog(self.filter_obj_list)
         self.filter_obj_list[-1].add_btn.show()
         if len(self.filter_obj_list) == 1:
             self.filter_obj_list[0].delete_btn.hide()  # 总不能全删完吧?
@@ -948,7 +973,7 @@ class filter_obj(QWidget):
                 SONG_NAME_LIST
             )  # 曲名这里直接提供info.tsv里面的东西就好了 具体的区分(Another Me) 再加一个曲师就好了
             self.limit_val_cbb.set_completer(self.limit_val_cbb.song_name_completer)
-            # log_write(
+            # infolog(
             #     "补全器模型:", self.limit_val_cbb.cbb.completer().model()
             # )
 
@@ -979,7 +1004,7 @@ class filter_obj(QWidget):
 
     def input_val_check(self, attribution, value) -> tuple[bool, str]:
         if attribution == "acc":
-            # log_write(f"val={value}")
+            # infolog(f"val={value}")
             if not value:
                 return (False, None)
             pattern = r"\d+\.?\d+"
@@ -993,16 +1018,16 @@ class filter_obj(QWidget):
                 value += "0"
             match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
             if match_results is None:
-                # log_write("无法匹配")
+                # infolog("无法匹配")
                 return (False, None)
             match_results = match_results.group()  # 获取匹配后的值
-            # log_write(match_results)
+            # infolog(match_results)
             acc = float(value)
             if acc > 100:  # 范围限定
-                # log_write("acc不可能大于100喵")
+                # infolog("acc不可能大于100")
                 return (False, None)
             if acc < 0:
-                # log_write("acc不可能小于0喵")
+                # infolog("acc不可能小于0")
                 return (False, None)
             return (True, value)
 
@@ -1020,18 +1045,18 @@ class filter_obj(QWidget):
                 value += "0"
             match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
             if match_results is None:
-                # log_write("无法匹配")
+                # infolog("无法匹配")
                 return (False, None)
             match_results = match_results.group()  # 获取匹配后的值
-            # log_write(match_results)
+            # infolog(match_results)
             singal_rks = float(value)
             if singal_rks > MAX_LEVEL:  # 范围限定
-                log_write(
-                    f"当前最高定数为{MAX_LEVEL}喵 {attribution}不可能高于{MAX_LEVEL}喵"
+                infolog(
+                    f"当前最高定数为{MAX_LEVEL} {attribution}不可能高于{MAX_LEVEL}"
                 )
                 return (False, None)
             if singal_rks < 0:
-                # log_write(f"{attribution}不可能小于0喵")
+                # infolog(f"{attribution}不可能小于0")
                 return (False, None)
             return (True, value)
 
@@ -1041,22 +1066,22 @@ class filter_obj(QWidget):
             pattern = r"\d+"
             match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
             if match_results is None:
-                log_write("无法匹配")
+                infolog("无法匹配")
                 return (False, None)
             match_results = match_results.group()  # 获取匹配后的值
-            # log_write(match_results)
+            # infolog(match_results)
             score = int(value)
             if score > 1000000:  # 范围限定
-                log_write("最高分只有100w喵 太高了啦")
+                infolog("最高分只有100w 太高了啦")
                 return (False, None)
             if score < 0:
-                log_write("得分不可能小于0喵")
+                infolog("得分不可能小于0")
                 return (False, None)
             return (True, value)
 
         elif attribution == "评级":
             if value not in ("F", "C", "B", "A", "S", "V", "蓝V", "phi"):
-                log_write(f"评级不可能是{value}喵")
+                infolog(f"评级不可能是{value}")
                 return (False, None)
             return (True, value)
 
@@ -1070,7 +1095,7 @@ class filter_obj(QWidget):
         attribution = self.attribution_choose_cbb.get_content()
         limit = self.limit_choose_cbb.get_content()
         limit_val = self.limit_val_cbb.get_content()
-        # log_write(attribution, limit, limit_val)
+        # infolog(attribution, limit, limit_val)
         check_result = self.input_val_check(attribution, limit_val)
         if check_result[0] == False:
             return None
@@ -1201,7 +1226,7 @@ class quick_function_card(CardWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            # log_write("左点击了!")
+            # infolog("左点击了!")
             self.left_func()
             self.clicked.emit()
         super().mousePressEvent(event)
@@ -1357,11 +1382,11 @@ class ImageLoaderWorker(QRunnable):
 
     def run(self):
         """将图片转换为指定宽度的QPixmap并存储"""
-        # log_write('run了', self.key)
+        # infolog('run了', self.key)
         image = QImage(self.image_path)
         if image.isNull():
             self.signal.finished.emit()
-            log_write(f"{self.image_path}地址的图片不存在哦~")
+            warnlog(f"{self.image_path}地址的图片不存在哦~")
             return
 
         original_width = image.width()
@@ -1377,7 +1402,7 @@ class ImageLoaderWorker(QRunnable):
         self.target_dict[self.key] = pixmap  # 将转为QPixmap的图片存储到指定的字典中
 
         self.signal.finished.emit()
-        # log_write("finish了喵")
+        # infolog("finish了")
 
 
 # 任务管理器类
@@ -1399,12 +1424,12 @@ class ImageLoader(QObject):  # 继承 QObject 以支持信号
         """添加一个待处理任务"""
         self.todo_list.append((image_path, key, target_dict, width))
         # if key == '雪降り雪が降っている.AiSSw夜輪ft結月ゆかり': # 检查特定曲名是否正常运行
-        #     log_write(f"接入任务: {image_path} -> {key}")
+        #     infolog(f"接入任务: {image_path} -> {key}")
 
     def start_processing(self):
         """启动所有已添加的任务"""
         self.total_tasks = len(self.todo_list)
-        log_write(f"开始处理任务 总任务量{self.total_tasks}")
+        infolog(f"开始处理任务 总任务量{self.total_tasks}")
         if self.total_tasks == 0:
             self.all_tasks_finished.emit()
             return
@@ -1430,7 +1455,7 @@ class ImageLoader(QObject):  # 继承 QObject 以支持信号
         """处理单个任务完成"""
         self.active_workers.remove(worker)  # 移除已完成的处理器
         if self.active_workers == []:
-            log_write(f"{self.total_tasks}个任务完成了!")
+            infolog(f"{self.total_tasks}个任务完成了!")
             self.all_tasks_finished.emit()  # 发射总完成信号
 
 
@@ -1506,7 +1531,7 @@ class SongListViewWidget(QWidget):
         user_name: str,
     ):
         """从存档中构建数据"""
-        log_write("开始从存档中构建数据")
+        infolog("开始从存档中构建数据")
         self.model = SongListModel()
         self.view.setModel(self.model)
         # ----- 获取分组信息 -----
@@ -1514,7 +1539,7 @@ class SongListViewWidget(QWidget):
         self.COMMENT_INFO = {}
         group_path = appdata_path(f"{user_name}_{GROUP_PATH}")
         if not os.path.exists(group_path) or os.path.getsize(group_path) == 0:
-            shutil.copy2(resource_path(DEFUALT_GROUP), group_path)
+            shutil.copy2(resource_path(DEFAULT_GROUP), group_path)
 
         df = pd.read_csv(
             group_path,
@@ -1531,7 +1556,7 @@ class SongListViewWidget(QWidget):
             if group_raw:
                 group_raw = group_raw.split("`")
             self.GROUP_INFO[idx] = group_raw
-            # log_write('GROUP_INFO是',GROUP_INFO)
+            # infolog('GROUP_INFO是',GROUP_INFO)
 
             #     group_raw = str(rowi["group"]).strip()
             #     for groupi in group_raw.split("`"):
@@ -1542,7 +1567,7 @@ class SongListViewWidget(QWidget):
         # ----- 获取简评信息 -----
         comment_path = appdata_path(f"{user_name}_{COMMENT_PATH}")
         if not os.path.exists(comment_path) or os.path.getsize(comment_path) == 0:
-            shutil.copy2(resource_path(DEFUALT_COMMENT), comment_path)
+            shutil.copy2(resource_path(DEFAULT_COMMENT), comment_path)
 
         df = pd.read_csv(
             comment_path,
@@ -1578,7 +1603,8 @@ class SongListViewWidget(QWidget):
                 try:
                     level = float(diff_map_result[combine_name][diffi])
                 except:
-                    log_write(f"{combine_name}没有{diffi}难度哦 再看看文件是否更新了")
+                    warnlog(
+                        f"{combine_name}没有{diffi}难度哦 再看看文件是否更新了",                    )
                 singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
                 acc = round(acc, 4)
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
@@ -1587,7 +1613,7 @@ class SongListViewWidget(QWidget):
                 groups = self.GROUP_INFO.get(combine_name, "")
                 comment = self.COMMENT_INFO.get(combine_name, {}).get(diffi, "")
                 # 构造 SongItem，并加入 model
-                # log_write(f"模型正在写入{combine_name}")
+                # infolog(f"模型正在写入{combine_name}")
                 item = SongItem(
                     combine_name=combine_name,
                     diff=diffi,
@@ -1608,7 +1634,7 @@ class SongListViewWidget(QWidget):
                 )
                 self.model.add_item(item)
                 row += 1
-        log_write("从存档中构建数据完成")
+        infolog("从存档中构建数据完成")
 
     def build_card(
         self, data: int | SongItem, is_expanded: bool = False
