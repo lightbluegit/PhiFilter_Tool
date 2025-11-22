@@ -8,10 +8,10 @@ def update_note_count_csv():
     """根据文酱的Phigros_Resource-master获取的 谱面chart 文件更新note_count文件"""
     start_time = time.time()
 
-    folder_path = "C:/Users/Administrator/Downloads/Phigros_Resource-master/chart"  # 替换为Phigros_Resource-master/chart文件对应的地址
+    folder_path = "E:/kafuyuno/download/Phigros_Resource-master/Phigros_Resource-master/chart"  # 替换为Phigros_Resource-master/chart文件对应的地址
     folder = Path(folder_path)
 
-    csv_path = "projects/PhiFilterTool/assets/data/note_count.csv"
+    csv_path = "python/rhythmgame_database/assets/data/note_count.csv"
     df = pd.read_csv(
         csv_path,
         sep=",",
@@ -70,7 +70,7 @@ update_note_count_csv()
 
 # 从info.tsv中读取新的信息
 df = pd.read_csv(
-    filepath_or_buffer="projects/PhiFilterTool/assets/data/info.tsv",
+    filepath_or_buffer="python/rhythmgame_database/assets/data/info.tsv",
     sep="\t",
     header=None,
     encoding="utf-8",
@@ -85,12 +85,12 @@ preinfo_list: list[str] = [
     "# 谱师\nCHARTER_LIST: list[str] = [",
 ]
 dft_file = open(
-    "projects/PhiFilterTool/src/core/update/default_file.txt",
+    "python/rhythmgame_database/src/core/update/default_file.txt",
     "w",
     encoding="utf-8",
 )
 with open(
-    "projects/PhiFilterTool/src/core/update/output.txt",
+    "python/rhythmgame_database/src/core/update/output.txt",
     "w",
     encoding="utf-8",
 ) as f:
@@ -98,10 +98,6 @@ with open(
     for i in range(4):
         f.write(preinfo_list[i])
         for _, row in df.iterrows():
-            # combine_name = row.iloc[0]
-            # name = row.iloc[1]
-            # composer = row.iloc[2]
-            # drawer = row.iloc[3]
             text = (
                 row.iloc[i]
                 .replace("\\", "\\\\")
