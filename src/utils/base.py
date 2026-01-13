@@ -5,8 +5,8 @@ from enum import Enum
 import logging
 from logging.handlers import RotatingFileHandler
 
-debug: bool = False
-debug: bool = True
+debug: bool = False # 打包
+debug: bool = True # 原地调试
 
 
 def appdata_path(relative_path="", create_file=True):
@@ -58,20 +58,17 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-LOG_PATH = "PhiFilterTool_log.log"  # 日志文件
-
-
 # 记录器
 logger = logging.getLogger("PhiFilterTool_log")
 logger.setLevel(logging.INFO)
 
 # 创建处理器
 infofilehandler = RotatingFileHandler(
-    filename="PhiFilterTool_infolog.log",
+    filename=appdata_path("PhiFilterTool_infolog.log"),
     maxBytes=15 * 1024 * 1024,  # 10 MB
     backupCount=3,  # 保留3个备份文件
 )
-filehandler = logging.FileHandler(filename="PhiFilterTool_log.log")
+filehandler = logging.FileHandler(filename=appdata_path("PhiFilterTool_log.log"))
 filehandler.setLevel(logging.WARNING)
 
 # 创建格式

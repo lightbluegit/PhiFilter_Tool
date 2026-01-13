@@ -71,10 +71,10 @@ class combobox(QWidget):  # 重写combobox控件 选择框
 
     def __init__(
         self,
-        content_list: list[str], # 选项列表
-        hint_label: str = "", # 提示文本
-        cbb_style: dict[str, str] = {}, # 选择框样式
-        label_style: dict[str, str] = {}, # 文本样式
+        content_list: list[str],  # 选项列表
+        hint_label: str = "",  # 提示文本
+        cbb_style: dict[str, str] = {},  # 选择框样式
+        label_style: dict[str, str] = {},  # 文本样式
     ):
         super().__init__()
         self.editor_layout = QHBoxLayout(self)
@@ -93,42 +93,42 @@ class combobox(QWidget):  # 重写combobox控件 选择框
         self.editor_layout.addWidget(self.cbb)
 
     def set_content(self, new_content_list: list[str]):
-        '''设置为新的内容列表
+        """设置为新的内容列表
 
         入参：
             new_content_list: 新的内容列表
-        '''
+        """
         self.cbb.clear()
         self.cbb.addItems(new_content_list)
 
     def get_content(self) -> str:
-        '''获取当前选中内容
-        
+        """获取当前选中内容
+
         返回值:
             str: 当前内容文本
-        '''
+        """
         return self.cbb.currentText()
 
     def bind_react_click_func(self, func):
-        '''绑定切换选项时执行的函数
-        
-        入参: 
+        """绑定切换选项时执行的函数
+
+        入参:
             func: 功能函数
-        '''
+        """
         self.cbb.currentTextChanged.connect(func)
 
     def set_current_choose(self, index: int):
-        '''设置当前选中内容
-        
-        入参: 
+        """设置当前选中内容
+
+        入参:
             index: 设置的内容序号
-        '''
+        """
         self.cbb.setCurrentIndex(index)
 
     def set_hint_text(self, text: str):
         """设置提示文本
-        
-        入参: 
+
+        入参:
             text: 提示文本
         """
         self.hint_label.setText(text)
@@ -237,9 +237,10 @@ class body_label(QLabel):
 
 # 多行文本
 class multiline_text(TextEdit):
-    def __init__(self, text: str = "", parent: QWidget = None):
+    def __init__(self, text: str = "", parent: QWidget = None, read_only:bool = False):
         super().__init__(parent)
-
+        if read_only:
+            self.setReadOnly(True)
         self.setText(text)
         self.setWordWrapMode(QTextOption.WordWrap)
         self.setAlignment(Qt.AlignVCenter)
@@ -464,7 +465,17 @@ class main_info_card(ElevatedCardWidget):
 
 # 左侧有底板背景作为提示 右侧可以任意填充内容的控件 hint_and_frame_widget
 class hint_and_frame_widget(QFrame):
-    def __init__(self, title: str):
+
+    def __init__(
+        self,
+        title: str,
+        content_style: dict[str, int]={
+            "max-height": 55,
+            "min-height": 55,
+            "min-width": 250,
+            "max-width": 250,
+        },
+    ):
         super().__init__()
 
         # ------------- 底层背景卡片 -------------
@@ -508,14 +519,14 @@ class hint_and_frame_widget(QFrame):
         layout.addWidget(self.scroll_area)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet(
-            """QScrollArea{
+            f"""QScrollArea{{
             background-color: transparent; 
             border: none;
-            max-height: 55px;
-            min-height: 55px;
-            min-width: 250px;
-            max-width: 250px;
-            }"""
+            max-height: {content_style["max-height"]}px;
+            min-height: {content_style["min-height"]}px;
+            min-width: {content_style["max-width"]}px;
+            max-width: {content_style["min-width"]}px;
+            }}"""
         )
         # 创建内容容器
         self.scroll_content_widget = QWidget()
@@ -687,8 +698,17 @@ class song_info_card(QWidget):
         self.group_label.add_widget(self.group_content_label)
         self.flow_layout.addWidget(self.group_label)
 
-        self.comment_label = hint_and_frame_widget("简评:")
-        self.comment_content_label = label(self.comment)
+        self.comment_label = hint_and_frame_widget(
+            "简评:",
+            {
+                "max-height": 80,
+                "min-height": 80,
+                "min-width": 250,
+                "max-width": 250,
+            },
+        )
+        self.comment_content_label = multiline_text(self.comment, read_only=True)
+        self.comment_content_label.setStyleSheet("font-size: 19px;")
         self.comment_label.add_widget(self.comment_content_label)
         self.flow_layout.addWidget(self.comment_label)
 
@@ -1051,9 +1071,7 @@ class filter_obj(QWidget):
             # infolog(match_results)
             singal_rks = float(value)
             if singal_rks > MAX_LEVEL:  # 范围限定
-                infolog(
-                    f"当前最高定数为{MAX_LEVEL} {attribution}不可能高于{MAX_LEVEL}"
-                )
+                infolog(f"当前最高定数为{MAX_LEVEL} {attribution}不可能高于{MAX_LEVEL}")
                 return (False, None)
             if singal_rks < 0:
                 # infolog(f"{attribution}不可能小于0")
@@ -1604,7 +1622,8 @@ class SongListViewWidget(QWidget):
                     level = float(diff_map_result[combine_name][diffi])
                 except:
                     warnlog(
-                        f"{combine_name}没有{diffi}难度哦 再看看文件是否更新了",                    )
+                        f"{combine_name}没有{diffi}难度哦 再看看文件是否更新了",
+                    )
                 singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
                 acc = round(acc, 4)
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
