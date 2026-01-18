@@ -5,8 +5,8 @@ from enum import Enum
 import logging
 from logging.handlers import RotatingFileHandler
 
-debug: bool = False # 打包
-debug: bool = True # 原地调试
+debug: bool = False  # 打包
+debug: bool = True  # 原地调试
 
 
 def appdata_path(relative_path="", create_file=True):

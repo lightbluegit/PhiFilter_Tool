@@ -3,70 +3,8 @@ from pathlib import Path
 import json
 import time
 
-
-def update_note_count_csv():
-    """根据文酱的Phigros_Resource-master获取的 谱面chart 文件更新note_count文件"""
-    start_time = time.time()
-
-    folder_path = "E:/kafuyuno/download/Phigros_Resource-master/Phigros_Resource-master/chart"  # 替换为Phigros_Resource-master/chart文件对应的地址
-    folder = Path(folder_path)
-
-    csv_path = "python/rhythmgame_database/assets/data/note_count.csv"
-    df = pd.read_csv(
-        csv_path,
-        sep=",",
-        header=None,
-        encoding="utf-8",
-        names=["combine_name", "tap", "hold", "drag", "flick", "sum"],
-        index_col=0,
-    )
-    df = df.fillna("")
-
-    for song_folderi in folder.glob("*"):  # rglob 递归，glob 非递归
-        if song_folderi.is_dir():  # 依次选中所有文件夹 (暗夜苏醒REANIMATE.Warak.0)
-            combine_name = song_folderi.name[
-                :-2:
-            ]  # 去掉最后的 '.0' (random有差分 .0~.6)
-            for charti in song_folderi.glob(
-                "*json"
-            ):  # 读取文件夹中所有的json文件 (EZ.json)
-                cname_with_diff = (
-                    f"{combine_name}.{charti.name.replace('.json', '')}"  # 构建 键
-                )
-                json_path = f"{folder_path}/{song_folderi.name}/{charti.name}"
-                tap_count = 0
-                drag_count = 0
-                hold_count = 0
-                flick_count = 0
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)  # 解析json文件
-                    list = data["judgeLineList"]  # 以 996的EZ为例方便弄懂结构
-                    for dicti in list:
-                        for notei in dicti["notesAbove"] + dicti["notesBelow"]:
-                            if notei["type"] == 1:
-                                tap_count += 1
-                            elif notei["type"] == 2:
-                                drag_count += 1
-                            elif notei["type"] == 3:
-                                hold_count += 1
-                            elif notei["type"] == 4:
-                                flick_count += 1
-                df.at[cname_with_diff, "tap"] = int(tap_count)
-                df.at[cname_with_diff, "drag"] = int(drag_count)
-                df.at[cname_with_diff, "hold"] = int(hold_count)
-                df.at[cname_with_diff, "flick"] = int(flick_count)
-                df.at[cname_with_diff, "sum"] = int(
-                    tap_count + drag_count + hold_count + flick_count
-                )
-                # print(
-                #     f"{cname_with_diff}统计数据是:{tap_count}, {drag_count}, {hold_count}, {flick_count}, 总共{tap_count + drag_count + hold_count + flick_count}"
-                # )
-    df.to_csv(csv_path, header=False, encoding="utf-8", index=True)
-
-    print(f"所有歌曲的note计数更新完成 用时{time.time() - start_time}")
-
-
-update_note_count_csv()
+import pandas as pd
+import os
 
 # 从info.tsv中读取新的信息
 df = pd.read_csv(

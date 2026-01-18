@@ -312,6 +312,66 @@ class MainWindow(FramelessWindow):
         self.loader.all_tasks_finished.connect(self.on_all_finished)  # 所有任务完成
         self.loader.start_processing()  # 开始处理任务
 
+    def merge_csv_updates(self, user_file_path, default_file_path, encoding="utf-8"):
+        """
+        对比两个CSV文件，将 default_file 中存在但 user_file 中不存在的记录
+        追加到 user_file 中，且不修改 user_file 原有的内容。
+
+        Args:
+            user_file_path (str): 用户数据文件路径 (kafuyuno_comment.csv)
+            default_file_path (str): 更新数据文件路径 (default_comment.csv)
+            encoding (str): 文件编码，默认为 utf-8
+        """
+
+        # 检查文件是否存在
+        if not os.path.exists(user_file_path) or not os.path.exists(default_file_path):
+            print("错误：找不到指定的文件路径。")
+            return
+
+        try:
+            # 1. 读取 CSV 文件
+            # header=None 表示文件没有标题行，直接读取数据
+            # on_bad_lines='skip' 防止因为格式错误导致读取中断
+            df_user = pd.read_csv(
+                user_file_path, header=None, encoding=encoding, on_bad_lines="skip"
+            )
+            df_default = pd.read_csv(
+                default_file_path, header=None, encoding=encoding, on_bad_lines="skip"
+            )
+
+            print(f"读取成功: 用户数据 {len(df_user)} 条, 更新数据 {len(df_default)} 条")
+
+            # 2. 确定唯一键 (假设第一列是唯一的歌曲ID/标识符)
+            # 获取用户文件中所有已存在的 ID 集合
+            existing_ids = set(df_user.iloc[:, 0])
+
+            # 3. 筛选新记录
+            # 在 df_default 中找到那些 ID 不在 existing_ids 里的行
+            new_records = df_default[~df_default.iloc[:, 0].isin(existing_ids)]
+
+            count_new = len(new_records)
+
+            if count_new == 0:
+                print("没有发现需要更新的新记录。")
+                return
+
+            print(f"发现 {count_new} 条新记录，准备合并...")
+
+            # 4. 合并数据
+            # 将新记录追加到用户数据后面
+            df_final = pd.concat([df_user, new_records], ignore_index=True)
+
+            # 5. 保存回用户文件
+            # index=False 去掉pandas自带的索引列
+            # header=False 因为原文件没有表头
+            df_final.to_csv(user_file_path, index=False, header=False, encoding=encoding)
+
+            print(f"成功！已将新记录写入 {user_file_path}")
+            print(f"当前用户文件总记录数: {len(df_final)}")
+
+        except Exception as e:
+            print(f"发生错误: {e}")
+
     # 预处理结束后执行的操作
     def on_all_finished(self):
         """预处理结束后执行的操作"""
@@ -584,6 +644,14 @@ class MainWindow(FramelessWindow):
         )
         self.is_updated = False  # 更新过数据了 之前存储的就不是最新的数据了
         # infolog("get_save_data 用时", time.time() - times, "s")
+        self.merge_csv_updates(
+            appdata_path(f"{self.user_name}_{COMMENT_PATH}"),
+            resource_path(DEFAULT_COMMENT),
+        )
+        self.merge_csv_updates(
+            appdata_path(f"{self.user_name}_{GROUP_PATH}"),
+            resource_path(DEFAULT_GROUP),
+        )
 
     # ----------------- 页面相关处理  -----------------
     # 初始化所有页面
