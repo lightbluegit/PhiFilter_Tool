@@ -141,6 +141,7 @@ class editable_combobox(QWidget):
         hint_label: str = "",
         cbb_style: dict[str, str] = {},
         label_style: dict[str, str] = {},
+        used_group = None,
     ):
         super().__init__()
         self.editor_layout = QHBoxLayout(self)
@@ -158,7 +159,7 @@ class editable_combobox(QWidget):
         self.composer_completer = QStringListModel(COMPOSER_LIST)
         self.charter_completer = QStringListModel(CHARTER_LIST)
         self.drawer_completer = QStringListModel(DRAWER_NAME_LIST)
-        # self.group_info_completer = QStringListModel(self.groups)
+        self.group_info_completer = QStringListModel(used_group)
         # self.comment_info_completer = QStringListModel(self.comments)
 
     def set_content_list(self, content_list):
@@ -866,12 +867,13 @@ class folder(QWidget):
 # 搜索页面的一条筛选控件
 class filter_obj(QWidget):
 
-    def __init__(self, index: int, filter_obj_list, flow_layout):
+    def __init__(self, index: int, filter_obj_list, flow_layout, get_used_group):
         super().__init__()
         self.logical_cbb: combobox = None
         self.index = index
         self.filter_obj_list = filter_obj_list
         self.flow_layout = flow_layout
+        self.get_used_group = get_used_group # 这是个函数
         # 主布局
         self.setMaximumHeight(40)
         self.setFixedWidth(880)
@@ -911,7 +913,9 @@ class filter_obj(QWidget):
             "max_height": 35,
             "font_size": 23,
         }
-        self.limit_val_cbb = editable_combobox([], "", limit_val_cbb_style)
+        self.limit_val_cbb = editable_combobox(
+            [], "", limit_val_cbb_style, used_group=list(get_used_group())
+        )
         self.limit_val_cbb.setContentsMargins(0, 0, 0, 0)
         self.main_layout.addWidget(self.limit_val_cbb)
 
@@ -946,7 +950,10 @@ class filter_obj(QWidget):
     def add_filter_obj(self):
         # infolog(self, self.filter_obj_list)
         filter_elm = filter_obj(
-            len(self.filter_obj_list), self.filter_obj_list, self.flow_layout
+            len(self.filter_obj_list),
+            self.filter_obj_list,
+            self.flow_layout,
+            self.get_used_group,
         )
         self.filter_obj_list.append(filter_elm)
         self.flow_layout.addWidget(filter_elm)
@@ -1014,13 +1021,11 @@ class filter_obj(QWidget):
 
         elif self.attribution_choose_cbb.get_content() == "分组":
             self.limit_choose_cbb.set_content(["包含", "不包含"])
-            self.limit_val_cbb.set_content_list(self.limit_val_cbb.groups)
+            self.limit_val_cbb.set_content_list(list(self.get_used_group()))
             self.limit_val_cbb.set_completer(self.limit_val_cbb.group_info_completer)
 
         elif self.attribution_choose_cbb.get_content() == "简评":
             self.limit_choose_cbb.set_content(["包含", "不包含"])
-            self.limit_val_cbb.set_content_list(self.limit_val_cbb.comments)
-            self.limit_val_cbb.set_completer(self.limit_val_cbb.comment_info_completer)
 
     def input_val_check(self, attribution, value) -> tuple[bool, str]:
         if attribution == "acc":
@@ -1568,11 +1573,13 @@ class SongListViewWidget(QWidget):
         )
         df = df.fillna("")
         df.set_index(df.columns[0], inplace=True)
-        # used_group = set()
+        used_group = set()
         for idx, rowi in df.iterrows():
             group_raw = str(rowi["group"])  # 组合名称 : 分组
             if group_raw:
                 group_raw = group_raw.split("`")
+                for i in group_raw:
+                    used_group.add(i)
             self.GROUP_INFO[idx] = group_raw
             # infolog('GROUP_INFO是',GROUP_INFO)
 

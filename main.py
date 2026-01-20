@@ -693,11 +693,12 @@ class MainWindow(FramelessWindow):
         self.score_calculate_page = self.init_score_calculate_page()
         self.score_calculate_page.setObjectName("score_calculate_page")
 
+        self.edit_info_page = self.init_edit_info_page() # 先初始化这个后初始化搜索 因为搜索要用到已经用过的分组但是在这里跑完才有数据
+        self.edit_info_page.setObjectName("edit_info_page")
+
         self.search_page = self.init_search_page()
         self.search_page.setObjectName("search_page")
 
-        self.edit_info_page = self.init_edit_info_page()
-        self.edit_info_page.setObjectName("edit_info_page")
 
         self.setting_page = self.init_setting_page()
         self.setting_page.setObjectName("setting_page")
@@ -1585,7 +1586,9 @@ class MainWindow(FramelessWindow):
         self.widgets["search_page"]["filter_obj_list"] = filter_obj_list
 
         # 初始化第一个 filter_obj并加入逻辑链接选项
-        filter_widget = filter_obj(0, filter_obj_list, flow_layout)
+        filter_widget = filter_obj(
+            0, filter_obj_list, flow_layout, lambda: self.used_group
+        )
         filter_widget.attribution_choose_cbb.set_current_choose(
             filter_widget.filter_attribution_list.index(
                 self.default_filter["attribution"]
@@ -1939,8 +1942,8 @@ class MainWindow(FramelessWindow):
             composer = item.composer
             drawer = item.drawer
             chapter = item.chapter
-            # groups = item.groups
-            # comments = item.comment
+            groups = item.groups
+            comments = item.comment
 
             if attribution == "acc":
                 if limit == "大于" and acc > float(limit_val):
@@ -2053,18 +2056,18 @@ class MainWindow(FramelessWindow):
                     result.add(songi)
                 elif limit == "不包含" and limit_val not in chapter:
                     result.add(songi)
-            # elif attribution == "分组":
-            #     groups_low = [g.replace(" ", "").lower() for g in groups]
-            #     if limit == "包含" and limit_val in groups_low:
-            #         result.add(songi)
-            #     elif limit == "不包含" and limit_val not in groups_low:
-            #         result.add(songi)
-            # elif attribution == "简评":
-            #     comments_low = comments.replace(" ", "").lower()
-            #     if limit == "包含" and limit_val in comments_low:
-            #         result.add(songi)
-            #     elif limit == "不包含" and limit_val not in comments_low:
-            #         result.add(songi)
+            elif attribution == "分组":
+                groups_low = [g.replace(" ", "").lower() for g in groups]
+                if limit == "包含" and limit_val in groups_low:
+                    result.add(songi)
+                elif limit == "不包含" and limit_val not in groups_low:
+                    result.add(songi)
+            elif attribution == "简评":
+                comments_low = comments.replace(" ", "").lower()
+                if limit == "包含" and limit_val in comments_low:
+                    result.add(songi)
+                elif limit == "不包含" and limit_val not in comments_low:
+                    result.add(songi)
         infolog("从给定的序号中筛选出符合条件的序号完成")
         return result
 
@@ -2979,7 +2982,7 @@ class MainWindow(FramelessWindow):
         search_setting_layout = QVBoxLayout(search_setting_widget)
         self.widgets["setting_page"]["search_setting_layout"] = search_setting_layout
 
-        default_filter_obj = filter_obj(0, [], FlowLayout)
+        default_filter_obj = filter_obj(0, [], FlowLayout, lambda: self.used_group)
         self.widgets["setting_page"]["default_filter_obj"] = default_filter_obj
         default_filter_obj.add_btn.hide()
         default_filter_obj.delete_btn.hide()
