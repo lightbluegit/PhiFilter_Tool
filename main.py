@@ -140,66 +140,82 @@ class MainWindow(FramelessWindow):
         infolog(f"开始获取用户设置")
         setting_file_path = appdata_path(SETTING_PATH)
         path_obj = Path(setting_file_path)
-        default_setting = {
-            self.user_name: {
-                "main_setting": {
-                    "always_update": False,
-                    "default_open_page": "home_page",
+        default_setting_text: dict = {
+            "main_setting": {
+                "always_update": False,
+                "default_open_page": "home_page",
+            },
+            "search_page_setting": {
+                "default_filter": {
+                    "attribution": "acc",
+                    "limit": "大于等于",
+                    "value": "99.3",
                 },
-                "search_page_setting": {
-                    "default_filter": {
-                        "attribution": "acc",
-                        "limit": "大于等于",
-                        "value": "99.3",
-                    }
-                },
+                "clear_after_search": False,
             },
         }
+        default_setting_file = {self.user_name: default_setting_text}
         if not path_obj.exists() or path_obj.stat().st_size == 0:
             # 如果不存在，创建默认设置并保存
             # 写入默认配置到文件
             infolog(f"设置记录文件不存在")
             with open(setting_file_path, "w", encoding="utf-8") as f:
-                json.dump(default_setting, f, ensure_ascii=False, indent=4)
+                json.dump(default_setting_file, f, ensure_ascii=False, indent=4)
                 infolog("已写入默认设置")
             # infolog(f"初始化配置文件: {setting_file_path}")
 
         with open(setting_file_path, "r", encoding="utf-8") as f:
             setting_file = json.load(f)
             if not setting_file:
-                setting_file = default_setting
+                setting_file = default_setting_file
             # 读取主设置
             if self.user_name not in setting_file.keys():  # 当前用户没有设置记录
                 infolog(f"当前用户没有设置记录")
-                setting_file[self.user_name] = {
-                    "main_setting": {
-                        "always_update": False,
-                        "default_open_page": "home_page",
-                    },
-                    "search_page_setting": {
-                        "default_filter": {
-                            "attribution": "acc",
-                            "limit": "大于等于",
-                            "value": "99.3",
-                        }
-                    },
-                }
-                with open(setting_file_path, "w", encoding="utf-8") as ff:
-                    json.dump(setting_file, ff, ensure_ascii=False, indent=4)
-                    infolog(f"初始化设置记录成功")
+                setting_file[self.user_name] = default_setting_text
 
             user_setting = setting_file[self.user_name]
             # infolog(f"用户设置:{user_setting}")
 
-            main_setting: dict = user_setting["main_setting"]
+            if "main_setting" not in user_setting:
+                user_setting["main_setting"] = default_setting_file[self.user_name][
+                    "main_setting"
+                ]
+            main_setting = user_setting["main_setting"]
+
+            if "always_update" not in main_setting:
+                main_setting["always_update"] = default_setting_file[self.user_name][
+                    "main_setting"
+                ]["always_update"]
             self.always_update: bool = main_setting["always_update"]
+
             # 读取默认开屏页设置
+            if "default_open_page" not in main_setting:
+                main_setting["default_open_page"] = default_setting_file[
+                    self.user_name
+                ]["main_setting"]["default_open_page"]
             self.default_open_page: str = main_setting["default_open_page"]
 
             # 读取搜索页设置
-            search_page_setting: dict = user_setting["search_page_setting"]
+            if "search_page_setting" not in user_setting:
+                user_setting["search_page_setting"] = default_setting_file[
+                    self.user_name
+                ]["search_page_setting"]
+            search_page_setting = user_setting["search_page_setting"]
             # infolog(f"读取搜索页设置{search_page_setting}")
+
+            if "clear_after_search" not in search_page_setting:
+                search_page_setting["clear_after_search"] = default_setting_file[
+                    self.user_name
+                ]["search_page_setting"]["clear_after_search"]
+            self.clear_after_search: bool = search_page_setting["clear_after_search"]
+
+            if "default_filter" not in search_page_setting:
+                search_page_setting["default_filter"] = default_setting_file[
+                    self.user_name
+                ]["search_page_setting"]["default_filter"]
             self.default_filter: dict[str, str] = search_page_setting["default_filter"]
+            with open(setting_file_path, "w", encoding="utf-8") as ff:
+                json.dump(setting_file, ff, ensure_ascii=False, indent=4)
         infolog(f"获取用户设置完成")
 
     # 初始化各种与账号相关的变量
@@ -339,7 +355,9 @@ class MainWindow(FramelessWindow):
                 default_file_path, header=None, encoding=encoding, on_bad_lines="skip"
             )
 
-            print(f"读取成功: 用户数据 {len(df_user)} 条, 更新数据 {len(df_default)} 条")
+            print(
+                f"读取成功: 用户数据 {len(df_user)} 条, 更新数据 {len(df_default)} 条"
+            )
 
             # 2. 确定唯一键 (假设第一列是唯一的歌曲ID/标识符)
             # 获取用户文件中所有已存在的 ID 集合
@@ -364,7 +382,9 @@ class MainWindow(FramelessWindow):
             # 5. 保存回用户文件
             # index=False 去掉pandas自带的索引列
             # header=False 因为原文件没有表头
-            df_final.to_csv(user_file_path, index=False, header=False, encoding=encoding)
+            df_final.to_csv(
+                user_file_path, index=False, header=False, encoding=encoding
+            )
 
             print(f"成功！已将新记录写入 {user_file_path}")
             print(f"当前用户文件总记录数: {len(df_final)}")
@@ -2222,6 +2242,13 @@ class MainWindow(FramelessWindow):
             parent=window,
         )
         infolog("布局筛选结果完成")
+        if self.clear_after_search:
+            filter_obj_list: list[filter_obj] = self.widgets["search_page"][
+                "filter_obj_list"
+            ]
+            print(f"待清除列表有{len(filter_obj_list)}个内容")
+            for i in filter_obj_list:
+                i.limit_val_cbb.clear_text()
 
     # 重置搜索结果
     def reset_filter_result(self):
@@ -2604,7 +2631,7 @@ class MainWindow(FramelessWindow):
             name_rks_layout.addWidget(name_label)
             name_label.adjustSize()
 
-        rks_label = label(self.rks if self.rks else "", lable_style)
+        rks_label = label("", lable_style)
         # rks_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         rks_label.setAlignment(Qt.AlignCenter)
         self.widgets["account_page"]["rks_label"] = rks_label
@@ -2889,6 +2916,9 @@ class MainWindow(FramelessWindow):
         always_update_sbtn.setOffText("当前:懒更新")
         always_update_sbtn.setOnText("当前:常更新")
         always_update_sbtn.setChecked(self.always_update)
+        always_update_sbtn.checkedChanged.connect(
+            lambda checked: setattr(self, "always_update", checked)
+        )
         always_update_sbtn.setStyleSheet(get_switch_button_style())
         always_update_sbtn.label.setStyleSheet(
             f"""
@@ -2968,6 +2998,29 @@ class MainWindow(FramelessWindow):
         # default_filter_obj.attribution_choose_cbb.setMaximumWidth(160)
         default_filter_obj.setFixedHeight(65)
         search_setting_layout.addWidget(default_filter_obj)
+
+        # 搜索结束后自动清除输入文本 切换按钮
+        clear_after_search_sbtn = SwitchButton()
+        self.widgets["setting_page"][
+            "clear_after_search_sbtn"
+        ] = clear_after_search_sbtn
+        clear_after_search_sbtn.setOffText("当前:不清除文本")
+        clear_after_search_sbtn.setOnText("当前:清除文本")
+        clear_after_search_sbtn.setChecked(self.clear_after_search)
+        clear_after_search_sbtn.checkedChanged.connect(
+            lambda checked: setattr(self, "clear_after_search", checked)
+        )
+        clear_after_search_style = {"max_width": 250, "min_width": 250}
+        clear_after_search_sbtn.setStyleSheet(
+            get_switch_button_style(**clear_after_search_style)
+        )
+        clear_after_search_sbtn.label.setStyleSheet(
+            f"""
+            font-size: 23px;
+            font-family: "{FONT_FAMILY["chi"]}";
+            """
+        )
+        search_setting_layout.addWidget(clear_after_search_sbtn)
 
         search_setting_layout.addStretch(1)
 

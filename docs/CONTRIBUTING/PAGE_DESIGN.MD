@@ -119,6 +119,7 @@ self.widgets = {
         'search_setting_widget': 搜索设置页面主控件,
         'search_setting_layout': 纵向布局,
         'default_filter_obj': 默认筛选条件,
+        'clear_after_search_sbtn':搜索后清除输入内容切换按钮,
     }
 }
 ```
