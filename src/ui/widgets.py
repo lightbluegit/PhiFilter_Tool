@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QFrame,
     QLabel,
+    QPushButton,
     QGridLayout,
     QCompleter,
     QListWidgetItem,
@@ -80,6 +81,7 @@ class combobox(QWidget):  # 重写combobox控件 选择框
         self.editor_layout = QHBoxLayout(self)
         self.editor_layout.setContentsMargins(0, 0, 0, 0)
         self.editor_layout.setSpacing(5)
+        self.content_list = content_list
 
         # 左侧提示标签
         self.hint_label = label(hint_label, label_style)
@@ -900,7 +902,7 @@ class filter_obj(QWidget):
         self.main_layout.addWidget(self.attribution_choose_cbb)
 
         # -----------属性限制部分-----------
-        self.filter_limit_list = NUMERIC_COMPARATORS
+        self.filter_limit_list = NUMERIC_COMPARATORS + LOGICAL_OPERATORS
         self.limit_choose_cbb = combobox(self.filter_limit_list, "", cbb_style)
         self.limit_choose_cbb.setContentsMargins(0, 0, 0, 0)
         self.main_layout.addWidget(self.limit_choose_cbb)
@@ -978,24 +980,28 @@ class filter_obj(QWidget):
             "得分",
             "定数",
         ):
-            self.limit_choose_cbb.set_content(NUMERIC_COMPARATORS)
+            self.filter_limit_list = NUMERIC_COMPARATORS
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.clear_text()
             self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "评级":
-            self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
+            self.filter_limit_list = LOGICAL_OPERATORS
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.set_content_list(
                 ["phi", "蓝V", "V", "S", "A", "B", "C", "F"]
             )
             self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "难度":
-            self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
+            self.filter_limit_list = LOGICAL_OPERATORS
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.set_content_list(["AT", "IN", "HD", "EZ"])
             self.limit_val_cbb.clear_completer()
 
         elif self.attribution_choose_cbb.get_content() == "曲名":
-            self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
+            self.filter_limit_list = LOGICAL_OPERATORS
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.set_content_list(
                 SONG_NAME_LIST
             )  # 曲名这里直接提供info.tsv里面的东西就好了 具体的区分(Another Me) 再加一个曲师就好了
@@ -1005,33 +1011,38 @@ class filter_obj(QWidget):
             # )
 
         elif self.attribution_choose_cbb.get_content() == "曲师":
-            self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
+            self.filter_limit_list = LOGICAL_OPERATORS
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.set_content_list(COMPOSER_LIST)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.composer_completer)
 
         elif self.attribution_choose_cbb.get_content() == "谱师":
-            self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
+            self.filter_limit_list = LOGICAL_OPERATORS
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.set_content_list(CHARTER_LIST)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.charter_completer)
 
         elif self.attribution_choose_cbb.get_content() == "画师":
-            self.limit_choose_cbb.set_content(LOGICAL_OPERATORS)
+            self.filter_limit_list = LOGICAL_OPERATORS
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.set_content_list(DRAWER_NAME_LIST)
             self.limit_val_cbb.set_completer(self.limit_val_cbb.drawer_completer)
 
         elif self.attribution_choose_cbb.get_content() == "分组":
-            self.limit_choose_cbb.set_content(["包含", "不包含"])
+            self.filter_limit_list = ["包含", "不包含"]
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
             self.limit_val_cbb.set_content_list(list(self.get_used_group()))
             self.limit_val_cbb.set_completer(self.limit_val_cbb.group_info_completer)
 
         elif self.attribution_choose_cbb.get_content() == "简评":
-            self.limit_choose_cbb.set_content(["包含", "不包含"])
+            self.filter_limit_list = ["包含", "不包含"]
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
 
     def input_val_check(self, attribution, value) -> tuple[bool, str]:
         if attribution == "acc":
             # infolog(f"val={value}")
             if not value:
-                return (False, None)
+                return (True, 0)
             pattern = r"\d+\.?\d+"
             if "." not in value:  # 没有 . 就只能是 23 这样的整数
                 value += "."
@@ -1050,15 +1061,15 @@ class filter_obj(QWidget):
             acc = float(value)
             if acc > 100:  # 范围限定
                 # infolog("acc不可能大于100")
-                return (False, None)
+                return (True, 100)
             if acc < 0:
                 # infolog("acc不可能小于0")
-                return (False, None)
+                return (True, 0)
             return (True, value)
 
         elif attribution in ("单曲rks", "定数"):
             if not value:
-                return (False, None)
+                return (True, 0)
             pattern = r"\d+\.?\d+"
             if "." not in value:  # 没有 . 就只能是 23 这样的整数
                 value += "."
@@ -1077,15 +1088,15 @@ class filter_obj(QWidget):
             singal_rks = float(value)
             if singal_rks > MAX_LEVEL:  # 范围限定
                 infolog(f"当前最高定数为{MAX_LEVEL} {attribution}不可能高于{MAX_LEVEL}")
-                return (False, None)
+                return (True, MAX_LEVEL)
             if singal_rks < 0:
                 # infolog(f"{attribution}不可能小于0")
-                return (False, None)
+                return (True, 0)
             return (True, value)
 
         elif attribution == "得分":
             if not value:
-                return (False, None)
+                return (True, 0)
             pattern = r"\d+"
             match_results = re.fullmatch(pattern, value)  # 完全匹配 '数字.数字' 的形式
             if match_results is None:
@@ -1096,10 +1107,10 @@ class filter_obj(QWidget):
             score = int(value)
             if score > 1000000:  # 范围限定
                 infolog("最高分只有100w 太高了啦")
-                return (False, None)
+                return (True, 1000000)
             if score < 0:
                 infolog("得分不可能小于0")
-                return (False, None)
+                return (True, 0)
             return (True, value)
 
         elif attribution == "评级":
@@ -1129,10 +1140,14 @@ class filter_obj(QWidget):
 # 可以多选的下拉菜单
 class multi_check_combobox(EditableComboBox):
     selectionChanged = pyqtSignal(list)
+    # 添加一个信号，如果外部需要知道哪个组被删除了，可以连接这个信号
+    itemRemoved = pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMaximumWidth(300)
+        self.contain_list = []
+        self.setMaximumWidth(360)
+
         # 创建自定义下拉菜单
         self.dropdown_menu = RoundMenu()
         self.scroll_area = ScrollArea(self.dropdown_menu)
@@ -1156,53 +1171,132 @@ class multi_check_combobox(EditableComboBox):
 
     def show_menu(self):
         """显示自定义下拉菜单"""
-        # 计算位置
         pos = self.mapToGlobal(self.rect().bottomLeft())
-
-        # 更新菜单尺寸
         if self.dropdown_menu.view.width() < self.width():
             self.dropdown_menu.view.setMinimumWidth(self.width())
             self.dropdown_menu.adjustSize()
-        # 显示菜单
         self.dropdown_menu.exec(pos, ani=True, aniType=MenuAnimationType.DROP_DOWN)
 
     def addItems(self, items):
         """添加可选项"""
         for text in items:
+            # 避免重复添加
+            if text in self.contain_list:
+                continue
+
+            self.contain_list.append(text)
             item = QListWidgetItem()
             self.list_widget.addItem(item)
+
+            # --- 修改开始：创建容器 Widget ---
+            container_widget = QWidget()
+            layout = QHBoxLayout(container_widget)
+            layout.setContentsMargins(5, 2, 5, 2)  # 调整边距
+            layout.setSpacing(5)
+
+            # 1. CheckBox
             if len(text) > 35:
                 display_text = text[:32] + "..."
             else:
                 display_text = text
+
             checkbox = CheckBox(display_text)
             checkbox.setObjectName("comboCheckBox")
-            checkbox.setToolTip(display_text)
-            self.list_widget.setItemWidget(item, checkbox)
-            item.setSizeHint(checkbox.sizeHint())  # 确保正确的高度
+            checkbox.setToolTip(text)  # 鼠标悬停显示完整文本
+
+            # 2. 叉叉按钮
+            close_btn = QPushButton("✕")
+            close_btn.setFixedSize(20, 20)
+            close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            # 设置样式：平时灰色透明，悬停变红
+            close_btn.setStyleSheet(
+                """
+                QPushButton {
+                    background: transparent;
+                    border: none;
+                    color: #999999;
+                    font-weight: bold;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #ffe6e6;
+                    color: #ff0000;
+                }
+            """
+            )
+
+            # 绑定删除事件，使用 lambda 捕获当前的 item 和 text
+            # 注意：这里需要 item=item, text=text 来避免闭包变量捕获问题
+            close_btn.clicked.connect(lambda _, i=item, t=text: self._remove_item(i, t))
+
+            # 3. 组装布局
+            layout.addWidget(checkbox)
+            layout.addStretch()  # 弹簧，把叉叉顶到最右边
+            layout.addWidget(close_btn)
+
+            # 4. 设置给 list_widget
+            self.list_widget.setItemWidget(item, container_widget)
+            item.setSizeHint(container_widget.sizeHint())  # 确保 Item 高度正确
+            # --- 修改结束 ---
+
+    def _remove_item(self, item, text):
+        """内部方法：点击叉叉时移除该项"""
+        # 1. 获取行号并移除
+        row = self.list_widget.row(item)
+        if row >= 0:
+            self.list_widget.takeItem(row)
+
+        # 2. 从数据列表中移除
+        if text in self.contain_list:
+            self.contain_list.remove(text)
+
+        # 3. 如果当前输入框显示的正是被删除的项，清空输入框
+        if self.text() == text:
+            self.setText("")
+
+        # 4. 发送信号（可选）
+        self.itemRemoved.emit(text)
 
     def get_selected_items(self):
         """获取当前选中的项"""
         selected = []
-        if self.text():
+        if self.text() and self.text() in self.contain_list:
             selected = [self.text()]
+
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
-            checkbox = self.list_widget.itemWidget(item)
-            if checkbox.isChecked():
-                selected.append(checkbox.text())
-        return selected
+            # 注意：现在 itemWidget 是 container，需要找里面的 checkbox
+            container = self.list_widget.itemWidget(item)
+            # 假设 checkbox 是布局里的第一个控件
+            if container:
+                # 遍历 container 的子控件找到 checkbox (比较稳妥的方式)
+                checkbox = container.findChild(CheckBox)
+                # 或者如果你确定顺序，也可以 layout.itemAt(0).widget()
+                if checkbox and checkbox.isChecked():
+                    # 这里我们要获取 checkbox 的完整文本（通常存在 tooltip 或者我们需要存原始值）
+                    # 简单起见，这里取 checkbox 显示的文本，但要注意被截断的情况
+                    # 更好的做法是在创建时把原始 text 存为 checkbox 的属性
+                    selected.append(checkbox.toolTip())
+
+        # 去重
+        return list(set(selected))
 
     def set_selected_items(self, items: list[str]):
         """设置选中项"""
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
-            checkbox = self.list_widget.itemWidget(item)
-            checkbox.setChecked(checkbox.text() in items)
+            container = self.list_widget.itemWidget(item)
+            if container:
+                checkbox = container.findChild(CheckBox)
+                if checkbox:
+                    # 比对 ToolTip (完整文本)
+                    is_checked = checkbox.toolTip() in items
+                    checkbox.setChecked(is_checked)
 
     def clear(self):
         """清除所有选项"""
         self.list_widget.clear()
+        self.contain_list.clear()
         self.setText("")
 
 
@@ -1728,3 +1822,78 @@ class score_display_widget(QWidget):
         max_count_label = label(max_count_num)
         label_list[3] = max_count_label
         layout.addWidget(max_count_label)
+
+
+class CapsuleTag(QFrame):
+    # 自定义信号：当标签被移除时发出（可选，方便父控件知道标签没了）
+    removed = pyqtSignal(str)
+
+    def __init__(self, text, font_size=12, parent=None):
+        super().__init__(parent)
+        self.text_content = text
+
+        # 1. 设置对象名，方便在 QSS 中特指这个控件
+        self.setObjectName("CapsuleFrame")
+
+        # 2. 设置布局
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(
+            15, 5, 10, 5
+        )  # 左 上 右 下 (调整边距以获得完美的胶囊感)
+        layout.setSpacing(10)  # 文本和叉叉之间的距离
+
+        # 3. 创建文本标签
+        self.label = QLabel(text)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # 标签背景透明，防止遮挡胶囊背景
+        self.label.setStyleSheet("background: transparent; border: none; color: #333;")
+
+        # 4. 创建关闭按钮 ("X")
+        self.close_btn = QPushButton("✕")
+        self.close_btn.setFixedSize(20, 20)  # 按钮大小
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        # 点击叉叉触发关闭逻辑
+        self.close_btn.clicked.connect(self.close_tag)
+
+        # 5. 添加到布局
+        layout.addWidget(self.label)
+        layout.addWidget(self.close_btn)
+
+        # 6. 设置样式 (胶囊外观 + 白色 RGB 背景)
+        self._set_style()
+
+        # 自动调整大小以适应内容
+        self.adjustSize()
+
+    def _set_style(self):
+        # 使用 QSS 设置样式
+        # border-radius 的值通常是高度的一半，这里设为 15px 作为一个通用值
+        # 如果字体很大，可能需要增加 padding 或 radius
+        style = """
+            QFrame#CapsuleFrame {
+                background-color: rgb(255, 255, 255); /* 要求的白色背景 RGB */
+                border: 1px solid #dcdcdc;            /* 加一点灰色边框，否则白色背景下看不清 */
+                border-radius: 18px;                  /* 胶囊圆角 */
+            }
+            
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                color: #999999;
+                font-weight: bold;
+                border-radius: 10px;
+            }
+            
+            QPushButton:hover {
+                background-color: #ffcccc; /* 悬停时的红色背景 */
+                color: #ff0000;
+            }
+        """
+        self.setStyleSheet(style)
+
+    def close_tag(self):
+        """处理标签移除"""
+        self.removed.emit(self.text_content)  # 发送信号
+        self.close()  # 从视觉上关闭窗口
+        self.deleteLater()  # 安排资源释放

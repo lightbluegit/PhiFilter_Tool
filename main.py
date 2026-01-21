@@ -693,12 +693,13 @@ class MainWindow(FramelessWindow):
         self.score_calculate_page = self.init_score_calculate_page()
         self.score_calculate_page.setObjectName("score_calculate_page")
 
-        self.edit_info_page = self.init_edit_info_page() # 先初始化这个后初始化搜索 因为搜索要用到已经用过的分组但是在这里跑完才有数据
+        self.edit_info_page = (
+            self.init_edit_info_page()
+        )  # 先初始化这个后初始化搜索 因为搜索要用到已经用过的分组但是在这里跑完才有数据
         self.edit_info_page.setObjectName("edit_info_page")
 
         self.search_page = self.init_search_page()
         self.search_page.setObjectName("search_page")
-
 
         self.setting_page = self.init_setting_page()
         self.setting_page.setObjectName("setting_page")
@@ -1594,11 +1595,16 @@ class MainWindow(FramelessWindow):
                 self.default_filter["attribution"]
             )
         )
+        # if self.default_filter["limit"] in ("acc", "单曲rks", "得分", "定数"):
+        #     filter_widget.filter_limit_list = NUMERIC_COMPARATORS
+        # else:
+        #     filter_widget.filter_limit_list = LOGICAL_OPERATORS
+        # filter_widget.limit_choose_cbb.set_content(filter_widget.filter_limit_list)
+        filter_widget.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
         filter_widget.limit_choose_cbb.set_current_choose(
             filter_widget.filter_limit_list.index(self.default_filter["limit"])
         )
-        filter_widget.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
-        filter_widget.limit_val_cbb.set_text(self.default_filter["value"])
+        filter_widget.limit_val_cbb.set_text(str(self.default_filter["value"]))
 
         filter_widget.logical_cbb = combobox(
             ["", "并且(与)", "或者(或)"],
@@ -2075,9 +2081,19 @@ class MainWindow(FramelessWindow):
     def place_record(self):
         """根据各种条件布局筛选结果"""
         if not self.filter_result:
+            InfoBar.info(
+                title="布局完成",
+                content="没有匹配的搜索结果",
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=window,
+            )
             return
         infolog("开始根据各种条件布局筛选结果")
         # infolog(f'搜索结果是{self.filter_result}')
+
         self.time_record = datetime.now()
         # 获取个数限制
         display_num: str = self.widgets["search_page"]["display_num_input"].text()
@@ -2341,12 +2357,32 @@ class MainWindow(FramelessWindow):
 
         group_label = label("分组:")
         edit_layout.addWidget(group_label)
+
+        group_layout = QHBoxLayout()
+        self.widgets["edit_info_page"]["group_layout"] = group_layout
+        group_layout.setSpacing(5)
+
+        # 左 分组下拉框
         group_ccb = multi_check_combobox()
         self.widgets["edit_info_page"]["group_ccb"] = group_ccb
-
         self.get_userd_group()
         group_ccb.addItems(self.used_group)
-        edit_layout.addWidget(group_ccb)
+        group_layout.addWidget(group_ccb)
+
+        # 右 分组按钮
+        create_group_btn_style = {
+            "max_width": 55,
+            "min_width": 55,
+            "min_height": 35,
+            "max_height": 35,
+            "font_size": 19
+        }
+        create_group_btn = button("新建", create_group_btn_style)
+        create_group_btn.bind_click_func(self.create_new_group)
+        self.widgets["edit_info_page"]["create_group_btn"] = create_group_btn
+        create_group_btn.setFixedSize(50, 50)
+        group_layout.addWidget(create_group_btn)
+        edit_layout.addLayout(group_layout)
 
         comment_label = multiline_text()
         self.widgets["edit_info_page"]["comment_label"] = comment_label
@@ -2406,6 +2442,19 @@ class MainWindow(FramelessWindow):
                     self.used_group.add(i)
         infolog("获取已经存在的分组完成")
         # infolog(f"已经使用过的分组是{self.used_group}")
+
+    def create_new_group(self):
+        infolog("开始新建分组")
+        group_ccb: multi_check_combobox = self.widgets["edit_info_page"]["group_ccb"]
+        user_input = group_ccb.text()
+        infolog(f"新分组名称为:{user_input}")
+        if user_input:
+            selected_group = group_ccb.get_selected_items() # 默认加入输入文字了
+            group_ccb.clear()
+            self.used_group.add(user_input) # 维护已使用的集合
+            group_ccb.addItems(self.used_group)
+            group_ccb.set_selected_items(selected_group)
+        infolog("新建分组结束")
 
     # 保存用户编辑后的信息
     def save_user_edit(self):
@@ -2997,7 +3046,7 @@ class MainWindow(FramelessWindow):
             default_filter_obj.filter_limit_list.index(self.default_filter["limit"])
         )
         default_filter_obj.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
-        default_filter_obj.limit_val_cbb.set_text(self.default_filter["value"])
+        default_filter_obj.limit_val_cbb.set_text(str(self.default_filter["value"]))
         # default_filter_obj.attribution_choose_cbb.setMaximumWidth(160)
         default_filter_obj.setFixedHeight(65)
         search_setting_layout.addWidget(default_filter_obj)
@@ -3093,7 +3142,12 @@ class MainWindow(FramelessWindow):
         default_filter_obj: filter_obj = self.widgets["setting_page"][
             "default_filter_obj"
         ]
-        attribution, limit, value = default_filter_obj.get_all_condition()
+        condition_list = default_filter_obj.get_all_condition()
+        if len(condition_list) == 3:
+            attribution, limit, value = condition_list
+        elif len(condition_list) == 2:
+            attribution, limit = condition_list
+            value = ""
         default_filter["attribution"] = attribution
         default_filter["limit"] = limit
         default_filter["value"] = value
