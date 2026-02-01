@@ -40,6 +40,7 @@ from math import sqrt
 import copy
 import random
 import json
+import yaml
 
 # 设置高 DPI 渲染策略，保证在高分辨率屏幕上界面清晰
 QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -430,10 +431,19 @@ class MainWindow(FramelessWindow):
         self.get_setting()
         self.init_all_pages()
         self.init_navigation()
-        self.generate_b27_phi3()  # 先预生成 后续
+        self.generate_b27_phi3()  # 先预生成
+        page_map = {
+            "主页": "home_page",
+            "rks组成页": "place_b27_phi3_page",
+            "分数计算页": "score_calculate_page",
+            "搜索页面": "search_page",
+            "编辑页面": "edit_info_page",
+            "账号页面": "account_page",
+            "设置页面": "setting_page",
+        }
         if self.token:
             self.switch_to(
-                self.widgets[self.default_open_page]["widget"]
+                self.widgets[page_map[self.default_open_page]]["widget"]
             )  # 切换到指定的起始页面
             # self.switch_to(self.account_page)
         else:
@@ -1041,7 +1051,7 @@ class MainWindow(FramelessWindow):
         combine_name = song_item.combine_name
         level = song_item.level
         diff = song_item.diff
-        singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
+        singal_rks = round(level * pow((acc - 55) / 45, 2), 8)
         if combine_name in b27_dict.keys() and diff in b27_dict[combine_name]:  # 在b27
             need_rks = delta_rks + singal_rks
             need_acc = 45 * sqrt(need_rks / level) + 55
@@ -1078,8 +1088,10 @@ class MainWindow(FramelessWindow):
         """b27_dict[组合名称]=['AT', 'IN'] 组合名称的歌在榜的难度"""
         min_b27_rks = MAX_LEVEL + 1  # b27地板对应rks
 
+        self.total_rks: float = 0.0
         for songi in self.b27:
             singal_rks, row = songi
+            self.total_rks += singal_rks
             item = model.get_item(row)
             combine_name = item.combine_name
             diff = item.diff
@@ -1091,14 +1103,18 @@ class MainWindow(FramelessWindow):
             min_b27_rks = min(min_b27_rks, singal_rks)
         # infolog(b27_dict)
 
-        player_now_rks = round(
-            self.total_rks / (len(self.b27) + len(self.phi3)), 4
+        for singal_rks, row in self.phi3:
+            self.total_rks += singal_rks
+        self.rks = round(
+            self.total_rks / (len(self.b27) + len(self.phi3)), 8
         )  # 当前玩家准确rks值
-        show_rks = int(player_now_rks * 100 + 0.5) / 100  # 游戏页面展示的rks值
+        show_rks = int(self.rks * 100 + 0.5) / 100  # 游戏页面展示的rks值
         delta_rks = (
-            show_rks + 0.005 - player_now_rks
+            show_rks + 0.005 - self.rks
         )  # 0.005保证游戏页面四舍五入后rks出现提升
-        # infolog(f"需要提升的rks是:{delta_rks * 30}")
+        infolog(
+            f"玩家当前rks:{self.rks} 展示的rks{show_rks} 需要提升的rks是:{delta_rks * 30}"
+        )
         for row in range(model.rowCount()):  # 遍历所有歌曲
             item = model.get_item(row)
             if not item:
@@ -1135,7 +1151,6 @@ class MainWindow(FramelessWindow):
         player_rks_label.setFixedHeight(50)
         layout.addWidget(player_rks_label, 0)
         # layout.insertWidget(0, player_rks_label, 0)
-        self.total_rks: float = 0.0
 
         b27_folder = folder("b27:", True)
         self.widgets["place_b27_phi3_page"]["b27_folder"] = b27_folder
@@ -1144,7 +1159,6 @@ class MainWindow(FramelessWindow):
         )  # 竖直方向占据最小需求值
         b27_folder.setMinimumHeight(0)
         for singal_rks, row in self.b27:
-            self.total_rks += singal_rks
             cardi = self.song_list_widget.build_card(row, is_expanded=False)
             if cardi:
                 cardi.setMinimumHeight(0)
@@ -1156,14 +1170,12 @@ class MainWindow(FramelessWindow):
         phi3_folder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         phi3_folder.setMinimumHeight(0)
         for singal_rks, row in self.phi3:
-            self.total_rks += singal_rks
             cardi = self.song_list_widget.build_card(row, is_expanded=False)
             if cardi:
                 cardi.setMinimumHeight(0)
                 phi3_folder.add_widget(cardi)
         layout.addWidget(phi3_folder)
 
-        self.rks = round(self.total_rks / (len(self.b27) + len(self.phi3)), 4)
         rks_content_label = label(
             str(self.rks), {"font_size": 24, "background_color": (0, 0, 0, 0)}
         )
@@ -1936,6 +1948,7 @@ class MainWindow(FramelessWindow):
 
         model = self.song_list_widget.model
         for songi in song_info:  # 取出index
+            print(f"歌曲信息一共{len(song_info)}条")
             item = model.get_item(songi)
             # combine_name = item.combine_name
             diffi = item.diff
@@ -1950,6 +1963,7 @@ class MainWindow(FramelessWindow):
             chapter = item.chapter
             groups = item.groups
             comments = item.comment
+            nickname_list = item.nickname_list
 
             if attribution == "acc":
                 if limit == "大于" and acc > float(limit_val):
@@ -2063,7 +2077,7 @@ class MainWindow(FramelessWindow):
                 elif limit == "不包含" and limit_val not in chapter:
                     result.add(songi)
             elif attribution == "分组":
-                groups_low = [g.replace(" ", "").lower() for g in groups]
+                groups_low = [str(g).replace(" ", "").lower() for g in groups]
                 if limit == "包含" and limit_val in groups_low:
                     result.add(songi)
                 elif limit == "不包含" and limit_val not in groups_low:
@@ -2074,6 +2088,20 @@ class MainWindow(FramelessWindow):
                     result.add(songi)
                 elif limit == "不包含" and limit_val not in comments_low:
                     result.add(songi)
+            elif attribution == "俗称":
+                nickname_low = [str(g).replace(" ", "").lower() for g in nickname_list]
+                if limit == "包含":
+                    for nicknamei in nickname_low:
+                        infolog(f'正在查找{nicknamei}')
+                        if limit_val in nicknamei:
+                            result.add(songi)
+                            break
+                elif limit == "不包含":
+                    for nicknamei in nickname_low:
+                        if limit_val not in nicknamei:
+                            result.add(songi)
+                            break
+                
         infolog("从给定的序号中筛选出符合条件的序号完成")
         return result
 
@@ -2342,6 +2370,7 @@ class MainWindow(FramelessWindow):
             "云女孩.符白牙SiYFics",
             comment="豪庭好玩",
             group=["好歌!", "初见杀"],
+            nickname_list=[]
         )
         display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["edit_info_page"]["song_info_card"] = example_song
@@ -2363,7 +2392,7 @@ class MainWindow(FramelessWindow):
         group_layout.setSpacing(5)
 
         # 左 分组下拉框
-        group_ccb = multi_check_combobox()
+        group_ccb = multi_check_combobox(self.user_name)
         self.widgets["edit_info_page"]["group_ccb"] = group_ccb
         self.get_userd_group()
         group_ccb.addItems(self.used_group)
@@ -2375,7 +2404,7 @@ class MainWindow(FramelessWindow):
             "min_width": 55,
             "min_height": 35,
             "max_height": 35,
-            "font_size": 19
+            "font_size": 19,
         }
         create_group_btn = button("新建", create_group_btn_style)
         create_group_btn.bind_click_func(self.create_new_group)
@@ -2383,8 +2412,15 @@ class MainWindow(FramelessWindow):
         create_group_btn.setFixedSize(50, 50)
         group_layout.addWidget(create_group_btn)
         edit_layout.addLayout(group_layout)
-
-        comment_label = multiline_text()
+        comment_label_style = {
+            "font_size": 22,
+            "max_height": 550,
+            "min_height": 550,
+            "min_width": 450,
+            "max_width": 450,
+            "background_transparent": 0,
+        }
+        comment_label = multiline_text(style=comment_label_style)
         self.widgets["edit_info_page"]["comment_label"] = comment_label
         edit_layout.addWidget(comment_label)
 
@@ -2449,9 +2485,9 @@ class MainWindow(FramelessWindow):
         user_input = group_ccb.text()
         infolog(f"新分组名称为:{user_input}")
         if user_input:
-            selected_group = group_ccb.get_selected_items() # 默认加入输入文字了
+            selected_group = group_ccb.get_selected_items()  # 默认加入输入文字了
             group_ccb.clear()
-            self.used_group.add(user_input) # 维护已使用的集合
+            self.used_group.add(user_input)  # 维护已使用的集合
             group_ccb.addItems(self.used_group)
             group_ccb.set_selected_items(selected_group)
         infolog("新建分组结束")
@@ -2480,6 +2516,7 @@ class MainWindow(FramelessWindow):
         diff = now_card.diff
         group_ccb: multi_check_combobox = self.widgets["edit_info_page"]["group_ccb"]
         new_group = "`".join(group_ccb.get_selected_items())
+        # print(f"new group={new_group}")
         new_comment = self.widgets["edit_info_page"]["comment_label"].get_plain_text()
         model = self.song_list_widget.model
         item: SongItem = model.item_dict[f"{now_card.combine_name}.{now_card.diff}"]
@@ -2989,20 +3026,23 @@ class MainWindow(FramelessWindow):
             "font_size": 20,
         }
         label_style = {"min_width": 210, "max_width": 210, "font_size": 24}
+        page_list = [
+            "主页",
+            "rks组成页",
+            "分数计算页",
+            "搜索页面",
+            "编辑页面",
+            "账号页面",
+            "设置页面",
+        ]
         default_open_page = combobox(
-            [
-                "主页",
-                "rks组成页",
-                "分数计算页",
-                "搜索页面",
-                "编辑页面",
-                "账号页面",
-                "设置页面",
-            ],
+            page_list,
             "设置默认启动页面",
             cbb_style,
             label_style,
         )
+        open_index = page_list.index(self.default_open_page)
+        default_open_page.set_current_choose(open_index)
         self.widgets["setting_page"]["default_open_page"] = default_open_page
         main_setting_layout.addWidget(default_open_page)
 
@@ -3042,10 +3082,10 @@ class MainWindow(FramelessWindow):
                 self.default_filter["attribution"]
             )
         )
+        default_filter_obj.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
         default_filter_obj.limit_choose_cbb.set_current_choose(
             default_filter_obj.filter_limit_list.index(self.default_filter["limit"])
         )
-        default_filter_obj.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
         default_filter_obj.limit_val_cbb.set_text(str(self.default_filter["value"]))
         # default_filter_obj.attribution_choose_cbb.setMaximumWidth(160)
         default_filter_obj.setFixedHeight(65)
@@ -3125,16 +3165,7 @@ class MainWindow(FramelessWindow):
         default_open_page: combobox = self.widgets["setting_page"]["default_open_page"]
         default_open_page_text = default_open_page.get_content()
 
-        page_map = {
-            "主页": "home_page",
-            "rks组成页": "place_b27_phi3_page",
-            "分数计算页": "score_calculate_page",
-            "搜索页面": "search_page",
-            "编辑页面": "edit_info_page",
-            "账号页面": "account_page",
-            "设置页面": "setting_page",
-        }
-        main_setting["default_open_page"] = page_map[default_open_page_text]
+        main_setting["default_open_page"] = default_open_page_text
 
         # 搜索页默认筛选条件写入
         search_page_setting = user_setting["search_page_setting"]

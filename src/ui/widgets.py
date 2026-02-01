@@ -143,7 +143,7 @@ class editable_combobox(QWidget):
         hint_label: str = "",
         cbb_style: dict[str, str] = {},
         label_style: dict[str, str] = {},
-        used_group = None,
+        used_group=None,
     ):
         super().__init__()
         self.editor_layout = QHBoxLayout(self)
@@ -162,7 +162,7 @@ class editable_combobox(QWidget):
         self.charter_completer = QStringListModel(CHARTER_LIST)
         self.drawer_completer = QStringListModel(DRAWER_NAME_LIST)
         self.group_info_completer = QStringListModel(used_group)
-        # self.comment_info_completer = QStringListModel(self.comments)
+        self.nickname_completer = QStringListModel(NICKNAME_LIST)
 
     def set_content_list(self, content_list):
         self.cbb.clear()
@@ -240,11 +240,19 @@ class body_label(QLabel):
 
 # 多行文本
 class multiline_text(TextEdit):
-    def __init__(self, text: str = "", parent: QWidget = None, read_only:bool = False):
+
+    def __init__(
+        self,
+        text: str = "",
+        parent: QWidget = None,
+        read_only: bool = False,
+        style: dict[str, str] = {},
+    ):
         super().__init__(parent)
         if read_only:
             self.setReadOnly(True)
         self.setText(text)
+        self.setStyleSheet(get_multiline_text_style(**style))
         self.setWordWrapMode(QTextOption.WordWrap)
         self.setAlignment(Qt.AlignVCenter)
 
@@ -350,7 +358,7 @@ class main_info_card(ElevatedCardWidget):
             "",
             {
                 "font_size": 23,
-                "font_color": (188, 188, 188, 1),
+                "font_color": (204, 250, 255, 1),
                 "max_width": 150,
                 "min_height": 26,
             },
@@ -472,15 +480,14 @@ class hint_and_frame_widget(QFrame):
     def __init__(
         self,
         title: str,
-        content_style: dict[str, int]={
-            "max-height": 55,
-            "min-height": 55,
+        content_style: dict[str, int] = {
+            "max-height": 63,
+            "min-height": 63,
             "min-width": 250,
             "max-width": 250,
         },
     ):
         super().__init__()
-
         # ------------- 底层背景卡片 -------------
         self.setStyleSheet(
             """
@@ -579,7 +586,8 @@ class song_info_card(QWidget):
         combine_name: str = "",
         improve_advice: float | None = None,
         comment: str = "",
-        group: list[str] = "",
+        group: list[str] = [],
+        nickname_list: list[str] = [],
     ):
         super().__init__()
         # 保存数据
@@ -600,6 +608,7 @@ class song_info_card(QWidget):
         self.diff_bg_path = diff_bg_path
         self.comment = comment
         self.group = group
+        self.nickname_list = nickname_list
 
         self.right_func = None
         self.setContentsMargins(0, 0, 0, 0)
@@ -672,46 +681,49 @@ class song_info_card(QWidget):
 
         # 禁用更新以批量添加控件，减少重复重绘
         self.scroll_content_widget.setUpdatesEnabled(False)
-
-        composer_content_elm = BodyLabel(self.composer)
-        composer_content_elm.setStyleSheet(self.label_style)
-        composer_content_elm.setWordWrap(True)
+        composer_content_elm = multiline_text(self.composer, read_only=True)
         composer_label = hint_and_frame_widget("曲师:")
         composer_label.add_widget(composer_content_elm)
         self.flow_layout.addWidget(composer_label)
 
-        chapter_content_elm = BodyLabel(self.chapter)
-        chapter_content_elm.setStyleSheet(self.label_style)
-        chapter_content_elm.setWordWrap(True)
+        chapter_content_elm = multiline_text(self.chapter, read_only=True)
         chapter_label = hint_and_frame_widget("谱师:")
         chapter_label.add_widget(chapter_content_elm)
         self.flow_layout.addWidget(chapter_label)
+
         try:
-            drawer_content_elm = BodyLabel(self.drawer)
+            drawer_content_elm = multiline_text(self.drawer, read_only=True)
         except:
             infolog(f"歌曲{self.name}出错了 得到的是{self.drawer}")
-        drawer_content_elm.setStyleSheet(self.label_style)
-        drawer_content_elm.setWordWrap(True)
         drawer_label = hint_and_frame_widget("画师:")
         drawer_label.add_widget(drawer_content_elm)
         self.flow_layout.addWidget(drawer_label)
 
         self.group_label = hint_and_frame_widget("分组:")
-        self.group_content_label = label("、".join(self.group))
+        self.group_content_label = multiline_text("、".join(self.group), read_only=True)
         self.group_label.add_widget(self.group_content_label)
         self.flow_layout.addWidget(self.group_label)
 
         self.comment_label = hint_and_frame_widget(
             "简评:",
             {
-                "max-height": 80,
-                "min-height": 80,
+                "max-height": 90,
+                "min-height": 90,
                 "min-width": 250,
                 "max-width": 250,
             },
         )
-        self.comment_content_label = multiline_text(self.comment, read_only=True)
-        self.comment_content_label.setStyleSheet("font-size: 19px;")
+        self.comment_content_label = multiline_text(
+            self.comment,
+            read_only=True,
+            style={
+                "font_size": 19,
+                "max_height": 85,
+                "min_height": 85,
+                "min_width": 250,
+                "max_width": 250,
+            },
+        )
         self.comment_label.add_widget(self.comment_content_label)
         self.flow_layout.addWidget(self.comment_label)
 
@@ -758,6 +770,7 @@ class song_info_card(QWidget):
             self.improve_advice,
             self.comment,
             self.group,
+            self.nickname_list
         )
 
 
@@ -875,7 +888,7 @@ class filter_obj(QWidget):
         self.index = index
         self.filter_obj_list = filter_obj_list
         self.flow_layout = flow_layout
-        self.get_used_group = get_used_group # 这是个函数
+        self.get_used_group = get_used_group  # 这是个函数
         # 主布局
         self.setMaximumHeight(40)
         self.setFixedWidth(880)
@@ -1037,6 +1050,13 @@ class filter_obj(QWidget):
         elif self.attribution_choose_cbb.get_content() == "简评":
             self.filter_limit_list = ["包含", "不包含"]
             self.limit_choose_cbb.set_content(self.filter_limit_list)
+            self.limit_val_cbb.clear_completer()
+
+        elif self.attribution_choose_cbb.get_content() == "俗称":
+            self.filter_limit_list = ["包含", "不包含"]
+            self.limit_choose_cbb.set_content(self.filter_limit_list)
+            self.limit_val_cbb.set_content_list(list(NICKNAME_LIST))
+            self.limit_val_cbb.set_completer(self.limit_val_cbb.nickname_completer)
 
     def input_val_check(self, attribution, value) -> tuple[bool, str]:
         if attribution == "acc":
@@ -1137,15 +1157,78 @@ class filter_obj(QWidget):
         return (attribution, limit, limit_val)
 
 
+import csv
+import os
+
+
+def remove_group_from_csv(user_name, group_name_to_remove):
+    """
+    遍历 CSV 文件，删除指定的分组名，并重新序列化保存
+    """
+    group_path = appdata_path(f"{user_name}_{GROUP_PATH}")
+    if not os.path.exists(group_path):
+        print(f"文件不存在: {group_path}")
+        return
+
+    updated_rows = []
+    file_changed = False
+
+    try:
+        # 读取文件
+        with open(group_path, mode="r", encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                # 确保行数据有效（至少有2列：键, 分组字符串）
+                if len(row) < 2:
+                    updated_rows.append(row)
+                    continue
+
+                key = row[0]
+                groups_str = row[1]
+
+                # 如果分组字符串为空，直接保留
+                if not groups_str:
+                    updated_rows.append(row)
+                    continue
+
+                # 反序列化：按反引号分割
+                # filter(None, ...) 用于去除可能产生的空字符串
+                group_list = groups_str.split("`")
+
+                # 检查是否存在要删除的分组
+                if group_name_to_remove in group_list:
+                    # 移除分组
+                    group_list.remove(group_name_to_remove)
+                    file_changed = True
+
+                    # 重新序列化：用反引号连接
+                    new_groups_str = "`".join(group_list)
+                    updated_rows.append([key, new_groups_str])
+                else:
+                    # 如果没有包含该分组，保持原样
+                    updated_rows.append(row)
+
+        # 只有在确实发生了更改时才写回文件，减少IO
+        if file_changed:
+            with open(group_path, mode="w", encoding="utf-8", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerows(updated_rows)
+            print(f"已从文件中移除分组: {group_name_to_remove}")
+
+    except Exception as e:
+        print(f"处理 CSV 文件时出错: {e}")
+
+
 # 可以多选的下拉菜单
 class multi_check_combobox(EditableComboBox):
     selectionChanged = pyqtSignal(list)
     # 添加一个信号，如果外部需要知道哪个组被删除了，可以连接这个信号
     itemRemoved = pyqtSignal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, user_name, parent=None):
         super().__init__(parent)
         self.contain_list = []
+        self.user_name = user_name
         self.setMaximumWidth(360)
 
         # 创建自定义下拉菜单
@@ -1254,13 +1337,14 @@ class multi_check_combobox(EditableComboBox):
         if self.text() == text:
             self.setText("")
 
+        remove_group_from_csv(self.user_name, text)
         # 4. 发送信号（可选）
         self.itemRemoved.emit(text)
 
     def get_selected_items(self):
         """获取当前选中的项"""
         selected = []
-        if self.text() and self.text() in self.contain_list:
+        if self.text():
             selected = [self.text()]
 
         for i in range(self.list_widget.count()):
@@ -1594,6 +1678,7 @@ class SongItem:  # 存储单个歌曲的信息
     illustration: QPixmap
     bg_path: str
     groups: list[str]
+    nickname_list: list[str]
     comment: str
     bg_pixmap: QPixmap | None = None
 
@@ -1651,9 +1736,9 @@ class SongListViewWidget(QWidget):
         infolog("开始从存档中构建数据")
         self.model = SongListModel()
         self.view.setModel(self.model)
-        # ----- 获取分组信息 -----
         self.GROUP_INFO = {}
         self.COMMENT_INFO = {}
+        # ----- 获取分组信息 -----
         group_path = appdata_path(f"{user_name}_{GROUP_PATH}")
         if not os.path.exists(group_path) or os.path.getsize(group_path) == 0:
             shutil.copy2(resource_path(DEFAULT_GROUP), group_path)
@@ -1730,8 +1815,9 @@ class SongListViewWidget(QWidget):
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
                 illustration = illustration_cache[combine_name]
                 bg_path = bg_cache[diffi]
-                groups = self.GROUP_INFO.get(combine_name, "")
+                groups = self.GROUP_INFO.get(combine_name, {})
                 comment = self.COMMENT_INFO.get(combine_name, {}).get(diffi, "")
+                nickname = NICKNAME_DICT.get(combine_name, {})
                 # 构造 SongItem，并加入 model
                 # infolog(f"模型正在写入{combine_name}")
                 item = SongItem(
@@ -1751,6 +1837,7 @@ class SongListViewWidget(QWidget):
                     bg_path=bg_path,
                     groups=groups,
                     comment=comment,
+                    nickname_list=nickname,
                 )
                 self.model.add_item(item)
                 row += 1
@@ -1788,6 +1875,7 @@ class SongListViewWidget(QWidget):
             item.improve_advice,
             item.comment,
             item.groups,
+            item.nickname_list
         )
 
         return card

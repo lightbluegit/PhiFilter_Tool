@@ -157,3 +157,26 @@ def get_switch_button_style(
     """
     style += "}"
     return style
+
+
+def get_multiline_text_style(
+    max_width: str = 250,
+    min_width: str = 250,
+    min_height: str = 63,
+    max_height: str = 63,
+    font_size: str = 19,
+    background_transparent: str = 1,
+):
+    style = "QTextEdit {\n"
+    if(background_transparent):
+        style += "background-color: transparent;"
+    style += f"""
+    border: none;
+    font-size: {font_size}px;
+    max-width: {max_width}px;
+    min-width: {min_width}px;
+    min-height: {min_height}px;
+    max-height: {max_height}px;
+    """
+    style += "}"
+    return style

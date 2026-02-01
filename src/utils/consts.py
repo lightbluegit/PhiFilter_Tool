@@ -13,6 +13,7 @@ ASSETS_PREPATH = FILE_PATH + "assets/"
 
 DATA_PREPATH = ASSETS_PREPATH + "data/"
 
+DEFAULT_NICKNAME = DATA_PREPATH + "default_nickname.yaml"
 DEFAULT_COMMENT = DATA_PREPATH + "default_comment.csv"  # 空白简评文件
 DEFAULT_GROUP = DATA_PREPATH + "default_group.csv"
 DIFFICULTY_PATH = DATA_PREPATH + "difficulty.tsv"  # 各个歌曲难度文件
@@ -86,7 +87,7 @@ SETTING_PATH = "PhiFilterTool_setting.json"  # 玩家设置
 
 GROUP_PATH = "group.csv"  # 玩家自定义分组信息存储路径
 COMMENT_PATH = "comment.csv"  # 玩家自定义简评信息存储路径
-
+NICKNAME_PATH = "nickname.yaml"
 
 # 可作为筛选依据的属性
 FILTER_ATTRIBUTION_LIST: list[str] = [
@@ -97,6 +98,7 @@ FILTER_ATTRIBUTION_LIST: list[str] = [
     "评级",
     "难度",
     "曲名",
+    "俗称",
     "曲师",
     "谱师",
     "画师",
@@ -1811,3 +1813,13 @@ CHARTER_LIST: list[str] = [
     """FORGET :: CLUTTER""",
     """XMT is silvery, 小咩兔 is silvery""",
 ]
+
+import yaml
+NICKNAME_LIST = []
+NICKNAME_DICT = {}
+with open(appdata_path(NICKNAME_PATH), "r", encoding="utf-8") as f:
+    NICKNAME_DICT:dict[str, list[str]] = yaml.safe_load(f)
+    print(f"原始文本一共{len(NICKNAME_DICT)}")
+    for key, value_list in NICKNAME_DICT.items(): # 遍历每首歌
+        for nicknamei in value_list: # 遍历每个俗称
+            NICKNAME_LIST.append(str(nicknamei)) # 收集每个俗称
