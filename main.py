@@ -1943,12 +1943,13 @@ class MainWindow(FramelessWindow):
         infolog("开始从给定的序号中筛选出符合条件的序号并返回")
         (attribution, limit, limit_val) = condition
         result = set()
-        if attribution in ("曲名", "曲师", "谱师", "画师", "分组", "简评"):
+        if attribution in ("曲名", "曲师", "谱师", "画师", "分组", "简评", "俗称"):
             limit_val = limit_val.replace(" ", "").lower()
 
         model = self.song_list_widget.model
         for songi in song_info:  # 取出index
-            print(f"歌曲信息一共{len(song_info)}条")
+            # print(f"歌曲信息一共{len(song_info)}条")
+
             item = model.get_item(songi)
             # combine_name = item.combine_name
             diffi = item.diff
@@ -1958,6 +1959,7 @@ class MainWindow(FramelessWindow):
             is_fc = item.is_fc
             singal_rks = item.rks
             song_name = item.name
+            # print(song_name)
             composer = item.composer
             drawer = item.drawer
             chapter = item.chapter
@@ -2095,13 +2097,11 @@ class MainWindow(FramelessWindow):
                         infolog(f'正在查找{nicknamei}')
                         if limit_val in nicknamei:
                             result.add(songi)
-                            break
                 elif limit == "不包含":
                     for nicknamei in nickname_low:
                         if limit_val not in nicknamei:
                             result.add(songi)
-                            break
-                
+
         infolog("从给定的序号中筛选出符合条件的序号完成")
         return result
 

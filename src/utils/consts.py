@@ -1818,8 +1818,10 @@ import yaml
 NICKNAME_LIST = []
 NICKNAME_DICT = {}
 with open(appdata_path(NICKNAME_PATH), "r", encoding="utf-8") as f:
-    NICKNAME_DICT:dict[str, list[str]] = yaml.safe_load(f)
-    print(f"原始文本一共{len(NICKNAME_DICT)}")
-    for key, value_list in NICKNAME_DICT.items(): # 遍历每首歌
+    raw_dict:dict[str, list[str]] = yaml.safe_load(f)
+    for key, value_list in raw_dict.items(): # 遍历每首歌
+        nickname_dicti = []
         for nicknamei in value_list: # 遍历每个俗称
+            nickname_dicti.append(str(nicknamei))
             NICKNAME_LIST.append(str(nicknamei)) # 收集每个俗称
+        NICKNAME_DICT[key] = nickname_dicti

@@ -681,6 +681,17 @@ class song_info_card(QWidget):
 
         # 禁用更新以批量添加控件，减少重复重绘
         self.scroll_content_widget.setUpdatesEnabled(False)
+        nickname_str = ''
+        for nicknamei in self.nickname_list:
+            nickname_str += nicknamei + ", "
+        nickname_str = nickname_str[:-2:]
+        nickname_content_elm = multiline_text(
+            nickname_str, read_only=True
+        )
+        nickname_label = hint_and_frame_widget("俗称:")
+        nickname_label.add_widget(nickname_content_elm)
+        self.flow_layout.addWidget(nickname_label)
+
         composer_content_elm = multiline_text(self.composer, read_only=True)
         composer_label = hint_and_frame_widget("曲师:")
         composer_label.add_widget(composer_content_elm)
@@ -770,7 +781,7 @@ class song_info_card(QWidget):
             self.improve_advice,
             self.comment,
             self.group,
-            self.nickname_list
+            self.nickname_list,
         )
 
 
@@ -1797,27 +1808,35 @@ class SongListViewWidget(QWidget):
             }
 
         row = 0
-        for combine_name, all_diff_dic in save_dict["gameRecord"].items():
-            for diffi, items in all_diff_dic.items():
-                if diffi == "Legacy":
-                    continue
-                score = int(items["score"])
-                acc = float(items["acc"])
-                is_fc = True if items["fc"] == 1 else False
-                try:
-                    level = float(diff_map_result[combine_name][diffi])
-                except:
-                    warnlog(
-                        f"{combine_name}没有{diffi}难度哦 再看看文件是否更新了",
-                    )
-                singal_rks = round(level * pow((acc - 55) / 45, 2), 4)
-                acc = round(acc, 4)
+        for combine_name, all_diff_dic in diff_map_result.items():
+            for diffi, leveli in all_diff_dic.items():
+                gamerecord = save_dict["gameRecord"]
+                # 一定会有的信息
+
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
                 illustration = illustration_cache[combine_name]
                 bg_path = bg_cache[diffi]
-                groups = self.GROUP_INFO.get(combine_name, {})
-                comment = self.COMMENT_INFO.get(combine_name, {}).get(diffi, "")
-                nickname = NICKNAME_DICT.get(combine_name, {})
+                nickname = NICKNAME_DICT.get(combine_name, []) # 有可能暂时没有没别名
+                if (
+                    combine_name not in gamerecord
+                    or diffi not in gamerecord[combine_name]
+                ): # 对于未游玩过的歌曲的处理
+                    score = 0
+                    acc = 0.0
+                    is_fc = False
+                    singal_rks = 0
+                    groups = []
+                    comment = ""
+                else:
+                    items = gamerecord[combine_name][diffi]
+                    score = int(items["score"])
+                    acc = float(items["acc"])
+                    acc = round(acc, 4)
+                    is_fc = True if items["fc"] == 1 else False
+                    singal_rks = round(leveli * pow((acc - 55) / 45, 2), 8)
+                    groups = self.GROUP_INFO.get(combine_name, {})
+                    comment = self.COMMENT_INFO.get(combine_name, {}).get(diffi, "")
+
                 # 构造 SongItem，并加入 model
                 # infolog(f"模型正在写入{combine_name}")
                 item = SongItem(
@@ -1826,7 +1845,7 @@ class SongListViewWidget(QWidget):
                     name=song_name,
                     rks=singal_rks,
                     acc=acc,
-                    level=level,
+                    level=leveli,
                     score=score,
                     improve_advice=None,
                     is_fc=is_fc,
@@ -1875,7 +1894,7 @@ class SongListViewWidget(QWidget):
             item.improve_advice,
             item.comment,
             item.groups,
-            item.nickname_list
+            item.nickname_list,
         )
 
         return card
