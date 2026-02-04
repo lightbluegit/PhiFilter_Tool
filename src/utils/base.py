@@ -66,7 +66,8 @@ logger.setLevel(logging.INFO)
 infofilehandler = RotatingFileHandler(
     filename=appdata_path("PhiFilterTool_infolog.log"),
     maxBytes=15 * 1024 * 1024,  # 10 MB
-    backupCount=3,  # 保留3个备份文件
+    backupCount=0,  # 不保留备份文件
+    encoding="utf-8",
 )
 filehandler = logging.FileHandler(filename=appdata_path("PhiFilterTool_log.log"))
 filehandler.setLevel(logging.WARNING)
@@ -119,3 +120,11 @@ def get_score_level(score: int, is_fc: bool = False) -> score_level_type:
         return score_level_type.C
     else:
         return score_level_type.F
+
+def clear_log_file():
+    for h in logger.handlers:
+        if isinstance(h, RotatingFileHandler):
+            # doRollover 会关闭当前文件，将其重命名（如果有备份），然后打开新文件
+            # 因为 backupCount=0，它实际上达到了清空并重新开始的效果
+            h.doRollover()
+

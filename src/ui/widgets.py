@@ -198,15 +198,64 @@ class editable_combobox(QWidget):
 
 
 class button(PrimaryPushButton):
-
-    def __init__(self, text: str, style: dict[str, str] = {}, iconpath=None):
+    def __init__(self, text: str, style: dict = {
+    "font_size": 34,
+    "max_width": 300,
+    "min_width": 300,
+    "min_height": 40,
+    "max_height": 40,}, iconpath=None):
         super().__init__()
-        self.setText(text)  # 设置按钮文本
-        self.setStyleSheet(get_button_style(**style))
+
+        self.setText(text)
         if iconpath:
             self.setIcon(QIcon(iconpath))
 
-    def bind_click_func(self, func):  # 绑定按钮对应功能
+        base_style = f"""
+            QPushButton {{
+                padding: 6px 16px;
+                outline: none;
+                font-size: {style["font_size"]}px;
+                font-family: "{FONT_FAMILY["chi"]}";
+                max-width: {style['max_width']}px;
+                min-width: {style['min_width']}px;
+                min-height: {style['min_height']}px;
+                max-height: {style['max_height']}px;
+                border-radius: 7px;
+            }}
+        """
+
+        # 背景色：#E6F7FF 边框色：#91D5FF 文字色：#0050B3
+        color_style = """
+            QPushButton {
+                background-color: #E6F7FF; 
+                border: 1px solid #91D5FF; 
+                color: #0050B3;            
+            }
+            
+            QPushButton:hover {
+                background-color: #BAE7FF;
+                border-color: #40A9FF;
+                color: #003A8C;
+            }
+            
+            QPushButton:pressed {
+                background-color: #91D5FF;
+                border-color: #096DD9;
+                color: #002766;
+                padding-top: 7px;
+                padding-bottom: 5px;
+            }
+            
+            QPushButton:disabled {
+                background-color: #F5F5F5;
+                border: 1px solid #D9D9D9;
+                color: #B0B0B0;
+            }
+        """
+
+        self.setStyleSheet(base_style + color_style)
+
+    def bind_click_func(self, func):
         self.clicked.connect(func)
 
     def set_icon_size(self, w, h):
@@ -805,6 +854,11 @@ class folder(QWidget):
         # 标题栏
         btn_style = {
             "background_color": (152, 245, 255, 1),
+            "font_size": 34,
+            "max_width": 360,
+            "min_width": 360,
+            "min_height": 50,
+            "max_height": 50,
         }
         self.title_btn = button(title, btn_style)
         self.title_btn.bind_click_func(self.toggle_expand)
@@ -947,10 +1001,11 @@ class filter_obj(QWidget):
 
         # -----------清除该筛选项按钮-----------
         btn_style = {
-            "max_width": "50",
-            "min_width": "50",
-            "min_height": 35,
-            "max_height": 35,
+            "max_width": 17,
+            "min_width": 17,
+            "min_height": 20,
+            "max_height": 20,
+            "font_size": 40,
         }
         self.delete_btn = button("-", btn_style)
         if len(self.filter_obj_list) == 0:
@@ -961,12 +1016,6 @@ class filter_obj(QWidget):
         self.delete_btn.clicked.connect(self.delete_filter_obj)
 
         # -----------增加一个选项按钮-----------
-        btn_style = {
-            "max_width": "50",
-            "min_width": "50",
-            "min_height": 35,
-            "max_height": 35,
-        }
         self.add_btn = button("+", btn_style)
         self.add_btn.setToolTip("新增筛选项")
         self.add_btn.setContentsMargins(0, 0, 0, 0)
@@ -1241,6 +1290,7 @@ class multi_check_combobox(EditableComboBox):
         self.contain_list = []
         self.user_name = user_name
         self.setMaximumWidth(360)
+        self.setMaximumHeight(28)
 
         # 创建自定义下拉菜单
         self.dropdown_menu = RoundMenu()
@@ -1833,7 +1883,7 @@ class SongListViewWidget(QWidget):
                     acc = float(items["acc"])
                     acc = round(acc, 4)
                     is_fc = True if items["fc"] == 1 else False
-                    singal_rks = round(leveli * pow((acc - 55) / 45, 2), 8)
+                    singal_rks = round(leveli * pow((acc - 55) / 45, 2), 4)
                     groups = self.GROUP_INFO.get(combine_name, {})
                     comment = self.COMMENT_INFO.get(combine_name, {}).get(diffi, "")
 

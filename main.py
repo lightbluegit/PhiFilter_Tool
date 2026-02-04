@@ -1645,9 +1645,11 @@ class MainWindow(FramelessWindow):
         filter_confirm_layout.setContentsMargins(0, 0, 0, 0)
 
         filter_btn_style = {
-            "min_height": 45,
-            "max_height": 45,
-            "font_size": 28,
+            "font_size": 24,
+            "max_width": 300,
+            "min_width": 300,
+            "min_height": 35,
+            "max_height": 35,
         }
 
         filter_from_all_song_btn = button(
@@ -1692,11 +1694,11 @@ class MainWindow(FramelessWindow):
 
         # 重置按钮
         reset_page_btn_style = {
-            "max_width": 120,
-            "min_width": 120,
-            "min_height": 40,
-            "max_height": 40,
-            "font_size": 30,
+            "max_width": 70,
+            "min_width": 70,
+            "min_height": 28,
+            "max_height": 28,
+            "font_size": 24,
         }
         reset_page_btn = button("重置", reset_page_btn_style, resource_path(RESET_PATH))
         self.widgets["search_page"]["reset_page_btn"] = reset_page_btn
@@ -2094,7 +2096,7 @@ class MainWindow(FramelessWindow):
                 nickname_low = [str(g).replace(" ", "").lower() for g in nickname_list]
                 if limit == "包含":
                     for nicknamei in nickname_low:
-                        infolog(f'正在查找{nicknamei}')
+                        infolog(f"正在查找{nicknamei}")
                         if limit_val in nicknamei:
                             result.add(songi)
                 elif limit == "不包含":
@@ -2120,7 +2122,7 @@ class MainWindow(FramelessWindow):
             )
             return
         infolog("开始根据各种条件布局筛选结果")
-        # infolog(f'搜索结果是{self.filter_result}')
+        infolog(f"调试：搜索结果是{self.filter_result}")
 
         self.time_record = datetime.now()
         # 获取个数限制
@@ -2165,6 +2167,7 @@ class MainWindow(FramelessWindow):
             item = model.get_item(row)
             combine_name = item.combine_name
             diffi = item.diff
+            infolog(f"name={combine_name}, diff={diffi}")
             score = item.score
             acc = item.acc
             level = item.level
@@ -2293,7 +2296,7 @@ class MainWindow(FramelessWindow):
             filter_obj_list: list[filter_obj] = self.widgets["search_page"][
                 "filter_obj_list"
             ]
-            print(f"待清除列表有{len(filter_obj_list)}个内容")
+            # print(f"待清除列表有{len(filter_obj_list)}个内容")
             for i in filter_obj_list:
                 i.limit_val_cbb.clear_text()
 
@@ -2309,19 +2312,25 @@ class MainWindow(FramelessWindow):
             filter_obj_list[idx].deleteLater()
             # infolog('delete')
         filter_obj_list = filter_obj_list[:1:]  # 只留第一个 还原
-
+        default_filter_obj: filter_obj = self.widgets["setting_page"][
+            "default_filter_obj"
+        ]
         # 重置带逻辑控件的这个
         basic_filter_obj = filter_obj_list[0]
         self.widgets["search_page"]["filter_obj_list"] = filter_obj_list
         basic_filter_obj.filter_obj_list = filter_obj_list  # filter_obj类需要这个数据来判断增删条件的时候是否需要隐藏删除按钮
         basic_filter_obj.add_btn.show()  # 条件筛选部分加上添加条件的按钮
-        basic_filter_obj.attribution_choose_cbb.set_current_choose(0)
 
-        basic_filter_obj.limit_choose_cbb.set_current_choose(0)
-        basic_filter_obj.limit_choose_cbb.set_content(NUMERIC_COMPARATORS)
-
-        basic_filter_obj.limit_val_cbb.clear_text()
-        basic_filter_obj.limit_val_cbb.clear_completer()
+        basic_filter_obj.attribution_choose_cbb.set_current_choose(
+            default_filter_obj.filter_attribution_list.index(
+                self.default_filter["attribution"]
+            )
+        )
+        basic_filter_obj.adapt_limit_option()  # 手动adapt根据定好的东西布局补全器和列表
+        basic_filter_obj.limit_choose_cbb.set_current_choose(
+            default_filter_obj.filter_limit_list.index(self.default_filter["limit"])
+        )
+        basic_filter_obj.limit_val_cbb.set_text(str(self.default_filter["value"]))
 
         basic_filter_obj.logical_cbb.set_current_choose(0)
 
@@ -2370,7 +2379,7 @@ class MainWindow(FramelessWindow):
             "云女孩.符白牙SiYFics",
             comment="豪庭好玩",
             group=["好歌!", "初见杀"],
-            nickname_list=[]
+            nickname_list=[],
         )
         display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["edit_info_page"]["song_info_card"] = example_song
@@ -2400,11 +2409,11 @@ class MainWindow(FramelessWindow):
 
         # 右 分组按钮
         create_group_btn_style = {
-            "max_width": 55,
-            "min_width": 55,
-            "min_height": 35,
-            "max_height": 35,
-            "font_size": 19,
+            "max_width": 50,
+            "min_width": 50,
+            "min_height": 28,
+            "max_height": 28,
+            "font_size": 23,
         }
         create_group_btn = button("新建", create_group_btn_style)
         create_group_btn.bind_click_func(self.create_new_group)
@@ -2530,7 +2539,10 @@ class MainWindow(FramelessWindow):
         ] = new_comment
 
         for i in range(model.rowCount()):
-            if model.items[i].combine_name == now_card.combine_name:
+            if (
+                model.items[i].combine_name == now_card.combine_name
+                and model.items[i].diff == now_card.diff
+            ):
                 model.items[i] = item
                 break
         try:
@@ -3056,8 +3068,12 @@ class MainWindow(FramelessWindow):
         open_log_file_btn = button("跳转日志文件位置", open_log_file_btn_style)
         self.widgets["setting_page"]["open_log_file_btn"] = open_log_file_btn
         main_setting_layout.addWidget(open_log_file_btn)
-
         open_log_file_btn.bind_click_func(lambda: os.startfile(appdata_path()))
+
+        clear_log_file_btn = button("清空日志文件", open_log_file_btn_style)
+        self.widgets["setting_page"]["clear_log_file_btn"] = clear_log_file_btn
+        main_setting_layout.addWidget(clear_log_file_btn)
+        clear_log_file_btn.bind_click_func(clear_log_file)
 
         main_setting_layout.setAlignment(Qt.AlignLeft)
         main_setting_layout.addStretch(1)

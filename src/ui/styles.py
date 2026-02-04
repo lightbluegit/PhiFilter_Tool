@@ -42,44 +42,6 @@ def get_combobox_style(
     return style
 
 
-def get_button_style(
-    max_width: str = 360,
-    min_width: str = 360,
-    min_height: str = 50,
-    max_height: str = 50,
-    font_family: str = FONT_FAMILY["chi"],
-    font_size: str = 34,
-    border_radius: str = 7,
-    background_color: tuple[str, str, str, str] = (0, 159, 170, 1),
-    color: str = "white",
-):
-    style = "PushButton {\n "
-    r, g, b, a = background_color
-    contain = f"""
-    font-size: {font_size}px;
-    font-family: "{font_family}";
-    max-width: {max_width}px;
-    min-width: {min_width}px;
-    min-height: {min_height}px;
-    max-height: {max_height}px;
-    border-radius: {border_radius}px;
-    background-color: rgba({r},{g},{b},{a});
-    color: {color};
-    """
-    style += (
-        contain
-        + """
-        }
-    PushButton:hover {
-        background-color: #00CDCD;
-    }
-    PushButton:pressed {
-        background-color: #00FFFF;
-    }"""
-    )
-    return style
-
-
 def get_label_style(
     font_size: str = 26,
     max_width: str = 0,
