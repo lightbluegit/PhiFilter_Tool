@@ -1,46 +1,40 @@
-from PyQt5.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QApplication,
-    QStackedWidget,
-    QDesktopWidget,
-    QSizePolicy,
-    QStackedLayout,
-)
-from qframelesswindow import FramelessWindow, StandardTitleBar
-from PyQt5.QtCore import Qt, QUrl
-from PyQt5.QtGui import (
-    QGuiApplication,
-    QIcon,
-    QPixmap,
-    QDesktopServices,
-)
-from qfluentwidgets import (
-    NavigationInterface,
-    NavigationItemPosition,
-    FlowLayout,
-    SmoothScrollArea,
-    InfoBar,
-    SwitchButton,
-    InfoBarPosition,
-    AvatarWidget,
-    HorizontalSeparator,
-    Action,
-    SegmentedWidget,
-)
-from qfluentwidgets import FluentIcon as FIF
-import sys
+#  PEP 8 分组与排序
+import copy
 import heapq  # 算rks组成
+import json
 import os
-from typing import Any, List, Tuple, Dict
-import pandas as pd
+import random
+import sys
 from datetime import datetime
 from math import sqrt
-import copy
-import random
-import json
-import yaml
+from typing import Any, Dict, List, Tuple
+
+import pandas as pd
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QDesktopServices, QGuiApplication, QIcon, QPixmap
+from PyQt5.QtWidgets import (
+    QApplication,
+    QDesktopWidget,
+    QHBoxLayout,
+    QSizePolicy,
+    QStackedLayout,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
+from qfluentwidgets import Action, AvatarWidget, FlowLayout
+from qfluentwidgets import FluentIcon as FIF
+from qfluentwidgets import (
+    HorizontalSeparator,
+    InfoBar,
+    InfoBarPosition,
+    NavigationInterface,
+    NavigationItemPosition,
+    SegmentedWidget,
+    SmoothScrollArea,
+    SwitchButton,
+)
+from qframelesswindow import FramelessWindow, StandardTitleBar
 
 # 设置高 DPI 渲染策略，保证在高分辨率屏幕上界面清晰
 QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -51,9 +45,8 @@ QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 #! 先创建 QApplication 实例再写窗口 否则初始化缓存图片的时候会失败
 app = QApplication(sys.argv)
-# from core.phi_cloud.get_play_data import * # 获取用户信息
+from src.core.phi_cloud.get_play_data import *  # 获取用户信息
 from src.ui.widgets import *
-from src.core.phi_cloud.get_play_data import *
 
 
 class MainWindow(FramelessWindow):
@@ -144,7 +137,7 @@ class MainWindow(FramelessWindow):
         default_setting_text: dict = {
             "main_setting": {
                 "always_update": False,
-                "default_open_page": "home_page",
+                "default_open_page": "搜索页面",
             },
             "search_page_setting": {
                 "default_filter": {
@@ -195,6 +188,11 @@ class MainWindow(FramelessWindow):
                     self.user_name
                 ]["main_setting"]["default_open_page"]
             self.default_open_page: str = main_setting["default_open_page"]
+            if "a" <= self.default_open_page[0] <= "z":
+                self.default_open_page = "搜索页面"
+                setting_file[self.user_name]["main_setting"][
+                    "default_open_page"
+                ] = "搜索页面"
 
             # 读取搜索页设置
             if "search_page_setting" not in user_setting:
@@ -1576,7 +1574,7 @@ class MainWindow(FramelessWindow):
         main_layout = QVBoxLayout(widget)
         self.widgets["search_page"]["main_layout"] = main_layout
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        main_layout.setSpacing(5)
 
         # ------------------ 筛选条件选择区域 -------------------
         scroll_area = SmoothScrollArea()  # 滚动区域
@@ -1679,7 +1677,7 @@ class MainWindow(FramelessWindow):
 
         result_layout = QVBoxLayout(result_widget)
         self.widgets["search_page"]["result_layout"] = result_layout
-        result_layout.setContentsMargins(0, 0, 0, 0)
+        result_layout.setContentsMargins(0, 3, 0, 0)
         main_layout.addWidget(result_widget, 1)  # 所有的额外空间都给搜索结果栏
 
         # ---------------- 上层 分组/排序依据 ------------
@@ -2379,7 +2377,7 @@ class MainWindow(FramelessWindow):
             "云女孩.符白牙SiYFics",
             comment="豪庭好玩",
             group=["好歌!", "初见杀"],
-            nickname_list=[],
+            nickname_list=["云女鬼", "炸云"],
         )
         display_layout.addWidget(example_song, 0, Qt.AlignCenter)
         self.widgets["edit_info_page"]["song_info_card"] = example_song
@@ -3059,11 +3057,11 @@ class MainWindow(FramelessWindow):
         main_setting_layout.addWidget(default_open_page)
 
         open_log_file_btn_style = {
-            "max_width": 200,
-            "min_width": 200,
-            "min_height": 40,
-            "max_height": 40,
-            "font_size": 24,
+            "max_width": 190,
+            "min_width": 190,
+            "min_height": 26,
+            "max_height": 26,
+            "font_size": 23,
         }
         open_log_file_btn = button("跳转日志文件位置", open_log_file_btn_style)
         self.widgets["setting_page"]["open_log_file_btn"] = open_log_file_btn

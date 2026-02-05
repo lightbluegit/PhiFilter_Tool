@@ -1,69 +1,69 @@
-from src.ui.styles import *
-from PyQt5.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QFrame,
-    QLabel,
-    QPushButton,
-    QGridLayout,
-    QCompleter,
-    QListWidgetItem,
-    QSizePolicy,
-    QGraphicsBlurEffect,
-    QGraphicsScene,
-    QGraphicsPixmapItem,
-    QListView,
-)
+import re
+import shutil
+from dataclasses import dataclass
+
+import pandas as pd
 from PyQt5.QtCore import (
-    Qt,
-    QStringListModel,
-    pyqtSignal,
-    QSize,
-    QTimer,
-    QRectF,
-    QRect,
-    QPropertyAnimation,
-    QObject,
-    QRunnable,
-    QThreadPool,
     QAbstractListModel,
     QModelIndex,
+    QObject,
+    QPropertyAnimation,
+    QRect,
+    QRectF,
+    QRunnable,
+    QSize,
+    QStringListModel,
+    Qt,
+    QThreadPool,
+    QTimer,
+    pyqtSignal,
 )
 from PyQt5.QtGui import (
-    QIcon,
     QColor,
-    QPainter,
-    QTextOption,
+    QIcon,
     QImage,
+    QPainter,
     QPainterPath,
     QPixmap,
+    QTextOption,
+)
+from PyQt5.QtWidgets import (
+    QCompleter,
+    QFrame,
+    QGraphicsBlurEffect,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QListView,
+    QListWidgetItem,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
 from qfluentwidgets import (
-    PrimaryPushButton,
+    CaptionLabel,
+    CardWidget,
+    CheckBox,
     ComboBox,
     EditableComboBox,
-    FlowLayout,
     ElevatedCardWidget,
-    CaptionLabel,
-    BodyLabel,
-    ImageLabel,
+    FlowLayout,
     HorizontalSeparator,
-    SmoothScrollArea,
-    RoundMenu,
-    MenuAnimationType,
-    TextEdit,
-    CheckBox,
+    ImageLabel,
     ListWidget,
+    MenuAnimationType,
+    PrimaryPushButton,
+    RoundMenu,
     ScrollArea,
-    CardWidget,
     SearchLineEdit,
+    SmoothScrollArea,
+    TextEdit,
 )
-from dataclasses import dataclass
+from src.ui.styles import *
 from src.utils.consts import *
-import re
-import pandas as pd
-import shutil
 
 # ------------------------- 这里是重写的控件 -------------------------
 
@@ -198,12 +198,18 @@ class editable_combobox(QWidget):
 
 
 class button(PrimaryPushButton):
-    def __init__(self, text: str, style: dict = {
-    "font_size": 34,
-    "max_width": 300,
-    "min_width": 300,
-    "min_height": 40,
-    "max_height": 40,}, iconpath=None):
+    def __init__(
+        self,
+        text: str,
+        style: dict = {
+            "font_size": 30,
+            "max_width": 300,
+            "min_width": 300,
+            "min_height": 35,
+            "max_height": 35,
+        },
+        iconpath=None,
+    ):
         super().__init__()
 
         self.setText(text)
@@ -730,13 +736,11 @@ class song_info_card(QWidget):
 
         # 禁用更新以批量添加控件，减少重复重绘
         self.scroll_content_widget.setUpdatesEnabled(False)
-        nickname_str = ''
+        nickname_str = ""
         for nicknamei in self.nickname_list:
             nickname_str += nicknamei + ", "
         nickname_str = nickname_str[:-2:]
-        nickname_content_elm = multiline_text(
-            nickname_str, read_only=True
-        )
+        nickname_content_elm = multiline_text(nickname_str, read_only=True)
         nickname_label = hint_and_frame_widget("俗称:")
         nickname_label.add_widget(nickname_content_elm)
         self.flow_layout.addWidget(nickname_label)
@@ -1866,11 +1870,11 @@ class SongListViewWidget(QWidget):
                 song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
                 illustration = illustration_cache[combine_name]
                 bg_path = bg_cache[diffi]
-                nickname = NICKNAME_DICT.get(combine_name, []) # 有可能暂时没有没别名
+                nickname = NICKNAME_DICT.get(combine_name, [])  # 有可能暂时没有没别名
                 if (
                     combine_name not in gamerecord
                     or diffi not in gamerecord[combine_name]
-                ): # 对于未游玩过的歌曲的处理
+                ):  # 对于未游玩过的歌曲的处理
                     score = 0
                     acc = 0.0
                     is_fc = False

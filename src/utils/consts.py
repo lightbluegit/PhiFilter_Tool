@@ -87,7 +87,7 @@ SETTING_PATH = "PhiFilterTool_setting.json"  # 玩家设置
 
 GROUP_PATH = "group.csv"  # 玩家自定义分组信息存储路径
 COMMENT_PATH = "comment.csv"  # 玩家自定义简评信息存储路径
-NICKNAME_PATH = "nickname.yaml"
+NICKNAME_PATH = DATA_PREPATH + "nickname.yaml"
 
 # 可作为筛选依据的属性
 FILTER_ATTRIBUTION_LIST: list[str] = [
@@ -1815,13 +1815,16 @@ CHARTER_LIST: list[str] = [
 ]
 
 import yaml
+
 NICKNAME_LIST = []
 NICKNAME_DICT = {}
-with open(appdata_path(NICKNAME_PATH), "r", encoding="utf-8") as f:
-    raw_dict:dict[str, list[str]] = yaml.safe_load(f)
-    for key, value_list in raw_dict.items(): # 遍历每首歌
+
+# print(resource_path(DIFFICULTY_PATH))
+with open(resource_path(NICKNAME_PATH), "r", encoding="utf-8") as f:
+    raw_dict: dict[str, list[str]] = yaml.safe_load(f)
+    for key, value_list in raw_dict.items():  # 遍历每首歌
         nickname_dicti = []
-        for nicknamei in value_list: # 遍历每个俗称
+        for nicknamei in value_list:  # 遍历每个俗称
             nickname_dicti.append(str(nicknamei))
-            NICKNAME_LIST.append(str(nicknamei)) # 收集每个俗称
+            NICKNAME_LIST.append(str(nicknamei))  # 收集每个俗称
         NICKNAME_DICT[key] = nickname_dicti

@@ -130,7 +130,7 @@ def get_multiline_text_style(
     background_transparent: str = 1,
 ):
     style = "QTextEdit {\n"
-    if(background_transparent):
+    if background_transparent:
         style += "background-color: transparent;"
     style += f"""
     border: none;

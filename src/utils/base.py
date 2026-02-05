@@ -1,9 +1,9 @@
-from pathlib import Path
+import logging
 import os
 import sys
 from enum import Enum
-import logging
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 debug: bool = False  # 打包
 debug: bool = True  # 原地调试
@@ -121,10 +121,10 @@ def get_score_level(score: int, is_fc: bool = False) -> score_level_type:
     else:
         return score_level_type.F
 
+
 def clear_log_file():
     for h in logger.handlers:
         if isinstance(h, RotatingFileHandler):
             # doRollover 会关闭当前文件，将其重命名（如果有备份），然后打开新文件
             # 因为 backupCount=0，它实际上达到了清空并重新开始的效果
             h.doRollover()
-
