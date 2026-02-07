@@ -2407,18 +2407,20 @@ class MainWindow(FramelessWindow):
             sep=",",
             header=None,
             encoding="utf-8",
-            names=["c_name", "group"],
+            names=["c_name", "EZ_group", "HD_group", "IN_group", "AT_group"],
         )
         df = df.fillna("")
         df.set_index(df.columns[0], inplace=True)
         # used_group = set()
         self.used_group = set()
         for idx, rowi in df.iterrows():
-            group_raw = str(rowi["group"])  # 组合名称 : 分组
-            if group_raw:
-                group_raw = group_raw.split("`")
-                for i in group_raw:
-                    self.used_group.add(i)
+            # 收集所有难度列中的分组
+            for diff in ["EZ_group", "HD_group", "IN_group", "AT_group"]:
+                group_raw = str(rowi[diff])
+                if group_raw:
+                    group_raw = group_raw.split("`")
+                    for i in group_raw:
+                        self.used_group.add(i)
         infolog("获取已经存在的分组完成")
         # infolog(f"已经使用过的分组是{self.used_group}")
 
@@ -2496,6 +2498,7 @@ class MainWindow(FramelessWindow):
         now_card.group = item.groups
         now_card.nickname_list = new_nicknames
 
+        # 更新当前难度的 item
         for i in range(model.rowCount()):
             if (
                 model.items[i].combine_name == now_card.combine_name
@@ -2503,6 +2506,14 @@ class MainWindow(FramelessWindow):
             ):
                 model.items[i] = item
                 break
+        
+        # 同步更新同一歌曲其他难度的 nickname_list
+        for i in range(model.rowCount()):
+            if (
+                model.items[i].combine_name == now_card.combine_name
+                and model.items[i].diff != now_card.diff
+            ):
+                model.items[i].nickname_list = new_nicknames
         try:
             group_path = appdata_path(f"{self.user_data.user_name}_{GROUP_PATH}")
             df = pd.read_csv(
@@ -2510,11 +2521,18 @@ class MainWindow(FramelessWindow):
                 sep=",",
                 header=None,
                 encoding="utf-8",
-                names=["combine_name", "group"],
+                names=[
+                    "combine_name",
+                    "EZ_group",
+                    "HD_group",
+                    "IN_group",
+                    "AT_group",
+                ],
                 index_col=0,
             )
             df = df.fillna("")
-            df.at[song_combine_name, "group"] = new_group
+            colname = f"{diff}_group"
+            df.at[song_combine_name, colname] = new_group
             df.to_csv(
                 group_path,
                 header=False,
@@ -2549,7 +2567,7 @@ class MainWindow(FramelessWindow):
 
         # 保存俗称到 nickname.yaml
         try:
-            nickname_key = f"{song_combine_name}.{diff}"
+            nickname_key = song_combine_name
             # 更新全局 NICKNAME_DICT
             if new_nicknames:
                 NICKNAME_DICT[nickname_key] = new_nicknames

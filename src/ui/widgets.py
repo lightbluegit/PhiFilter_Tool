@@ -1228,6 +1228,7 @@ import os
 def remove_group_from_csv(user_name, group_name_to_remove):
     """
     遍历 CSV 文件，删除指定的分组名，并重新序列化保存
+    支持新的4列格式：combine_name, EZ_group, HD_group, IN_group, AT_group
     """
     group_path = appdata_path(f"{user_name}_{GROUP_PATH}")
     if not os.path.exists(group_path):
@@ -1242,32 +1243,38 @@ def remove_group_from_csv(user_name, group_name_to_remove):
         with open(group_path, mode="r", encoding="utf-8", newline="") as f:
             reader = csv.reader(f)
             for row in reader:
-                # 确保行数据有效（至少有2列：键, 分组字符串）
-                if len(row) < 2:
+                # 确保行数据有效（至少有5列：键, EZ_group, HD_group, IN_group, AT_group）
+                if len(row) < 5:
                     updated_rows.append(row)
                     continue
 
                 key = row[0]
-                groups_str = row[1]
+                row_changed = False
+                new_row = [key]
 
-                # 如果分组字符串为空，直接保留
-                if not groups_str:
-                    updated_rows.append(row)
-                    continue
+                # 处理每个难度的分组（第1-4列对应 EZ, HD, IN, AT）
+                for i in range(1, 5):
+                    groups_str = row[i] if i < len(row) else ""
+                    if not groups_str:
+                        new_row.append(groups_str)
+                        continue
 
-                # 反序列化：按反引号分割
-                # filter(None, ...) 用于去除可能产生的空字符串
-                group_list = groups_str.split("`")
+                    # 反序列化：按反引号分割
+                    group_list = groups_str.split("`")
 
-                # 检查是否存在要删除的分组
-                if group_name_to_remove in group_list:
-                    # 移除分组
-                    group_list.remove(group_name_to_remove)
-                    file_changed = True
+                    # 检查是否存在要删除的分组
+                    if group_name_to_remove in group_list:
+                        # 移除分组
+                        group_list.remove(group_name_to_remove)
+                        row_changed = True
 
                     # 重新序列化：用反引号连接
                     new_groups_str = "`".join(group_list)
-                    updated_rows.append([key, new_groups_str])
+                    new_row.append(new_groups_str)
+
+                if row_changed:
+                    file_changed = True
+                    updated_rows.append(new_row)
                 else:
                     # 如果没有包含该分组，保持原样
                     updated_rows.append(row)
@@ -1893,30 +1900,51 @@ class SongListViewWidget(QWidget):
             sep=",",
             header=None,
             encoding="utf-8",
-            names=["c_name", "group"],
+            names=["c_name", "EZ_group", "HD_group", "IN_group", "AT_group"],
         )
         df = df.fillna("")
         df.set_index(df.columns[0], inplace=True)
         used_group = set()
         for combine_namei, rowi in df.iterrows():  # 遍历分组文件
-            group_raw = str(rowi["group"])  # 分组信息
-            if group_raw:  # 以`分割的原始字符串
-                group = group_raw.split("`")
-                for i in group:  # 记录使用过的分组
+            # EZ 分组
+            ez_group_raw = str(rowi["EZ_group"])
+            if ez_group_raw:
+                ez_group = ez_group_raw.split("`")
+                for i in ez_group:
                     used_group.add(i)
-                #! 分组要差分难度啊啊啊啊
                 EZ_item: SongItem = self.model.get_item(f"{combine_namei}.EZ")
-                EZ_item.groups = group  # 填充各个难度的分组信息
+                if EZ_item is not None:
+                    EZ_item.groups = ez_group
 
+            # HD 分组
+            hd_group_raw = str(rowi["HD_group"])
+            if hd_group_raw:
+                hd_group = hd_group_raw.split("`")
+                for i in hd_group:
+                    used_group.add(i)
                 HD_item: SongItem = self.model.get_item(f"{combine_namei}.HD")
-                HD_item.groups = group
+                if HD_item is not None:
+                    HD_item.groups = hd_group
 
+            # IN 分组
+            in_group_raw = str(rowi["IN_group"])
+            if in_group_raw:
+                in_group = in_group_raw.split("`")
+                for i in in_group:
+                    used_group.add(i)
                 IN_item: SongItem = self.model.get_item(f"{combine_namei}.IN")
-                IN_item.groups = group
+                if IN_item is not None:
+                    IN_item.groups = in_group
 
+            # AT 分组
+            at_group_raw = str(rowi["AT_group"])
+            if at_group_raw:
+                at_group = at_group_raw.split("`")
+                for i in at_group:
+                    used_group.add(i)
                 AT_item: SongItem = self.model.get_item(f"{combine_namei}.AT")
                 if AT_item is not None:
-                    AT_item.groups = group
+                    AT_item.groups = at_group
 
         # ----- 获取简评信息 -----
         comment_path = appdata_path(f"{user_name}_{COMMENT_PATH}")
@@ -1940,17 +1968,20 @@ class SongListViewWidget(QWidget):
         df.set_index(df.columns[0], inplace=True)
         for combine_namei, rowi in df.iterrows():
             EZ_item: SongItem = self.model.get_item(f"{combine_namei}.EZ")
-            EZ_item.groups = str(rowi["EZ_comment"])  # 填充各个难度的分组信息
+            if EZ_item is not None:
+                EZ_item.comment = str(rowi["EZ_comment"])  # 填充各个难度的评论信息
 
             HD_item: SongItem = self.model.get_item(f"{combine_namei}.HD")
-            HD_item.groups = str(rowi["HD_comment"])
+            if HD_item is not None:
+                HD_item.comment = str(rowi["HD_comment"])
 
             IN_item: SongItem = self.model.get_item(f"{combine_namei}.IN")
-            IN_item.groups = str(rowi["IN_comment"])
+            if IN_item is not None:
+                IN_item.comment = str(rowi["IN_comment"])
 
             AT_item: SongItem = self.model.get_item(f"{combine_namei}.AT")
             if AT_item is not None:
-                AT_item.groups = str(rowi["AT_comment"])
+                AT_item.comment = str(rowi["AT_comment"])
 
         df = pd.read_csv(
             resource_path(DIFFICULTY_PATH),
