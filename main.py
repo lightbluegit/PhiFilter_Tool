@@ -1,4 +1,3 @@
-#  PEP 8 分组与排序
 import copy
 import heapq  # 算rks组成
 import json
@@ -10,6 +9,7 @@ from math import sqrt
 from typing import Any, Dict, List, Tuple
 
 import pandas as pd
+import yaml
 from PyQt5.QtCore import Qt, QUrl
 from PyQt5.QtGui import QDesktopServices, QGuiApplication, QIcon, QPixmap
 from PyQt5.QtWidgets import (
@@ -45,8 +45,10 @@ QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 #! 先创建 QApplication 实例再写窗口 否则初始化缓存图片的时候会失败
 app = QApplication(sys.argv)
+from src.core.models import user_data  # 获取用户信息
 from src.core.phi_cloud.get_play_data import *  # 获取用户信息
 from src.ui.widgets import *
+from src.utils.consts import NICKNAME_DICT, NICKNAME_PATH, resource_path
 
 
 class MainWindow(FramelessWindow):
@@ -65,7 +67,7 @@ class MainWindow(FramelessWindow):
         )  # 多线程预处理曲绘转化与裁切 后续 搜索/rks组成 布局就可以复用这些缓存 加速布局
         """self.illustration_cache[组合名称] = 曲绘缓存图"""
 
-        self.page_bg_cache: dict[str, QPixmap] = {}  # 各个页面的二次元背景及图片缓存
+        self.page_bg_cache: dict[str, QPixmap] = {}  # 各个页面的背景图片缓存
         """self.page_bg_cache[组合名称] = 背景缓存图"""
 
         self.page_icon_cache: dict[str, QPixmap] = {}  # 主页各个组件的二次元图标缓存
@@ -80,9 +82,16 @@ class MainWindow(FramelessWindow):
             "由于找不到合适的图标索性就用二次元头像做icon了(",
         ]
 
+        self.cname_to_name: dict[str, Tuple[str, str, str, dict[str, str]]] = {}
+        """
+        self.cname_to_name[组合名称] = (写个dataclass songinfo得了
+            正常名称,
+            曲师名称,
+            画师名称,
+            {"EZ": EZ难度谱师, "HD": HD难度谱师, "IN": IN难度谱师}
+        )
+        """
         self.init_variable()  # 初始化各种变量
-
-        datetime.now()
         self.preinit()  # 并行预处理图片
 
         # ---------------- 主窗口设置 ----------------
@@ -148,7 +157,7 @@ class MainWindow(FramelessWindow):
                 "clear_after_search": False,
             },
         }
-        default_setting_file = {self.user_name: default_setting_text}
+        default_setting_file = {self.user_data.user_name: default_setting_text}
         if not path_obj.exists() or path_obj.stat().st_size == 0:
             # 如果不存在，创建默认设置并保存
             # 写入默认配置到文件
@@ -163,21 +172,21 @@ class MainWindow(FramelessWindow):
             if not setting_file:
                 setting_file = default_setting_file
             # 读取主设置
-            if self.user_name not in setting_file.keys():  # 当前用户没有设置记录
+            if self.user_data.user_name not in setting_file.keys():  # 当前用户没有设置记录
                 infolog(f"当前用户没有设置记录")
-                setting_file[self.user_name] = default_setting_text
+                setting_file[self.user_data.user_name] = default_setting_text
 
-            user_setting = setting_file[self.user_name]
+            user_setting = setting_file[self.user_data.user_name]
             # infolog(f"用户设置:{user_setting}")
 
             if "main_setting" not in user_setting:
-                user_setting["main_setting"] = default_setting_file[self.user_name][
+                user_setting["main_setting"] = default_setting_file[self.user_data.user_name][
                     "main_setting"
                 ]
             main_setting = user_setting["main_setting"]
 
             if "always_update" not in main_setting:
-                main_setting["always_update"] = default_setting_file[self.user_name][
+                main_setting["always_update"] = default_setting_file[self.user_data.user_name][
                     "main_setting"
                 ]["always_update"]
             self.always_update: bool = main_setting["always_update"]
@@ -185,32 +194,32 @@ class MainWindow(FramelessWindow):
             # 读取默认开屏页设置
             if "default_open_page" not in main_setting:
                 main_setting["default_open_page"] = default_setting_file[
-                    self.user_name
+                    self.user_data.user_name
                 ]["main_setting"]["default_open_page"]
             self.default_open_page: str = main_setting["default_open_page"]
             if "a" <= self.default_open_page[0] <= "z":
                 self.default_open_page = "搜索页面"
-                setting_file[self.user_name]["main_setting"][
+                setting_file[self.user_data.user_name]["main_setting"][
                     "default_open_page"
                 ] = "搜索页面"
 
             # 读取搜索页设置
             if "search_page_setting" not in user_setting:
                 user_setting["search_page_setting"] = default_setting_file[
-                    self.user_name
+                    self.user_data.user_name
                 ]["search_page_setting"]
             search_page_setting = user_setting["search_page_setting"]
             # infolog(f"读取搜索页设置{search_page_setting}")
 
             if "clear_after_search" not in search_page_setting:
                 search_page_setting["clear_after_search"] = default_setting_file[
-                    self.user_name
+                    self.user_data.user_name
                 ]["search_page_setting"]["clear_after_search"]
             self.clear_after_search: bool = search_page_setting["clear_after_search"]
 
             if "default_filter" not in search_page_setting:
                 search_page_setting["default_filter"] = default_setting_file[
-                    self.user_name
+                    self.user_data.user_name
                 ]["search_page_setting"]["default_filter"]
             self.default_filter: dict[str, str] = search_page_setting["default_filter"]
             with open(setting_file_path, "w", encoding="utf-8") as ff:
@@ -221,48 +230,8 @@ class MainWindow(FramelessWindow):
     def init_variable(self):
         """初始化各种与账号相关的变量 方便退出账号的时候重置变量 已经缓存过的就不用了"""
         self.time_record = datetime.now()  # 记录起始时间
-        infolog("开始初始化与账号相关的变量")
-        self.is_updated: bool = False  # 之前 存储的数据是否为最新的数据
-        self.avatar: str = ""  # 存放用户头像文件名
-        self.background_name: str = ""  # 背景名称
-        self.EZ_statistical_data: list[int] = [
-            -1,
-            -1,
-            -1,
-        ]  # 各个难度的统计数据[cleared, FC, AP]
-        self.HD_statistical_data: list[int] = [-1, -1, -1]
-        self.IN_statistical_data: list[int] = [-1, -1, -1]
-        self.AT_statistical_data: list[int] = [-1, -1, -1]
-        self.rks: float = 0  # 玩家的rks
-        self.money: tuple[int] = (0, 0, 0, 0, 0)  # KB MB GB TB PB
-        self.challengemode_rank: str = ""  #
-        self.user_introduction: str = ""  # 用户自我介绍
-        self.user_name: str = ""  # 用户名
-        self.token: str = ""  # 用户 session_token
-        self.save_dict: dict = {}  # 云存档解析后的字典数据
-        self.total_rks: float = 0  # rks未/30之前得到的值 用于计算某个歌曲是否能推分
-
-        self.b27: List[Tuple[float, Tuple[str, Any]]] = []
-        """self.b27 = (单曲rks, 处于哪一行)"""
-
-        self.phi3: List[Tuple[float, Tuple[str, Any]]] = []  # 格式同self.b27
-
-        self.cname_to_name: dict[str, Tuple[str, str, str, dict[str, str]]] = {}
-        """
-        self.cname_to_name[组合名称] = (
-            正常名称,
-            曲师名称,
-            画师名称,
-            {"EZ": EZ难度谱师, "HD": HD难度谱师, "IN": IN难度谱师}
-        )
-        """
-
-        self.diff_map_result: Dict[str, Dict[str, str]] = (
-            {}
-        )  # diff_map_result[组合名称][难度]=定数
-
+        self.user_data = user_data()
         self.filter_result = None  # 筛选结果
-        infolog("初始化与账号相关的变量结束")
 
     # 多线程预处理函数
     def preinit(self):
@@ -327,7 +296,7 @@ class MainWindow(FramelessWindow):
         self.loader.all_tasks_finished.connect(self.on_all_finished)  # 所有任务完成
         self.loader.start_processing()  # 开始处理任务
 
-    def merge_csv_updates(self, user_file_path, default_file_path, encoding="utf-8"):
+    def merge_csv_updates(self, user_file_path, default_file_path):
         """
         对比两个CSV文件，将 default_file 中存在但 user_file 中不存在的记录
         追加到 user_file 中，且不修改 user_file 原有的内容。
@@ -335,44 +304,39 @@ class MainWindow(FramelessWindow):
         Args:
             user_file_path (str): 用户数据文件路径 (kafuyuno_comment.csv)
             default_file_path (str): 更新数据文件路径 (default_comment.csv)
-            encoding (str): 文件编码，默认为 utf-8
         """
 
         # 检查文件是否存在
         if not os.path.exists(user_file_path) or not os.path.exists(default_file_path):
-            print("错误：找不到指定的文件路径。")
+            warnlog("错误：找不到指定的文件路径")
             return
 
         try:
-            # 1. 读取 CSV 文件
             # header=None 表示文件没有标题行，直接读取数据
             # on_bad_lines='skip' 防止因为格式错误导致读取中断
             df_user = pd.read_csv(
-                user_file_path, header=None, encoding=encoding, on_bad_lines="skip"
+                user_file_path, header=None, encoding="utf-8", on_bad_lines="skip"
             )
             df_default = pd.read_csv(
-                default_file_path, header=None, encoding=encoding, on_bad_lines="skip"
+                default_file_path, header=None, encoding="utf-8", on_bad_lines="skip"
             )
 
-            print(
+            infolog(
                 f"读取成功: 用户数据 {len(df_user)} 条, 更新数据 {len(df_default)} 条"
             )
 
-            # 2. 确定唯一键 (假设第一列是唯一的歌曲ID/标识符)
-            # 获取用户文件中所有已存在的 ID 集合
+            # 以第一列作为标识
             existing_ids = set(df_user.iloc[:, 0])
 
             # 3. 筛选新记录
             # 在 df_default 中找到那些 ID 不在 existing_ids 里的行
             new_records = df_default[~df_default.iloc[:, 0].isin(existing_ids)]
-
             count_new = len(new_records)
-
             if count_new == 0:
-                print("没有发现需要更新的新记录。")
+                infolog("没有发现需要更新的新记录。")
                 return
 
-            print(f"发现 {count_new} 条新记录，准备合并...")
+            infolog(f"发现 {count_new} 条新记录，准备合并...")
 
             # 4. 合并数据
             # 将新记录追加到用户数据后面
@@ -382,46 +346,46 @@ class MainWindow(FramelessWindow):
             # index=False 去掉pandas自带的索引列
             # header=False 因为原文件没有表头
             df_final.to_csv(
-                user_file_path, index=False, header=False, encoding=encoding
+                user_file_path, index=False, header=False, encoding="utf-8"
             )
 
-            print(f"成功！已将新记录写入 {user_file_path}")
-            print(f"当前用户文件总记录数: {len(df_final)}")
+            infolog(f"成功！已将新记录写入 {user_file_path}")
+            infolog(f"当前用户文件总记录数: {len(df_final)}")
 
         except Exception as e:
-            print(f"发生错误: {e}")
+            warnlog(f"发生错误: {e}")
 
     # 预处理结束后执行的操作
     def on_all_finished(self):
         """预处理结束后执行的操作"""
         # 检查文件是否存在且不为空
-        infolog("预处理已经完成 开始收尾")
+        infolog("预处理已完成 开始收尾")
         if (
             not os.path.exists(appdata_path(TOKEN_PATH))
             or os.path.getsize(appdata_path(TOKEN_PATH)) == 0
         ):
             infolog("Token文件不存在或为空 创建新的token存储")
-            self.token_file = {"last_user": ""}  # 初始化为空字典
+            self.user_data.token_file = {"last_user": ""}  # 初始化为空字典
             # 保存初始文件
             with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as f:
-                json.dump(self.token_file, f, ensure_ascii=False, indent=4)
+                json.dump(self.user_data.token_file, f, ensure_ascii=False, indent=4)
                 infolog(f"Token文件默认写入")
 
         if os.path.exists(appdata_path(TOKEN_PATH)):  # 尝试获取已存储的token
             with open(appdata_path(TOKEN_PATH), "r", encoding="utf-8") as token_file:
-                self.token_file = json.load(token_file)
+                self.user_data.token_file = json.load(token_file)
 
-                last_user = self.token_file["last_user"]
+                last_user = self.user_data.token_file["last_user"]
                 if last_user:
                     infolog(f"上次登录为{last_user}")
-                    self.token = self.token_file[last_user]  # 获取上一次登录时的账号
+                    self.user_data.token = self.user_data.token_file[last_user]  # 获取上一次登录时的账号
 
         else:  # TOKEN_PATH 不存在
             with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as token_file:
-                self.token_file = {"last_user": ""}
-                json.dump(self.token_file, token_file, ensure_ascii=False, indent=4)
+                self.user_data.token_file = {"last_user": ""}
+                json.dump(self.user_data.token_file, token_file, ensure_ascii=False, indent=4)
 
-        if self.token:
+        if self.user_data.token:
             infolog("预处理结束了 有token")
             # 常更新的话生成rks组成的时候会自动更新一次 这里再更新就重复了
             self.get_save_data()
@@ -439,7 +403,7 @@ class MainWindow(FramelessWindow):
             "账号页面": "account_page",
             "设置页面": "setting_page",
         }
-        if self.token:
+        if self.user_data.token:
             self.switch_to(
                 self.widgets[page_map[self.default_open_page]]["widget"]
             )  # 切换到指定的起始页面
@@ -514,49 +478,6 @@ class MainWindow(FramelessWindow):
         # 在右键位置弹出菜单
         menu.exec_(global_pos)
 
-    # 生成组合名称与其对应名称 曲师等信息对照
-    def generate_cname_to_name_info(self):
-        """读取 info.tsv 并构建 self.cname_to_name 信息"""
-        infolog("生成组合名称与其对应名称 曲师等信息对照")
-        df = pd.read_csv(
-            resource_path(INFO_PATH),
-            sep="\t",  # 文酱的项目生成的.tsv文件 分隔符是 \t
-            header=None,  # 无头模式
-            encoding="utf-8",
-            names=[  # 每一列的名称
-                "combine_name",
-                "song_name",
-                "composer",
-                "drawer",
-                "EZchapter",
-                "HDchapter",
-                "INchapter",
-                "ATchapter",
-                "Legendchapter",
-            ],
-        )
-        df = df.fillna("")  # 没有数据的部分填充空字符
-        for _, row in df.iterrows():
-            combine_name = row["combine_name"]
-            song_name = row["song_name"]
-            composer = row["composer"]
-            drawer = row["drawer"]
-            EZchapter = row["EZchapter"]
-            HDchapter = row["HDchapter"]
-            INchapter = row["INchapter"]
-            ATchapter = row["ATchapter"]
-
-            self.cname_to_name[combine_name] = (
-                song_name,
-                composer,
-                drawer,
-                {"EZ": EZchapter, "HD": HDchapter, "IN": INchapter},
-            )
-
-            if ATchapter:  # 有可能没有AT
-                self.cname_to_name[combine_name][3]["AT"] = ATchapter
-        # infolog(f"组合名称与其对应名称 曲师等信息对照信息为：{self.cname_to_name}") # 很长 谨慎使用
-
     # 获取存档信息并填充歌曲信息
     def get_save_data(self):
         """
@@ -565,7 +486,7 @@ class MainWindow(FramelessWindow):
         依赖: self.cname_to_name 图片缓存
         """
         infolog("获取存档信息并填充歌曲信息")
-        if self.token == "":
+        if self.user_data.token == "":
             InfoBar.warning(
                 title="用户未登录",
                 content="请先回到账号页面进行授权！",
@@ -579,24 +500,24 @@ class MainWindow(FramelessWindow):
             return
         try:
             # 此部分来自 千柒 的 Phi-CloudAction-python-master 项目
-            with PhigrosCloud(self.token) as cloud:
+            with PhigrosCloud(self.user_data.token) as cloud:
                 summary_data = (
                     cloud.getSummary()
                 )  # summary_data的值就是get_play_data.py的 class summary 里面的那些变量做成字典
                 # infolog(f"你的summary是{summary_data}")
 
-                self.challengemode_rank = str(summary_data["challenge"])
-                # infolog(f"你的挑战模式组成是{self.challengemode_rank}")
+                self.user_data.challengemode_rank = str(summary_data["challenge"])
+                # infolog(f"你的挑战模式组成是{self.user_data.challengemode_rank}")
 
-                # self.rks = summary_data['rks'] # 这里的rks可以被修改 自己算比较安全
-                self.avatar = summary_data["avatar"]
-                self.EZ_statistical_data = summary_data["EZ"]
-                self.HD_statistical_data = summary_data["HD"]
-                self.IN_statistical_data = summary_data["IN"]
-                self.AT_statistical_data = summary_data["AT"]
+                # self.user_data.rks = summary_data['rks'] # 这里的rks可以被修改 自己算比较安全
+                self.user_data.avatar = summary_data["avatar"]
+                self.user_data.EZ_stats = summary_data["EZ"]
+                self.user_data.HD_stats = summary_data["HD"]
+                self.user_data.IN_stats = summary_data["IN"]
+                self.user_data.AT_stats = summary_data["AT"]
 
-                self.user_name = cloud.getNickname()
-                # infolog(f"你的名字是{self.user_name}")
+                self.user_data.user_name = cloud.getNickname()
+                # infolog(f"你的名字是{self.user_data.user_name}")
 
                 save_data = cloud.getSave(summary_data["url"], summary_data["checksum"])
                 save_dict = unzipSave(save_data)  # 解压合法的存档压缩包
@@ -605,16 +526,16 @@ class MainWindow(FramelessWindow):
                 # print(f'解密之后的结果是{save_dict}') #
                 save_dict = formatSaveDict(save_dict)  # 格式化
                 # print(f'格式化之后的结果是{save_dict}')
-                self.save_dict = save_dict
+                self.user_data.save_dict = save_dict
                 # infolog(f"存档文件是这个{save_dict}")
 
-                self.background_name = save_dict["user"]["background"]
-                # infolog(f"你的背景名称是{self.background_name}")
-                self.money = save_dict["gameProgress"]["money"]
-                # infolog(f"你的金币是{self.money}")
+                self.user_data.background_name = save_dict["user"]["background"]
+                # infolog(f"你的背景名称是{self.user_data.background_name}")
+                self.user_data.money = save_dict["gameProgress"]["money"]
+                # infolog(f"你的金币是{self.user_data.money}")
 
-                self.user_introduction = save_dict["user"]["selfIntro"]
-                # infolog(f"你的自我介绍是{self.user_introduction}")
+                self.user_data.user_introduction = save_dict["user"]["selfIntro"]
+                # infolog(f"你的自我介绍是{self.user_data.user_introduction}")
         except:
             InfoBar.error(
                 title="未知错误",
@@ -628,36 +549,15 @@ class MainWindow(FramelessWindow):
             return
         infolog("存档获取完成")
 
-        # 生成难度对照表
-        df = pd.read_csv(
-            resource_path(DIFFICULTY_PATH),
-            sep="\t",
-            header=None,
-            encoding="utf-8",
-            names=["song_name", "EZ", "HD", "IN", "AT"],
-        )
-        df = df.fillna("")  # 用空字符串替换 NaN
-        self.diff_map_result: Dict[str, Dict[str, str]] = {}
-        for _, row in df.iterrows():
-            name = row["song_name"]
-            diff_map = {"EZ": row["EZ"], "HD": row["HD"], "IN": row["IN"]}
-            if row["AT"]:
-                diff_map["AT"] = row["AT"]
-            self.diff_map_result[name] = diff_map
-
         # 使用委托式视图填充 model
         self.song_list_widget = SongListViewWidget()  # 覆盖掉之前的所有信息
-        self.generate_cname_to_name_info()  # 重新登陆会洗掉cname_to_name原来的值
-        # infolog(f"进入init_model_from_save_data{self.save_dict}") # 很长的log 慎用
+        # self.generate_cname_to_name_info()  #? 重新登陆会洗掉cname_to_name原来的值
+        # infolog(f"进入init_model_from_save_data{self.user_data.save_dict}") # 很长的log 慎用
         self.song_list_widget.init_model_from_save_data(
-            self.save_dict,
-            self.diff_map_result,
-            self.cname_to_name,
-            # GROUP_INFO,
-            # COMMENT_INFO,
+            self.user_data.save_dict,
             self.illustration_cache,
             self.page_bg_cache,
-            self.user_name,
+            self.user_data.user_name,
         )
         infolog("更新完成~")
 
@@ -670,14 +570,14 @@ class MainWindow(FramelessWindow):
             duration=3000,
             parent=window,
         )
-        self.is_updated = False  # 更新过数据了 之前存储的就不是最新的数据了
+        self.user_data.is_updated = False  # 更新过数据了 之前存储的就不是最新的数据了
         # infolog("get_save_data 用时", time.time() - times, "s")
         self.merge_csv_updates(
-            appdata_path(f"{self.user_name}_{COMMENT_PATH}"),
+            appdata_path(f"{self.user_data.user_name}_{COMMENT_PATH}"),
             resource_path(DEFAULT_COMMENT),
         )
         self.merge_csv_updates(
-            appdata_path(f"{self.user_name}_{GROUP_PATH}"),
+            appdata_path(f"{self.user_data.user_name}_{GROUP_PATH}"),
             resource_path(DEFAULT_GROUP),
         )
 
@@ -957,7 +857,7 @@ class MainWindow(FramelessWindow):
         使用model中的整合数据计算b27与phi3及其提升可能 存储并布局
         """
         infolog("开始计算b27与phi3组成")
-        if not self.token:
+        if not self.user_data.token:
             InfoBar.warning(
                 title="用户未登录",
                 content="请先回到账号页面进行授权！",
@@ -971,7 +871,7 @@ class MainWindow(FramelessWindow):
             return
 
         if (
-            not self.always_update and self.is_updated
+            not self.always_update and self.user_data.is_updated
         ):  # 懒更新 且 最新的版本已经布局过了 直接跳转即可
             self.switch_to(self.place_b27_phi3_page)
             infolog("懒更新 直接跳转最新最热rks")
@@ -982,10 +882,10 @@ class MainWindow(FramelessWindow):
             self.get_save_data()
 
         model = self.song_list_widget.model
-        self.b27 = []
-        self.phi3 = []
-        heapq.heapify(self.b27)
-        heapq.heapify(self.phi3)
+        self.user_data.b27 = []
+        self.user_data.phi3 = []
+        heapq.heapify(self.user_data.b27)
+        heapq.heapify(self.user_data.phi3)
         infolog(f"一共条目数{model.rowCount()}")
         for row in range(model.rowCount()):
             item = model.get_item(row)
@@ -1000,23 +900,23 @@ class MainWindow(FramelessWindow):
             if acc < 70:  # acc < 70% 不计入rks
                 continue
             # infolog(f'当前处理歌曲{item.name}')
-            if len(self.b27) < 27:
-                heapq.heappush(self.b27, (item.rks, row))
+            if len(self.user_data.b27) < 27:
+                heapq.heappush(self.user_data.b27, (item.rks, row))
             else:
-                heapq.heappushpop(self.b27, (item.rks, row))
+                heapq.heappushpop(self.user_data.b27, (item.rks, row))
 
             if int(item.score) == int(1e6):
                 # infolog(f"{combine_name}可能是合法phi3之一")
-                if len(self.phi3) < 3:
-                    heapq.heappush(self.phi3, (item.rks, row))
+                if len(self.user_data.phi3) < 3:
+                    heapq.heappush(self.user_data.phi3, (item.rks, row))
                 else:
-                    heapq.heappushpop(self.phi3, (item.rks, row))
+                    heapq.heappushpop(self.user_data.phi3, (item.rks, row))
 
         # 按单曲rks从大到小排序( 这不还是要排序吗...
-        self.b27 = sorted(self.b27, key=lambda x: x[0], reverse=True)
-        # infolog(f"b27是这些:{self.b27}")
-        self.phi3 = sorted(self.phi3, key=lambda x: x[0], reverse=True)
-        # infolog(f"phi3是这些:{self.phi3}")
+        self.user_data.b27 = sorted(self.user_data.b27, key=lambda x: x[0], reverse=True)
+        # infolog(f"b27是这些:{self.user_data.b27}")
+        self.user_data.phi3 = sorted(self.user_data.phi3, key=lambda x: x[0], reverse=True)
+        # infolog(f"phi3是这些:{self.user_data.phi3}")
 
         self.generate_improve_rks_advise()
         self.place_b27_phi3()
@@ -1057,7 +957,7 @@ class MainWindow(FramelessWindow):
                 return int(need_acc * 100 + 0.9) / 100
 
             # 考虑推到ap之后能不能靠这首歌在 b27和phi3 中的表现让rks产生变化
-            if level - singal_rks + level - float(self.phi3[-1][0]) >= delta_rks:
+            if level - singal_rks + level - float(self.user_data.phi3[-1][0]) >= delta_rks:
                 return 100  # 推AP去吧
             else:
                 return None  # AP也救不了你
@@ -1071,7 +971,7 @@ class MainWindow(FramelessWindow):
                 return int(need_acc * 100 + 0.9) / 100
 
             # 考虑推到ap之后能不能靠这首歌在 b27和phi3 中的表现让rks产生变化
-            if level - min_b27_rks + level - float(self.phi3[-1][0]) >= delta_rks:
+            if level - min_b27_rks + level - float(self.user_data.phi3[-1][0]) >= delta_rks:
                 return 100  # 推AP去吧
             else:
                 return None  # AP也救不了你
@@ -1086,10 +986,10 @@ class MainWindow(FramelessWindow):
         """b27_dict[组合名称]=['AT', 'IN'] 组合名称的歌在榜的难度"""
         min_b27_rks = MAX_LEVEL + 1  # b27地板对应rks
 
-        self.total_rks: float = 0.0
-        for songi in self.b27:
+        self.user_data.total_rks = 0.0
+        for songi in self.user_data.b27:
             singal_rks, row = songi
-            self.total_rks += singal_rks
+            self.user_data.total_rks += singal_rks
             item = model.get_item(row)
             combine_name = item.combine_name
             diff = item.diff
@@ -1101,17 +1001,17 @@ class MainWindow(FramelessWindow):
             min_b27_rks = min(min_b27_rks, singal_rks)
         # infolog(b27_dict)
 
-        for singal_rks, row in self.phi3:
-            self.total_rks += singal_rks
-        self.rks = round(
-            self.total_rks / (len(self.b27) + len(self.phi3)), 8
+        for singal_rks, row in self.user_data.phi3:
+            self.user_data.total_rks += singal_rks
+        self.user_data.rks = round(
+            self.user_data.total_rks / (len(self.user_data.b27) + len(self.user_data.phi3)), 8
         )  # 当前玩家准确rks值
-        show_rks = int(self.rks * 100 + 0.5) / 100  # 游戏页面展示的rks值
+        show_rks = int(self.user_data.rks * 100 + 0.5) / 100  # 游戏页面展示的rks值
         delta_rks = (
-            show_rks + 0.005 - self.rks
+            show_rks + 0.005 - self.user_data.rks
         )  # 0.005保证游戏页面四舍五入后rks出现提升
         infolog(
-            f"玩家当前rks:{self.rks} 展示的rks{show_rks} 需要提升的rks是:{delta_rks * 30}"
+            f"玩家当前rks:{self.user_data.rks} 展示的rks{show_rks} 需要提升的rks是:{delta_rks * 30}"
         )
         for row in range(model.rowCount()):  # 遍历所有歌曲
             item = model.get_item(row)
@@ -1156,7 +1056,7 @@ class MainWindow(FramelessWindow):
             QSizePolicy.Expanding, QSizePolicy.Minimum
         )  # 竖直方向占据最小需求值
         b27_folder.setMinimumHeight(0)
-        for singal_rks, row in self.b27:
+        for singal_rks, row in self.user_data.b27:
             cardi = self.song_list_widget.build_card(row, is_expanded=False)
             if cardi:
                 cardi.setMinimumHeight(0)
@@ -1167,7 +1067,7 @@ class MainWindow(FramelessWindow):
         self.widgets["place_b27_phi3_page"]["phi3_folder"] = phi3_folder
         phi3_folder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
         phi3_folder.setMinimumHeight(0)
-        for singal_rks, row in self.phi3:
+        for singal_rks, row in self.user_data.phi3:
             cardi = self.song_list_widget.build_card(row, is_expanded=False)
             if cardi:
                 cardi.setMinimumHeight(0)
@@ -1175,23 +1075,23 @@ class MainWindow(FramelessWindow):
         layout.addWidget(phi3_folder)
 
         rks_content_label = label(
-            str(self.rks), {"font_size": 24, "background_color": (0, 0, 0, 0)}
+            str(self.user_data.rks), {"font_size": 24, "background_color": (0, 0, 0, 0)}
         )
         player_rks_label.add_widget(rks_content_label)
 
         rks_label: label = self.widgets["account_page"][
             "rks_label"
         ]  # 同步更新账号页面的数据
-        rks_label.set_text(f"rks: {int(self.rks * 100 + 0.5) / 100}")
+        rks_label.set_text(f"rks: {int(self.user_data.rks * 100 + 0.5) / 100}")
 
-        self.is_updated = True  # 更新完就是最新的啦
+        self.user_data.is_updated = True  # 更新完就是最新的啦
         self.switch_to(self.place_b27_phi3_page)
         infolog("布局b27 phi3卡片完成")
 
     # -----------更新信息卡片-----------
     def update_data(self):
         """更新数据"""
-        if self.token == "":
+        if self.user_data.token == "":
             InfoBar.warning(
                 title="用户未登录",
                 content="请先回到账号页面进行授权！",
@@ -1792,7 +1692,7 @@ class MainWindow(FramelessWindow):
     # 从全部歌曲中筛选符合条件的歌曲
     def filter_from_all_song(self):
         """从全部歌曲中筛选符合条件的歌曲"""
-        if not self.token:
+        if not self.user_data.token:
             InfoBar.warning(
                 title="用户未登录",
                 content="请先回到账号页面进行授权！",
@@ -1857,7 +1757,7 @@ class MainWindow(FramelessWindow):
     # 在已有 self.filter_result 的基础上继续做筛选
     def filter_from_previous_song(self):
         """在已有 self.filter_result 的基础上继续做筛选"""
-        if not self.token:
+        if not self.user_data.token:
             InfoBar.warning(
                 title="用户未登录",
                 content="请先回到账号页面进行授权！",
@@ -2399,7 +2299,7 @@ class MainWindow(FramelessWindow):
         group_layout.setSpacing(5)
 
         # 左 分组下拉框
-        group_ccb = multi_check_combobox(self.user_name)
+        group_ccb = multi_check_combobox(self.user_data.user_name)
         self.widgets["edit_info_page"]["group_ccb"] = group_ccb
         self.get_userd_group()
         group_ccb.addItems(self.used_group)
@@ -2419,6 +2319,37 @@ class MainWindow(FramelessWindow):
         create_group_btn.setFixedSize(50, 50)
         group_layout.addWidget(create_group_btn)
         edit_layout.addLayout(group_layout)
+
+        # ---------------- 俗称编辑区域 ----------------
+        nickname_label = label("俗称:")
+        edit_layout.addWidget(nickname_label)
+
+        nickname_layout = QHBoxLayout()
+        self.widgets["edit_info_page"]["nickname_layout"] = nickname_layout
+        nickname_layout.setSpacing(5)
+
+        # 左 俗称下拉框
+        nickname_ccb = multi_check_combobox(self.user_data.user_name)
+        self.widgets["edit_info_page"]["nickname_ccb"] = nickname_ccb
+        self.get_used_nicknames()
+        nickname_ccb.addItems(self.used_nicknames)
+        nickname_layout.addWidget(nickname_ccb)
+
+        # 右 俗称按钮
+        create_nickname_btn_style = {
+            "max_width": 50,
+            "min_width": 50,
+            "min_height": 28,
+            "max_height": 28,
+            "font_size": 23,
+        }
+        create_nickname_btn = button("新建", create_nickname_btn_style)
+        create_nickname_btn.bind_click_func(self.create_new_nickname)
+        self.widgets["edit_info_page"]["create_nickname_btn"] = create_nickname_btn
+        create_nickname_btn.setFixedSize(50, 50)
+        nickname_layout.addWidget(create_nickname_btn)
+        edit_layout.addLayout(nickname_layout)
+
         comment_label_style = {
             "font_size": 22,
             "max_height": 550,
@@ -2455,6 +2386,11 @@ class MainWindow(FramelessWindow):
         selected_group = info_card_copy.group
         group_ccb.set_selected_items(selected_group)
 
+        # 同步俗称编辑区的控件状态
+        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"]["nickname_ccb"]
+        selected_nicknames = info_card_copy.nickname_list
+        nickname_ccb.set_selected_items(selected_nicknames)
+
         comment_label: multiline_text = self.widgets["edit_info_page"]["comment_label"]
         now_comment = info_card_copy.comment
         comment_label.set_text(now_comment)
@@ -2462,7 +2398,7 @@ class MainWindow(FramelessWindow):
     def get_userd_group(self):
         """获取已经存在的分组"""
         infolog("开始获取已经存在的分组")
-        group_path = appdata_path(f"{self.user_name}_{GROUP_PATH}")
+        group_path = appdata_path(f"{self.user_data.user_name}_{GROUP_PATH}")
         if not os.path.exists(group_path) or os.path.getsize(group_path) == 0:
             shutil.copy2(resource_path(DEFAULT_GROUP), group_path)
 
@@ -2499,11 +2435,34 @@ class MainWindow(FramelessWindow):
             group_ccb.set_selected_items(selected_group)
         infolog("新建分组结束")
 
+    def get_used_nicknames(self):
+        """获取已经存在的俗称"""
+        infolog("开始获取已经存在的俗称")
+        self.used_nicknames = set()
+        # 从 NICKNAME_DICT 中收集所有已存在的俗称
+        for key, nicknames in NICKNAME_DICT.items():
+            for nickname in nicknames:
+                self.used_nicknames.add(nickname)
+        infolog("获取已经存在的俗称完成")
+
+    def create_new_nickname(self):
+        infolog("开始新建俗称")
+        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"]["nickname_ccb"]
+        user_input = nickname_ccb.text()
+        infolog(f"新俗称为:{user_input}")
+        if user_input:
+            selected_nicknames = nickname_ccb.get_selected_items()  # 默认加入输入文字了
+            nickname_ccb.clear()
+            self.used_nicknames.add(user_input)  # 维护已使用的集合
+            nickname_ccb.addItems(self.used_nicknames)
+            nickname_ccb.set_selected_items(selected_nicknames)
+        infolog("新建俗称结束")
+
     # 保存用户编辑后的信息
     def save_user_edit(self):
         """保存用户编辑后的信息"""
 
-        if not self.token:
+        if not self.user_data.token:
             InfoBar.warning(
                 title="用户未登录",
                 content="请先回到账号页面进行授权！",
@@ -2525,16 +2484,17 @@ class MainWindow(FramelessWindow):
         new_group = "`".join(group_ccb.get_selected_items())
         # print(f"new group={new_group}")
         new_comment = self.widgets["edit_info_page"]["comment_label"].get_plain_text()
+        # 读取新俗称值
+        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"]["nickname_ccb"]
+        new_nicknames = nickname_ccb.get_selected_items()
         model = self.song_list_widget.model
-        item: SongItem = model.item_dict[f"{now_card.combine_name}.{now_card.diff}"]
+        item: SongItem = model.get_item(f"{now_card.combine_name}.{now_card.diff}")
         item.comment = new_comment
         item.groups = group_ccb.get_selected_items()
+        item.nickname_list = new_nicknames
         now_card.comment = new_comment
         now_card.group = item.groups
-        self.song_list_widget.GROUP_INFO[now_card.combine_name] = item.groups
-        self.song_list_widget.COMMENT_INFO[now_card.combine_name][
-            now_card.diff
-        ] = new_comment
+        now_card.nickname_list = new_nicknames
 
         for i in range(model.rowCount()):
             if (
@@ -2544,7 +2504,7 @@ class MainWindow(FramelessWindow):
                 model.items[i] = item
                 break
         try:
-            group_path = appdata_path(f"{self.user_name}_{GROUP_PATH}")
+            group_path = appdata_path(f"{self.user_data.user_name}_{GROUP_PATH}")
             df = pd.read_csv(
                 group_path,
                 sep=",",
@@ -2565,7 +2525,7 @@ class MainWindow(FramelessWindow):
             pass
 
         try:
-            comment_path = appdata_path(f"{self.user_name}_{COMMENT_PATH}")
+            comment_path = appdata_path(f"{self.user_data.user_name}_{COMMENT_PATH}")
             df = pd.read_csv(
                 comment_path,
                 sep=",",
@@ -2587,11 +2547,33 @@ class MainWindow(FramelessWindow):
         except Exception:
             pass
 
+        # 保存俗称到 nickname.yaml
+        try:
+            nickname_key = f"{song_combine_name}.{diff}"
+            # 更新全局 NICKNAME_DICT
+            if new_nicknames:
+                NICKNAME_DICT[nickname_key] = new_nicknames
+            else:
+                # 如果没有俗称，从字典中删除该键
+                if nickname_key in NICKNAME_DICT:
+                    del NICKNAME_DICT[nickname_key]
+            # 保存到文件
+            with open(resource_path(NICKNAME_PATH), "w", encoding="utf-8") as f:
+                yaml.safe_dump(NICKNAME_DICT, f, allow_unicode=True, sort_keys=False)
+        except Exception as e:
+            infolog(f"保存俗称失败: {e}")
+
         self.get_userd_group()
         # infolog(f'玩家选择了的分组是{item.groups}')
         group_ccb.clear()
         group_ccb.addItems(self.used_group)
         group_ccb.set_selected_items(item.groups)
+
+        # 更新俗称下拉框
+        self.get_used_nicknames()
+        nickname_ccb.clear()
+        nickname_ccb.addItems(self.used_nicknames)
+        nickname_ccb.set_selected_items(item.nickname_list)
 
         self.place_b27_phi3()
         self.place_record()  # 更新搜索页面
@@ -2631,11 +2613,11 @@ class MainWindow(FramelessWindow):
         """生成账号页面的基本布局"""
         infolog("开始生成账号页面的基本布局")
         self.widgets["account_page"] = {}
-        if self.token:  # 有token
-            infolog(f"你的背景名称是{self.background_name}")
-            # self.background_name = "Stasis.Maozon" # 调试用
-            self.background_name = self.transform_bakcground_name(self.background_name)
-            widget = bg_widget(self.illustration_cache[self.background_name], 10)
+        if self.user_data.token:  # 有token
+            infolog(f"你的背景名称是{self.user_data.background_name}")
+            # self.user_data.background_name = "Stasis.Maozon" # 调试用
+            self.user_data.background_name = self.transform_bakcground_name(self.user_data.background_name)
+            widget = bg_widget(self.illustration_cache[self.user_data.background_name], 10)
             self.widgets["account_page"]["widget"] = widget
         else:  # 没token 暂时用一下无背景的吧
             widget = QWidget()
@@ -2658,7 +2640,7 @@ class MainWindow(FramelessWindow):
         layout.addWidget(login_confirm_btn)
         login_confirm_btn.bind_click_func(self.start_login)
 
-        if self.token:
+        if self.user_data.token:
             login_confirm_btn.hide()  # 如果已经有了token就不用再获取了
             QRcode_img.hide()
             self.draw_account_detail(widget, layout)  #
@@ -2669,9 +2651,9 @@ class MainWindow(FramelessWindow):
     def draw_account_detail(self, widget: bg_widget, layout: QGridLayout):
         """绘制账号详细信息(头像 名称 rks 简介...)"""
         infolog("开始绘制账号详细信息")
-        if self.avatar:
+        if self.user_data.avatar:
             original_pixmap = QPixmap(
-                resource_path(AVATER_IMG_PREPATH + self.avatar + ".png")
+                resource_path(AVATER_IMG_PREPATH + self.user_data.avatar + ".png")
             )
             avatar_widget = AvatarWidget(original_pixmap, widget)
             self.widgets["account_page"]["avatar_widget"] = avatar_widget
@@ -2685,8 +2667,8 @@ class MainWindow(FramelessWindow):
             "background_color": (255, 255, 255, 0.8),
         }
 
-        if self.challengemode_rank:  # 挑战模式评级拆分
-            bg_color = self.challengemode_rank[0]
+        if self.user_data.challengemode_rank:  # 挑战模式评级拆分
+            bg_color = self.user_data.challengemode_rank[0]
             if bg_color == "0":
                 bg_img = self.page_bg_cache["white"]
             elif bg_color == "1":
@@ -2700,7 +2682,7 @@ class MainWindow(FramelessWindow):
             elif bg_color == "5":
                 bg_img = self.page_bg_cache["colorful"]
 
-            levelsum = self.challengemode_rank[1::]
+            levelsum = self.user_data.challengemode_rank[1::]
             challenge_widget = bg_widget(bg_img.scaled(130, 46), 0)
             challenge_widget.setFixedSize(130, 46)
             layout.addWidget(challenge_widget, 1, 0, 1, 1)
@@ -2723,8 +2705,8 @@ class MainWindow(FramelessWindow):
         name_rks_layout = QVBoxLayout(name_rks_widget)
         name_rks_layout.setSpacing(0)
 
-        if self.user_name:
-            name_label = label(self.user_name, lable_style)
+        if self.user_data.user_name:
+            name_label = label(self.user_data.user_name, lable_style)
             name_label.setAlignment(Qt.AlignLeft)
             # name_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
             name_rks_layout.addWidget(name_label)
@@ -2744,7 +2726,7 @@ class MainWindow(FramelessWindow):
             "background_color": (255, 255, 255, 0.8),
         }
         self_introduction_label = label(
-            self.user_introduction, self_introduction_label_style
+            self.user_data.user_introduction, self_introduction_label_style
         )
         self_introduction_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self_introduction_label, 2, 0, 5, 4)
@@ -2781,15 +2763,15 @@ class MainWindow(FramelessWindow):
         EZ_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZ_label, 3, 4, 1, 1)
 
-        EZclear_label = label(self.EZ_statistical_data[0], summary_label_style)
+        EZclear_label = label(self.user_data.EZ_stats[0], summary_label_style)
         EZclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZclear_label, 3, 5, 1, 1)
 
-        EZFC_label = label(self.EZ_statistical_data[1], summary_label_style)
+        EZFC_label = label(self.user_data.EZ_stats[1], summary_label_style)
         EZFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZFC_label, 3, 6, 1, 1)
 
-        EZAP_label = label(self.EZ_statistical_data[2], summary_label_style)
+        EZAP_label = label(self.user_data.EZ_stats[2], summary_label_style)
         EZAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(EZAP_label, 3, 7, 1, 1)
 
@@ -2798,15 +2780,15 @@ class MainWindow(FramelessWindow):
         HD_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HD_label, 4, 4, 1, 1)
 
-        HDclear_label = label(self.HD_statistical_data[0], summary_label_style)
+        HDclear_label = label(self.user_data.HD_stats[0], summary_label_style)
         HDclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HDclear_label, 4, 5, 1, 1)
 
-        HDFC_label = label(self.HD_statistical_data[1], summary_label_style)
+        HDFC_label = label(self.user_data.HD_stats[1], summary_label_style)
         HDFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HDFC_label, 4, 6, 1, 1)
 
-        HDAP_label = label(self.HD_statistical_data[2], summary_label_style)
+        HDAP_label = label(self.user_data.HD_stats[2], summary_label_style)
         HDAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(HDAP_label, 4, 7, 1, 1)
 
@@ -2815,15 +2797,15 @@ class MainWindow(FramelessWindow):
         IN_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(IN_label, 5, 4, 1, 1)
 
-        INclear_label = label(self.IN_statistical_data[0], summary_label_style)
+        INclear_label = label(self.user_data.IN_stats[0], summary_label_style)
         INclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INclear_label, 5, 5, 1, 1)
 
-        INFC_label = label(self.IN_statistical_data[1], summary_label_style)
+        INFC_label = label(self.user_data.IN_stats[1], summary_label_style)
         INFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INFC_label, 5, 6, 1, 1)
 
-        INAP_label = label(self.IN_statistical_data[2], summary_label_style)
+        INAP_label = label(self.user_data.IN_stats[2], summary_label_style)
         INAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(INAP_label, 5, 7, 1, 1)
 
@@ -2832,15 +2814,15 @@ class MainWindow(FramelessWindow):
         AT_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(AT_label, 6, 4, 1, 1)
 
-        ATclear_label = label(self.AT_statistical_data[0], summary_label_style)
+        ATclear_label = label(self.user_data.AT_stats[0], summary_label_style)
         ATclear_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(ATclear_label, 6, 5, 1, 1)
 
-        ATFC_label = label(self.AT_statistical_data[1], summary_label_style)
+        ATFC_label = label(self.user_data.AT_stats[1], summary_label_style)
         ATFC_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(ATFC_label, 6, 6, 1, 1)
 
-        ATAP_label = label(self.AT_statistical_data[2], summary_label_style)
+        ATAP_label = label(self.user_data.AT_stats[2], summary_label_style)
         ATAP_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(ATAP_label, 6, 7, 1, 1)
 
@@ -2886,15 +2868,15 @@ class MainWindow(FramelessWindow):
             Token = TapTapLogin.GetUserData({**Profile["data"], **Login_info["data"]})
 
             # 保存token
-            self.token = Token["sessionToken"]
+            self.user_data.token = Token["sessionToken"]
 
             self.get_save_data()  # 获取存档数据并初始化变量
-            self.token_file[self.user_name] = self.token
-            self.token_file["last_user"] = self.user_name
-            # infolog("token文件内容是", self.token_file)
+            self.user_data.token_file[self.user_data.user_name] = self.user_data.token
+            self.user_data.token_file["last_user"] = self.user_data.user_name
+            # infolog("token文件内容是", self.user_data.token_file)
             with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as f:
                 json.dump(  # dump是写回
-                    self.token_file,
+                    self.user_data.token_file,
                     f,
                     ensure_ascii=False,  # 支持中文
                     indent=4,  # 格式化缩进 便于阅读
@@ -2903,9 +2885,9 @@ class MainWindow(FramelessWindow):
             self.widgets["account_page"]["QRcode_img"].hide()
             self.widgets["account_page"]["login_confirm_btn"].hide()
 
-            # self.background_name = "Stasis.Maozon"
-            self.background_name = self.transform_bakcground_name(self.background_name)
-            widget = bg_widget(self.illustration_cache[self.background_name])
+            # self.user_data.background_name = "Stasis.Maozon"
+            self.user_data.background_name = self.transform_bakcground_name(self.user_data.background_name)
+            widget = bg_widget(self.illustration_cache[self.user_data.background_name])
             self.widgets["account_page"]["widget"] = widget
             self.account_page = widget
             widget.setLayout(
@@ -2932,9 +2914,9 @@ class MainWindow(FramelessWindow):
         """玩家登出后还原页面及变量"""
         infolog("玩家登出 开始还原页面及变量")
         with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as f:  # 清空tokn记录
-            self.token_file[self.user_name] = ""
+            self.user_data.token_file[self.user_data.user_name] = ""
             json.dump(
-                self.token_file, f, ensure_ascii=False, indent=4  # 支持中文
+                self.user_data.token_file, f, ensure_ascii=False, indent=4  # 支持中文
             )  # 格式化缩进 便于阅读)
             self.init_variable()  # 还原所有与账号相关的变量
 
@@ -3146,7 +3128,7 @@ class MainWindow(FramelessWindow):
 
     # 保存用户设置
     def save_user_setting(self):
-        if not self.token:
+        if not self.user_data.token:
             InfoBar.warning(
                 title="用户未登录",
                 content="请先回到账号页面进行授权！",
@@ -3166,7 +3148,7 @@ class MainWindow(FramelessWindow):
             setting_file = json.load(f)
 
         # 修改设置
-        user_setting = setting_file[self.user_name]
+        user_setting = setting_file[self.user_data.user_name]
         main_setting = user_setting["main_setting"]
 
         # 常更新写入

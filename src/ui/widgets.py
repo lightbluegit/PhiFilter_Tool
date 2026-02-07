@@ -1,6 +1,6 @@
 import re
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 from PyQt5.QtCore import (
@@ -1728,36 +1728,33 @@ class ImageLoader(QObject):  # 继承 QObject 以支持信号
 # -----------虽然用了模型与视图/委托交互的模式 但是实际上似乎只用了存储数据的部分...--------
 @dataclass
 class SongItem:  # 存储单个歌曲的信息
-    combine_name: str
-    diff: str
-    name: str
-    rks: float
-    acc: float
-    level: float
-    score: int
-    improve_advice: float | None
-    is_fc: bool
-    composer: str
-    chapter: str
-    drawer: str
-    illustration: QPixmap
-    bg_path: str
-    groups: list[str]
-    nickname_list: list[str]
-    comment: str
-    bg_pixmap: QPixmap | None = None
+    combine_name: str = ""  # 组合名称
+    diff: str = ""
+    name: str = ""
+    rks: float = 0
+    acc: float = 0
+    level: float = 0
+    score: int = 0
+    improve_advice: float | None = None  # 能否推分
+    is_fc: bool = False
+    composer: str = ""  # 曲师
+    chapter: str = ""  # 谱师
+    drawer: str = ""  # 画师
+    illustration: QPixmap = None  # 曲绘
+    bg_path: str = ""  # ? 背景
+    groups: list[str] = field(default_factory=lambda: [])  # 对此难度的分组
+    nickname_list: list[str] = field(default_factory=lambda: [])  # 对此歌的俗称
+    comment: str = ""  # 评论
+    bg_pixmap: QPixmap | None = None  # ?
 
 
 # 定义模型 为 QListView 提供数据 用于管理 SongItem 列表 负责将数据提供给视图 (如 QListView)。
 class SongListModel(QAbstractListModel):
 
-    def __init__(self, items: list[SongItem] = None):
+    def __init__(self):
         super().__init__()
-        self.items = [] if items is None else items
-        self.item_dict = {}  # {组合名称.难度 : SongItem}
-        if items is not None:
-            for itemi in items:
-                self.item_dict[f"{itemi.combine_name}.{itemi.diff}"] = itemi
+        self.items = []  # 存储所有歌曲信息
+        self.item_dict = {}  # {组合名称.难度 : 对应row}
 
     def rowCount(
         self, parent=QModelIndex()
@@ -1768,11 +1765,16 @@ class SongListModel(QAbstractListModel):
     def add_item(self, item: SongItem):
         # 向模型尾部插入一行
         self.beginInsertRows(QModelIndex(), len(self.items), len(self.items))
+        self.item_dict[f"{item.combine_name}.{item.diff}"] = len(self.items)
         self.items.append(item)
-        self.item_dict[f"{item.combine_name}.{item.diff}"] = item
         self.endInsertRows()
 
-    def get_item(self, row: int) -> SongItem | None:
+    def get_item(self, row: int | str) -> SongItem | None:
+        """根据传入的 row / 组合名称.难度 获取对应曲子信息"""
+        if isinstance(row, str):  # 传入的是 组合名称.难度
+            if self.item_dict.get(row, None) is None:  # 错误参数
+                return None
+            row = self.item_dict[row]  # 转为对应row
         # 获取行对应的 SongItem
         if 0 <= row < len(self.items):
             return self.items[row]
@@ -1787,12 +1789,87 @@ class SongListViewWidget(QWidget):
         self.view = QListView()  # 向用户展示数据，并处理用户的交互（如点击、选择等）
         self.view.setModel(self.model)
 
+    # 生成组合名称与其对应名称 曲师等信息对照
+    def generate_cname_to_name_info(self):
+        """
+        读取 info.tsv 并填充模型 后续只需要查找对应模型并补全信息即可
+        """
+        infolog("生成组合名称与其对应名称 曲师等信息对照")
+        df = pd.read_csv(
+            resource_path(INFO_PATH),
+            sep="\t",  # 文酱的项目生成的.tsv文件 分隔符是 \t
+            header=None,  # 无头模式
+            encoding="utf-8",
+            names=[  # 每一列的名称
+                "combine_name",
+                "song_name",
+                "composer",
+                "drawer",
+                "EZchapter",
+                "HDchapter",
+                "INchapter",
+                "ATchapter",
+                "Legendchapter",
+            ],
+        )
+        df = df.fillna("")  # 没有数据的部分填充空字符
+
+        for _, row in df.iterrows():  # 遍历获取基本曲目信息
+            combine_name = row["combine_name"]
+            song_name = row["song_name"]
+            composer = row["composer"]
+            drawer = row["drawer"]
+            EZchapter = row["EZchapter"]
+            HDchapter = row["HDchapter"]
+            INchapter = row["INchapter"]
+            ATchapter = row["ATchapter"]
+
+            EZitem = SongItem(  # 构建曲目信息
+                combine_name=combine_name,
+                name=song_name,
+                diff="EZ",
+                composer=composer,
+                drawer=drawer,
+                chapter=EZchapter,
+            )
+            self.model.add_item(EZitem)  # 加入模型
+
+            HDitem = SongItem(  # 构建曲目信息
+                combine_name=combine_name,
+                name=song_name,
+                diff="HD",
+                composer=composer,
+                drawer=drawer,
+                chapter=HDchapter,
+            )
+            self.model.add_item(HDitem)  # 加入模型
+
+            INitem = SongItem(  # 构建曲目信息
+                combine_name=combine_name,
+                name=song_name,
+                diff="IN",
+                composer=composer,
+                drawer=drawer,
+                chapter=INchapter,
+            )
+            self.model.add_item(INitem)  # 加入模型
+
+            if ATchapter:  # 有可能没有AT
+                ATitem = SongItem(  # 构建曲目信息
+                    combine_name=combine_name,
+                    name=song_name,
+                    diff="AT",
+                    composer=composer,
+                    drawer=drawer,
+                    chapter=ATchapter,
+                )
+                self.model.add_item(ATitem)  # 加入模型
+        # infolog(f"组合名称与其对应名称 曲师等信息对照信息为：{self.cname_to_name}") # 很长 谨慎使用
+
     # 从存档中构建数据
     def init_model_from_save_data(
         self,
         save_dict: dict,
-        diff_map_result: dict,
-        cname_to_name: dict,
         illustration_cache: dict[str, QPixmap],
         bg_cache: dict[str, QPixmap],
         user_name: str,
@@ -1801,12 +1878,15 @@ class SongListViewWidget(QWidget):
         infolog("开始从存档中构建数据")
         self.model = SongListModel()
         self.view.setModel(self.model)
-        self.GROUP_INFO = {}
-        self.COMMENT_INFO = {}
+        self.generate_cname_to_name_info()  # 填充模型
         # ----- 获取分组信息 -----
-        group_path = appdata_path(f"{user_name}_{GROUP_PATH}")
-        if not os.path.exists(group_path) or os.path.getsize(group_path) == 0:
-            shutil.copy2(resource_path(DEFAULT_GROUP), group_path)
+        group_path = appdata_path(f"{user_name}_{GROUP_PATH}")  # 获取指定用户的分组路径
+        if (
+            not os.path.exists(group_path) or os.path.getsize(group_path) == 0
+        ):  # 如果没有分组文件
+            shutil.copy2(
+                resource_path(DEFAULT_GROUP), group_path
+            )  # 复制默认空白分组文件
 
         df = pd.read_csv(
             group_path,
@@ -1818,20 +1898,25 @@ class SongListViewWidget(QWidget):
         df = df.fillna("")
         df.set_index(df.columns[0], inplace=True)
         used_group = set()
-        for idx, rowi in df.iterrows():
-            group_raw = str(rowi["group"])  # 组合名称 : 分组
-            if group_raw:
-                group_raw = group_raw.split("`")
-                for i in group_raw:
+        for combine_namei, rowi in df.iterrows():  # 遍历分组文件
+            group_raw = str(rowi["group"])  # 分组信息
+            if group_raw:  # 以`分割的原始字符串
+                group = group_raw.split("`")
+                for i in group:  # 记录使用过的分组
                     used_group.add(i)
-            self.GROUP_INFO[idx] = group_raw
-            # infolog('GROUP_INFO是',GROUP_INFO)
+                #! 分组要差分难度啊啊啊啊
+                EZ_item: SongItem = self.model.get_item(f"{combine_namei}.EZ")
+                EZ_item.groups = group  # 填充各个难度的分组信息
 
-            #     group_raw = str(rowi["group"]).strip()
-            #     for groupi in group_raw.split("`"):
-            #         if groupi:
-            #             used_group.add(groupi)
-            # used_group = list(used_group)
+                HD_item: SongItem = self.model.get_item(f"{combine_namei}.HD")
+                HD_item.groups = group
+
+                IN_item: SongItem = self.model.get_item(f"{combine_namei}.IN")
+                IN_item.groups = group
+
+                AT_item: SongItem = self.model.get_item(f"{combine_namei}.AT")
+                if AT_item is not None:
+                    AT_item.groups = group
 
         # ----- 获取简评信息 -----
         comment_path = appdata_path(f"{user_name}_{COMMENT_PATH}")
@@ -1853,21 +1938,37 @@ class SongListViewWidget(QWidget):
         )
         df = df.fillna("")
         df.set_index(df.columns[0], inplace=True)
-        for idx, rowi in df.iterrows():
-            self.COMMENT_INFO[idx] = {
-                "EZ": str(rowi["EZ_comment"]),
-                "HD": str(rowi["HD_comment"]),
-                "IN": str(rowi["IN_comment"]),
-                "AT": str(rowi["AT_comment"]),
-            }
+        for combine_namei, rowi in df.iterrows():
+            EZ_item: SongItem = self.model.get_item(f"{combine_namei}.EZ")
+            EZ_item.groups = str(rowi["EZ_comment"])  # 填充各个难度的分组信息
 
-        row = 0
-        for combine_name, all_diff_dic in diff_map_result.items():
+            HD_item: SongItem = self.model.get_item(f"{combine_namei}.HD")
+            HD_item.groups = str(rowi["HD_comment"])
+
+            IN_item: SongItem = self.model.get_item(f"{combine_namei}.IN")
+            IN_item.groups = str(rowi["IN_comment"])
+
+            AT_item: SongItem = self.model.get_item(f"{combine_namei}.AT")
+            if AT_item is not None:
+                AT_item.groups = str(rowi["AT_comment"])
+
+        df = pd.read_csv(
+            resource_path(DIFFICULTY_PATH),
+            sep="\t",
+            header=None,
+            encoding="utf-8",
+            names=["song_name", "EZ", "HD", "IN", "AT"],
+        )
+        df = df.fillna("")  # 用空字符串替换 NaN
+        for _, row in df.iterrows():  # 遍历难度文件 从存档中构建曲目信息
+            combine_name = row["song_name"]
+            all_diff_dic: dict = {"EZ": row["EZ"], "HD": row["HD"], "IN": row["IN"]}
+            if row["AT"]:
+                all_diff_dic["AT"] = row["AT"]
+
             for diffi, leveli in all_diff_dic.items():
                 gamerecord = save_dict["gameRecord"]
                 # 一定会有的信息
-
-                song_name, composer, drawer, chapter_dic = cname_to_name[combine_name]
                 illustration = illustration_cache[combine_name]
                 bg_path = bg_cache[diffi]
                 nickname = NICKNAME_DICT.get(combine_name, [])  # 有可能暂时没有没别名
@@ -1879,8 +1980,6 @@ class SongListViewWidget(QWidget):
                     acc = 0.0
                     is_fc = False
                     singal_rks = 0
-                    groups = []
-                    comment = ""
                 else:
                     items = gamerecord[combine_name][diffi]
                     score = int(items["score"])
@@ -1888,32 +1987,20 @@ class SongListViewWidget(QWidget):
                     acc = round(acc, 4)
                     is_fc = True if items["fc"] == 1 else False
                     singal_rks = round(leveli * pow((acc - 55) / 45, 2), 4)
-                    groups = self.GROUP_INFO.get(combine_name, {})
-                    comment = self.COMMENT_INFO.get(combine_name, {}).get(diffi, "")
-
+                song_item = self.model.get_item(f"{combine_name}.{diffi}")
+                if song_item is None:
+                    warnlog(f"未找到{combine_name}.{diffi}")
+                    continue
+                song_item.rks = singal_rks
+                song_item.acc = acc
+                song_item.level = leveli
+                song_item.score = score
+                song_item.is_fc = is_fc
+                song_item.illustration = illustration
+                song_item.bg_path = bg_path
+                song_item.nickname_list = nickname
                 # 构造 SongItem，并加入 model
                 # infolog(f"模型正在写入{combine_name}")
-                item = SongItem(
-                    combine_name=combine_name,
-                    diff=diffi,
-                    name=song_name,
-                    rks=singal_rks,
-                    acc=acc,
-                    level=leveli,
-                    score=score,
-                    improve_advice=None,
-                    is_fc=is_fc,
-                    composer=composer,
-                    chapter=chapter_dic[diffi],
-                    drawer=drawer,
-                    illustration=illustration,
-                    bg_path=bg_path,
-                    groups=groups,
-                    comment=comment,
-                    nickname_list=nickname,
-                )
-                self.model.add_item(item)
-                row += 1
         infolog("从存档中构建数据完成")
 
     def build_card(
