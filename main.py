@@ -2299,7 +2299,7 @@ class MainWindow(FramelessWindow):
         group_layout.setSpacing(5)
 
         # 左 分组下拉框
-        group_ccb = multi_check_combobox(self.user_data.user_name)
+        group_ccb = multi_check_combobox(self.user_data.user_name, is_group=True)
         self.widgets["edit_info_page"]["group_ccb"] = group_ccb
         self.get_userd_group()
         group_ccb.addItems(self.used_group)
@@ -2329,7 +2329,7 @@ class MainWindow(FramelessWindow):
         nickname_layout.setSpacing(5)
 
         # 左 俗称下拉框
-        nickname_ccb = multi_check_combobox(self.user_data.user_name)
+        nickname_ccb = multi_check_combobox(self.user_data.user_name, is_group=False)
         self.widgets["edit_info_page"]["nickname_ccb"] = nickname_ccb
         self.get_used_nicknames()
         nickname_ccb.addItems(self.used_nicknames)

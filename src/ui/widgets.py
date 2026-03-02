@@ -62,6 +62,7 @@ from qfluentwidgets import (
     SmoothScrollArea,
     TextEdit,
 )
+from qfluentwidgets.components.settings.custom_color_setting_card import CustomColorSettingCard
 from src.ui.styles import *
 from src.utils.consts import *
 
@@ -1296,10 +1297,11 @@ class multi_check_combobox(EditableComboBox):
     # 添加一个信号，如果外部需要知道哪个组被删除了，可以连接这个信号
     itemRemoved = pyqtSignal(str)
 
-    def __init__(self, user_name, parent=None):
+    def __init__(self, user_name, is_group=True, parent=None):
         super().__init__(parent)
         self.contain_list = []
         self.user_name = user_name
+        self.is_group = is_group  # True 表示分组，False 表示俗称
         self.setMaximumWidth(360)
         self.setMaximumHeight(28)
 
@@ -1324,6 +1326,9 @@ class multi_check_combobox(EditableComboBox):
         self.dropButton.clicked.disconnect()
         self.dropButton.clicked.connect(self.show_menu)
 
+        # 连接文本变化信号 - 使用 EditableComboBox 内置的补全功能
+        self.textChanged.connect(self._on_text_changed)
+
     def show_menu(self):
         """显示自定义下拉菜单"""
         pos = self.mapToGlobal(self.rect().bottomLeft())
@@ -1331,6 +1336,36 @@ class multi_check_combobox(EditableComboBox):
             self.dropdown_menu.view.setMinimumWidth(self.width())
             self.dropdown_menu.adjustSize()
         self.dropdown_menu.exec(pos, ani=True, aniType=MenuAnimationType.DROP_DOWN)
+
+    def _on_text_changed(self, text):
+        """文本变化时更新下拉菜单的显示（过滤）"""
+        if not text:
+            # 显示所有项
+            for i in range(self.list_widget.count()):
+                self.list_widget.item(i).setHidden(False)
+            return
+        
+        text_lower = text.lower()
+        # 过滤列表项，隐藏不匹配的
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            container = self.list_widget.itemWidget(item)
+            if container:
+                checkbox = container.findChild(CheckBox)
+                if checkbox:
+                    item_text = checkbox.toolTip().lower()
+                    # 如果匹配或者是已勾选的，则显示
+                    is_checked = checkbox.isChecked()
+                    is_match = text_lower in item_text
+                    item.setHidden(not (is_match or is_checked))
+        
+        # 自动打开下拉菜单（如果有关键字匹配）
+        has_match = any(
+            not self.list_widget.item(i).isHidden() 
+            for i in range(self.list_widget.count())
+        )
+        if has_match and not self.dropdown_menu.isVisible():
+            self.show_menu()
 
     def addItems(self, items):
         """添加可选项"""
@@ -1409,8 +1444,11 @@ class multi_check_combobox(EditableComboBox):
         if self.text() == text:
             self.setText("")
 
-        remove_group_from_csv(self.user_name, text)
-        # 4. 发送信号（可选）
+        # 4. 如果是分组，从 CSV 文件中移除
+        if self.is_group:
+            remove_group_from_csv(self.user_name, text)
+        
+        # 5. 发送信号（可选）
         self.itemRemoved.emit(text)
 
     def get_selected_items(self):
