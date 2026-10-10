@@ -62,7 +62,9 @@ from qfluentwidgets import (
     SmoothScrollArea,
     TextEdit,
 )
-from qfluentwidgets.components.settings.custom_color_setting_card import CustomColorSettingCard
+from qfluentwidgets.components.settings.custom_color_setting_card import (
+    CustomColorSettingCard,
+)
 from src.ui.styles import *
 from src.utils.consts import *
 
@@ -545,8 +547,7 @@ class hint_and_frame_widget(QFrame):
     ):
         super().__init__()
         # ------------- 底层背景卡片 -------------
-        self.setStyleSheet(
-            """
+        self.setStyleSheet("""
             hint_and_frame_widget {
                 background-color: rgba(255, 255, 255, 0.65);
                 border-radius: 8px;
@@ -554,8 +555,7 @@ class hint_and_frame_widget(QFrame):
                 padding: 0;
                 max-width: 380px;
             }
-        """
-        )
+        """)
         self.setContentsMargins(0, 0, 0, 0)
 
         # ------------- 上层内容容器 -------------
@@ -567,8 +567,7 @@ class hint_and_frame_widget(QFrame):
 
         # 标题部分
         self.title_label = CaptionLabel(title)
-        self.title_label.setStyleSheet(
-            """
+        self.title_label.setStyleSheet("""
             min-width: 60px;
             font-size: 25px;
             color: #666;
@@ -576,24 +575,21 @@ class hint_and_frame_widget(QFrame):
             border-radius: 8px;
             border-right: 1px solid #EEE;
             background-color: rgba(255, 255, 255, 0.85);
-        """
-        )
+        """)
         layout.addWidget(self.title_label)
 
         # 内容部分
         self.scroll_area = SmoothScrollArea()
         layout.addWidget(self.scroll_area)
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet(
-            f"""QScrollArea{{
+        self.scroll_area.setStyleSheet(f"""QScrollArea{{
             background-color: transparent; 
             border: none;
             max-height: {content_style["max-height"]}px;
             min-height: {content_style["min-height"]}px;
             min-width: {content_style["max-width"]}px;
             max-width: {content_style["min-width"]}px;
-            }}"""
-        )
+            }}""")
         # 创建内容容器
         self.scroll_content_widget = QWidget()
         self.flow_layout = FlowLayout(self.scroll_content_widget)  # 使用流式布局
@@ -696,14 +692,12 @@ class song_info_card(QWidget):
         self.scroll_area = SmoothScrollArea()
         self.mainlayout.addWidget(self.scroll_area)
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet(
-            """QScrollArea{
+        self.scroll_area.setStyleSheet("""QScrollArea{
             background-color: rgba(187, 255, 255, 0.6); 
             border: none; max-width: 400px;
             min-width: 400px; 
             min-height: 200px; 
-            max-height: 200px;}"""
-        )
+            max-height: 200px;}""")
         self.setStyleSheet("QWidget{background: transparent}")
 
         if not self.is_expended:
@@ -1344,7 +1338,7 @@ class multi_check_combobox(EditableComboBox):
             for i in range(self.list_widget.count()):
                 self.list_widget.item(i).setHidden(False)
             return
-        
+
         text_lower = text.lower()
         # 过滤列表项，隐藏不匹配的
         for i in range(self.list_widget.count()):
@@ -1358,10 +1352,10 @@ class multi_check_combobox(EditableComboBox):
                     is_checked = checkbox.isChecked()
                     is_match = text_lower in item_text
                     item.setHidden(not (is_match or is_checked))
-        
+
         # 自动打开下拉菜单（如果有关键字匹配）
         has_match = any(
-            not self.list_widget.item(i).isHidden() 
+            not self.list_widget.item(i).isHidden()
             for i in range(self.list_widget.count())
         )
         if has_match and not self.dropdown_menu.isVisible():
@@ -1399,8 +1393,7 @@ class multi_check_combobox(EditableComboBox):
             close_btn.setFixedSize(20, 20)
             close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             # 设置样式：平时灰色透明，悬停变红
-            close_btn.setStyleSheet(
-                """
+            close_btn.setStyleSheet("""
                 QPushButton {
                     background: transparent;
                     border: none;
@@ -1412,8 +1405,7 @@ class multi_check_combobox(EditableComboBox):
                     background-color: #ffe6e6;
                     color: #ff0000;
                 }
-            """
-            )
+            """)
 
             # 绑定删除事件，使用 lambda 捕获当前的 item 和 text
             # 注意：这里需要 item=item, text=text 来避免闭包变量捕获问题
@@ -1447,7 +1439,7 @@ class multi_check_combobox(EditableComboBox):
         # 4. 如果是分组，从 CSV 文件中移除
         if self.is_group:
             remove_group_from_csv(self.user_name, text)
-        
+
         # 5. 发送信号（可选）
         self.itemRemoved.emit(text)
 
@@ -2036,9 +2028,16 @@ class SongListViewWidget(QWidget):
                 all_diff_dic["AT"] = row["AT"]
 
             for diffi, leveli in all_diff_dic.items():
+                leveli = float(leveli)
                 gamerecord = save_dict["gameRecord"]
                 # 一定会有的信息
-                illustration = illustration_cache[combine_name]
+                illustration = None
+                if combine_name in DIFF_ILLUSTRATION:
+                    illustration = illustration_cache[
+                        DIFF_ILLUSTRATION[combine_name][diffi]
+                    ]
+                else:
+                    illustration = illustration_cache[combine_name]
                 bg_path = bg_cache[diffi]
                 nickname = NICKNAME_DICT.get(combine_name, [])  # 有可能暂时没有没别名
                 if (

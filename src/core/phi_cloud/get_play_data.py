@@ -1,21 +1,20 @@
-from typing import Any, Optional, Union
-from base64 import b64decode
-from requests import Session
-from struct import unpack, pack
-from hashlib import md5
-from zipfile import ZipFile, ZIP_DEFLATED
-from io import BytesIO
 from base64 import b64decode, b64encode
+from hashlib import md5, sha1, sha256
 from hmac import new
+from io import BytesIO
 from json import dumps
-from hashlib import sha256, sha1
 from random import randint
+from struct import pack, unpack
 from time import *
+from typing import Any, Optional, Union
 from uuid import uuid4
-from qrcode import make
-from Crypto.Cipher.AES import new, MODE_CBC, block_size
-from Crypto.Util.Padding import unpad
+from zipfile import ZIP_DEFLATED, ZipFile
+
 import pandas as pd
+from Crypto.Cipher.AES import MODE_CBC, block_size, new
+from Crypto.Util.Padding import unpad
+from qrcode import make
+from requests import Session
 from src.utils.base import infolog
 
 # ---------------------- 信息获取相关操作 ----------------------
@@ -349,6 +348,7 @@ class PhigrosCloud:
 
             self.request = PigeonRequest(sessionToken, client)
             self.baseUrl = "https://rak3ffdi.cloud.tds1.tapapis.cn/1.1/"
+            self.user_objectid: Optional[str] = None  # getSummary 用,缓存当前用户的 objectId
 
     async def __aenter__(self):
         return self
@@ -392,9 +392,16 @@ class PhigrosCloud:
         infolog("调用函数：getSummary()")
 
         # 请求并初步解析存档信息
-        result = (self.request.get(self.baseUrl + "classes/_GameSave?limit=1")).json()[
-            "results"
-        ][0]
+        if self.user_objectid is None:  # __init__ 里加 self.user_objectid = None
+            self.user_objectid = (self.request.get(self.baseUrl + "users/me")).json()["objectId"]
+        where = '{"user":{"__type":"Pointer","className":"_User","objectId":"%s"}}' % self.user_objectid
+        result = (self.request.get(
+            self.baseUrl + "classes/_GameSave?skip=0&limit=100&where=" + where + "&include=cover,gameFile"
+        )).json()["results"][0]
+
+        # result = (self.request.get(self.baseUrl + "classes/_GameSave?limit=1")).json()[
+        #     "results"
+        # ][0]
         summary_data = b64decode(result["summary"])  # base64解码summary数据
 
         # 解析summary数据（谢谢废酱！）
@@ -535,10 +542,10 @@ class PhigrosCloud:
         """
         infolog("调用函数：uploadSummary()")
 
-        from struct import pack
         from base64 import b64encode
-        from json import dumps
         from datetime import datetime
+        from json import dumps
+        from struct import pack
 
         # 将解析过的summary构建回去
         avatar_data = summary["avatar"].encode()  # 对头像名称进行编码
@@ -653,6 +660,32 @@ class dataTypeAbstract:
 
     @staticmethod
     def write(data: bytearray, value): ...
+
+
+class _NibbleLow(dataTypeAbstract):
+    """低 4 位：与紧随其后的 _NibbleHigh 共用一个字节"""
+
+    @staticmethod
+    def read(data: bytes, pos: int):
+        return data[pos] & 0x0F, pos + 1
+
+    @staticmethod
+    def write(data: bytearray, value: int):
+        data.append(value & 0x0F)
+        return data
+
+
+class _NibbleHigh(dataTypeAbstract):
+    """高 4 位：读取上一个字节的高 4 位，不推进 pos"""
+
+    @staticmethod
+    def read(data: bytes, pos: int):
+        return (data[pos - 1] >> 4) & 0x0F, pos
+
+    @staticmethod
+    def write(data: bytearray, value: int):
+        data[-1] = (data[-1] & 0x0F) | ((value & 0x0F) << 4)
+        return data
 
 
 class Byte(dataTypeAbstract):
@@ -1266,6 +1299,21 @@ class GameKey(dataTypeAbstract):
         return writer.get_data()
 
 
+class gameKey01:
+    """版本号≥2.3.0(2.4.0 才加入云存档)
+
+    新增 Lanota 联动精选集,新增 "lanotaReadKeys"
+    """
+
+    file_head = b"\x01"
+
+    keyList: GameKey
+    """游戏中所有Key的状态值"""
+
+    lanotaReadKeys: Bits[6]
+    """Lanota收藏品阅读进度(解锁倒霉蛋和船的AT)"""
+
+
 class gameKey03:
     """
     版本号≥3.9.0
@@ -1461,6 +1509,274 @@ class gameProgress04:
     """第四章Takumi AT解锁"""
 
 
+class gameProgress05:
+    """版本号=4.0.0
+
+    第九章第一阶段的新增:
+    chapter9UnlockBegin、chapter9SecretChallengePendingLifeUnlock、
+    chapter9SongUnlocked、chapter9SecretChallengeLifeTier、
+    chapter9SecretChallengeSelectedLifeTier、chapter9SecretPassword
+    """
+
+    file_head = b"\x05"
+
+    isFirstRun: Bit
+    """是否首次运行"""
+
+    legacyChapterFinished: Bit
+    """过去的章节是否完成"""
+
+    alreadyShowCollectionTip: Bit
+    """是否展示收藏品Tip"""
+
+    alreadyShowAutoUnlockINTip: Bit
+    """是否展示自动解锁IN Tip"""
+
+    completed: String
+    """剧情完成 (用于显示全部歌曲和课题模式入口)"""
+
+    songUpdateInfo: VarInt
+
+    challengeModeRank: ShortInt
+    """课题分"""
+
+    money: Money
+    """Data值"""
+
+    unlockFlagOfSpasmodic: Bits[4]
+    """Spasmodic解锁"""
+
+    unlockFlagOfIgallta: Bits[4]
+    """Igallta解锁"""
+
+    unlockFlagOfRrharil: Bits[4]
+    """Rrhar'il解锁"""
+
+    flagOfSongRecordKey: Bits
+    """部分歌曲IN达到S解锁AT"""
+
+    randomVersionUnlocked: Bits[6]
+    """Random切片解锁"""
+
+    chapter8UnlockBegin: Bit
+    """第八章入场"""
+
+    chapter8UnlockSecondPhase: Bit
+    """第八章第二阶段"""
+
+    chapter8Passed: Bit
+    """第八章通过"""
+
+    chapter8SongUnlocked: Bits[6]
+    """第八章各曲目解锁"""
+
+    flagOfSongRecordKeyTakumi: Bits[3]
+    """第四章Takumi AT解锁"""
+
+    chapter9UnlockBegin: Bit
+    """第九章第一阶段入场"""
+
+    chapter9SecretChallengePendingLifeUnlock: Bit
+    """新生灵命位提示曲未确认"""
+
+    chapter9SongUnlocked: Bits[6]
+    """第九章第一阶段各曲目解锁"""
+
+    chapter9SecretChallengeLifeTier: _NibbleLow
+    """已解锁新生灵命位上界"""
+
+    chapter9SecretChallengeSelectedLifeTier: _NibbleHigh
+    """下次挑战选用的生灵命位"""
+
+    chapter9SecretPassword: String
+    """第九章解锁密码 (默认就是"0")"""
+
+
+class gameProgress06:
+    """版本号≥4.0.1
+
+    第九章第二阶段内容的更新:
+    chapter9Phase2SongUnlocked、chapter9Phase2Begin、chapter9Phase2Passed、
+    c9BaselineChallengeReached、chapter9Phase2Step
+    """
+
+    file_head = b"\x06"
+
+    isFirstRun: Bit
+    """是否首次运行"""
+
+    legacyChapterFinished: Bit
+    """过去的章节是否完成"""
+
+    alreadyShowCollectionTip: Bit
+    """是否展示收藏品Tip"""
+
+    alreadyShowAutoUnlockINTip: Bit
+    """是否展示自动解锁IN Tip"""
+
+    completed: String
+    """剧情完成 (用于显示全部歌曲和课题模式入口)"""
+
+    songUpdateInfo: VarInt
+
+    challengeModeRank: ShortInt
+    """课题分"""
+
+    money: Money
+    """Data值"""
+
+    unlockFlagOfSpasmodic: Bits[4]
+    """Spasmodic解锁"""
+
+    unlockFlagOfIgallta: Bits[4]
+    """Igallta解锁"""
+
+    unlockFlagOfRrharil: Bits[4]
+    """Rrhar'il解锁"""
+
+    flagOfSongRecordKey: Bits
+    """部分歌曲IN达到S解锁AT"""
+
+    randomVersionUnlocked: Bits[6]
+    """Random切片解锁"""
+
+    chapter8UnlockBegin: Bit
+    """第八章入场"""
+
+    chapter8UnlockSecondPhase: Bit
+    """第八章第二阶段"""
+
+    chapter8Passed: Bit
+    """第八章通过"""
+
+    chapter8SongUnlocked: Bits[6]
+    """第八章各曲目解锁"""
+
+    flagOfSongRecordKeyTakumi: Bits[3]
+    """第四章Takumi AT解锁"""
+
+    chapter9UnlockBegin: Bit
+    """第九章第一阶段入场"""
+
+    chapter9SecretChallengePendingLifeUnlock: Bit
+    """新生灵命位提示曲未确认"""
+
+    chapter9SongUnlocked: Bits[6]
+    """第九章第一阶段各曲目解锁"""
+
+    chapter9SecretChallengeLifeTier: _NibbleLow
+    """已解锁新生灵命位上界"""
+
+    chapter9SecretChallengeSelectedLifeTier: _NibbleHigh
+    """下次挑战选用的生灵命位"""
+
+    chapter9SecretPassword: String
+    """第九章解锁密码 (默认就是"0")"""
+
+    chapter9Phase2SongUnlocked: Bits[6]
+    """第九章第二阶段各曲目解锁"""
+
+    chapter9Phase2Begin: Bit
+    """第九章第二阶段入场"""
+
+    chapter9Phase2Passed: Bit
+    """第九章第二阶段通过"""
+
+    c9BaselineChallengeReached: Bit
+    """已开启第九章第二阶段最后的挑战"""
+
+    chapter9Phase2Step: Byte
+    """第九章第二阶段剧情阶段"""
+
+
+class gameProgress01:
+    """版本号≥2.4.0(2.4.0 才加入云存档)"""
+
+    file_head = b"\x01"
+
+    isFirstRun: Bit
+    """是否首次运行"""
+
+    legacyChapterFinished: Bit
+    """过去的章节是否完成"""
+
+    alreadyShowCollectionTip: Bit
+    """是否展示收藏品Tip"""
+
+    alreadyShowAutoUnlockINTip: Bit
+    """是否展示自动解锁IN Tip"""
+
+    completed: String
+    """剧情完成 (用于显示全部歌曲和课题模式入口)"""
+
+    songUpdateInfo: VarInt
+
+    challengeModeRank: ShortInt
+    """课题分"""
+
+    money: Money
+    """Data值"""
+
+    unlockFlagOfSpasmodic: Bits[4]
+    """Spasmodic解锁"""
+
+    unlockFlagOfIgallta: Bits[4]
+    """Igallta解锁"""
+
+    unlockFlagOfRrharil: Bits[4]
+    """Rrhar'il解锁"""
+
+    flagOfSongRecordKey: Bits
+    """部分歌曲IN达到S解锁AT"""
+
+
+class gameProgress02:
+    """版本号≥2.5.1
+
+    新增"randomVersionUnlocked"
+    """
+
+    file_head = b"\x02"
+
+    isFirstRun: Bit
+    """是否首次运行"""
+
+    legacyChapterFinished: Bit
+    """过去的章节是否完成"""
+
+    alreadyShowCollectionTip: Bit
+    """是否展示收藏品Tip"""
+
+    alreadyShowAutoUnlockINTip: Bit
+    """是否展示自动解锁IN Tip"""
+
+    completed: String
+    """剧情完成 (用于显示全部歌曲和课题模式入口)"""
+
+    songUpdateInfo: VarInt
+
+    challengeModeRank: ShortInt
+    """课题分"""
+
+    money: Money
+    """Data值"""
+
+    unlockFlagOfSpasmodic: Bits[4]
+    """Spasmodic解锁"""
+
+    unlockFlagOfIgallta: Bits[4]
+    """Igallta解锁"""
+
+    unlockFlagOfRrharil: Bits[4]
+    """Rrhar'il解锁"""
+
+    flagOfSongRecordKey: Bits
+    """部分歌曲IN达到S解锁AT"""
+
+    randomVersionUnlocked: Bits[6]
+    """Random切片解锁"""
+
+
 class gameProgress03:
     """版本号<3.8.1"""
 
@@ -1604,17 +1920,32 @@ def getStructure(file_head: dict[str, bytes]) -> dict[str, Any]:
     elif file_head.get("gameKey") == b"\x02":
         structure_list["gameKey"] = gameKey02
 
+    elif file_head.get("gameKey") == b"\x01":
+        structure_list["gameKey"] = gameKey01
+
     elif isinstance(file_head.get("gameKey"), bytes):
         raise ValueError(
             f'文件头不正确，可能数据结构已更新！不应为：{file_head.get("gameKey")}'
         )
 
     # gameProgress
-    if file_head.get("gameProgress") == b"\x04":
+    if file_head.get("gameProgress") == b"\x06":
+        structure_list["gameProgress"] = gameProgress06
+
+    elif file_head.get("gameProgress") == b"\x05":
+        structure_list["gameProgress"] = gameProgress05
+
+    elif file_head.get("gameProgress") == b"\x04":
         structure_list["gameProgress"] = gameProgress04
 
     elif file_head.get("gameProgress") == b"\x03":
         structure_list["gameProgress"] = gameProgress03
+
+    elif file_head.get("gameProgress") == b"\x02":
+        structure_list["gameProgress"] = gameProgress02
+
+    elif file_head.get("gameProgress") == b"\x01":
+        structure_list["gameProgress"] = gameProgress01
 
     elif isinstance(file_head.get("gameProgress"), bytes):
         raise ValueError(

@@ -98,12 +98,10 @@ class MainWindow(FramelessWindow):
         # 设置窗口标题
         self.setTitleBar(StandardTitleBar(self))
         self.titleBar.setTitle("PhiFilter Tool")
-        self.titleBar.titleLabel.setStyleSheet(
-            """
+        self.titleBar.titleLabel.setStyleSheet("""
             font-size: 30px;
             font-family: "Segoe UI";
-        """
-        )
+        """)
         self.setWindowTitle("PhiFilter Tool")  # 设置任务栏标题
         self.resize(950, 800)  # 主窗口大小 随便设的
         # 将窗口居中显示
@@ -172,7 +170,9 @@ class MainWindow(FramelessWindow):
             if not setting_file:
                 setting_file = default_setting_file
             # 读取主设置
-            if self.user_data.user_name not in setting_file.keys():  # 当前用户没有设置记录
+            if (
+                self.user_data.user_name not in setting_file.keys()
+            ):  # 当前用户没有设置记录
                 infolog(f"当前用户没有设置记录")
                 setting_file[self.user_data.user_name] = default_setting_text
 
@@ -180,15 +180,15 @@ class MainWindow(FramelessWindow):
             # infolog(f"用户设置:{user_setting}")
 
             if "main_setting" not in user_setting:
-                user_setting["main_setting"] = default_setting_file[self.user_data.user_name][
-                    "main_setting"
-                ]
+                user_setting["main_setting"] = default_setting_file[
+                    self.user_data.user_name
+                ]["main_setting"]
             main_setting = user_setting["main_setting"]
 
             if "always_update" not in main_setting:
-                main_setting["always_update"] = default_setting_file[self.user_data.user_name][
-                    "main_setting"
-                ]["always_update"]
+                main_setting["always_update"] = default_setting_file[
+                    self.user_data.user_name
+                ]["main_setting"]["always_update"]
             self.always_update: bool = main_setting["always_update"]
 
             # 读取默认开屏页设置
@@ -241,12 +241,26 @@ class MainWindow(FramelessWindow):
 
         # ------------ 添加任务 ------------
         for combine_namei in COMBINE_NAME:  # 缓存曲绘
-            self.loader.add_task(
-                resource_path(rf"{ILLUSTRATION_PREPATH}{combine_namei}.png"),
-                combine_namei,
-                self.illustration_cache,
-                400,
-            )
+            if combine_namei in DIFF_ILLUSTRATION.keys():
+                all_combine_namei = DIFF_ILLUSTRATION[combine_namei]
+                # print(combine_namei + "有差分")
+                for diffi, diff_combine_namei in all_combine_namei.items():
+                    self.loader.add_task(
+                        resource_path(
+                            rf"{ILLUSTRATION_PREPATH}{diff_combine_namei}.png"
+                        ),
+                        diff_combine_namei,
+                        self.illustration_cache,
+                        400,
+                    )
+                    # print(diffi + "难度的差分名称:" + diff_combine_namei)
+            else:
+                self.loader.add_task(
+                    resource_path(rf"{ILLUSTRATION_PREPATH}{combine_namei}.png"),
+                    combine_namei,
+                    self.illustration_cache,
+                    400,
+                )
 
         for keyi, pathi in SONG_CARD_BACKGROUND.items():  # 背景卡片
             self.loader.add_task(resource_path(pathi), keyi, self.page_bg_cache, 250)
@@ -345,9 +359,7 @@ class MainWindow(FramelessWindow):
             # 5. 保存回用户文件
             # index=False 去掉pandas自带的索引列
             # header=False 因为原文件没有表头
-            df_final.to_csv(
-                user_file_path, index=False, header=False, encoding="utf-8"
-            )
+            df_final.to_csv(user_file_path, index=False, header=False, encoding="utf-8")
 
             infolog(f"成功！已将新记录写入 {user_file_path}")
             infolog(f"当前用户文件总记录数: {len(df_final)}")
@@ -378,12 +390,16 @@ class MainWindow(FramelessWindow):
                 last_user = self.user_data.token_file["last_user"]
                 if last_user:
                     infolog(f"上次登录为{last_user}")
-                    self.user_data.token = self.user_data.token_file[last_user]  # 获取上一次登录时的账号
+                    self.user_data.token = self.user_data.token_file[
+                        last_user
+                    ]  # 获取上一次登录时的账号
 
         else:  # TOKEN_PATH 不存在
             with open(appdata_path(TOKEN_PATH), "w", encoding="utf-8") as token_file:
                 self.user_data.token_file = {"last_user": ""}
-                json.dump(self.user_data.token_file, token_file, ensure_ascii=False, indent=4)
+                json.dump(
+                    self.user_data.token_file, token_file, ensure_ascii=False, indent=4
+                )
 
         if self.user_data.token:
             infolog("预处理结束了 有token")
@@ -913,9 +929,13 @@ class MainWindow(FramelessWindow):
                     heapq.heappushpop(self.user_data.phi3, (item.rks, row))
 
         # 按单曲rks从大到小排序( 这不还是要排序吗...
-        self.user_data.b27 = sorted(self.user_data.b27, key=lambda x: x[0], reverse=True)
+        self.user_data.b27 = sorted(
+            self.user_data.b27, key=lambda x: x[0], reverse=True
+        )
         # infolog(f"b27是这些:{self.user_data.b27}")
-        self.user_data.phi3 = sorted(self.user_data.phi3, key=lambda x: x[0], reverse=True)
+        self.user_data.phi3 = sorted(
+            self.user_data.phi3, key=lambda x: x[0], reverse=True
+        )
         # infolog(f"phi3是这些:{self.user_data.phi3}")
 
         self.generate_improve_rks_advise()
@@ -957,21 +977,30 @@ class MainWindow(FramelessWindow):
                 return int(need_acc * 100 + 0.9) / 100
 
             # 考虑推到ap之后能不能靠这首歌在 b27和phi3 中的表现让rks产生变化
-            if level - singal_rks + level - float(self.user_data.phi3[-1][0]) >= delta_rks:
+            if (
+                level - singal_rks + level - float(self.user_data.phi3[-1][0])
+                >= delta_rks
+            ):
                 return 100  # 推AP去吧
             else:
                 return None  # AP也救不了你
 
         else:  # 不在b27
             need_rks = delta_rks + min_b27_rks
-            need_acc = 45 * sqrt(need_rks / level) + 55
+            try:
+                need_acc = 45 * sqrt(need_rks / level) + 55
+            except ZeroDivisionError:
+                print("名称" + combine_name + "等级", level)
             if need_acc < 70:  # 不到70不计入rks 要上榜最少要70
                 return 70
             if need_acc <= 100:  # 可以只靠这首歌在 b27 的表现让rks产生变化
                 return int(need_acc * 100 + 0.9) / 100
 
             # 考虑推到ap之后能不能靠这首歌在 b27和phi3 中的表现让rks产生变化
-            if level - min_b27_rks + level - float(self.user_data.phi3[-1][0]) >= delta_rks:
+            if (
+                level - min_b27_rks + level - float(self.user_data.phi3[-1][0])
+                >= delta_rks
+            ):
                 return 100  # 推AP去吧
             else:
                 return None  # AP也救不了你
@@ -1004,7 +1033,9 @@ class MainWindow(FramelessWindow):
         for singal_rks, row in self.user_data.phi3:
             self.user_data.total_rks += singal_rks
         self.user_data.rks = round(
-            self.user_data.total_rks / (len(self.user_data.b27) + len(self.user_data.phi3)), 8
+            self.user_data.total_rks
+            / (len(self.user_data.b27) + len(self.user_data.phi3)),
+            8,
         )  # 当前玩家准确rks值
         show_rks = int(self.user_data.rks * 100 + 0.5) / 100  # 游戏页面展示的rks值
         delta_rks = (
@@ -1191,12 +1222,10 @@ class MainWindow(FramelessWindow):
         sort_result_reverse_btn.setOnText("当前:从大到小")
         sort_result_reverse_btn.setChecked(True)  # 默认从大到小
         sort_result_reverse_btn.setStyleSheet(get_switch_button_style())
-        sort_result_reverse_btn.label.setStyleSheet(
-            f"""
+        sort_result_reverse_btn.label.setStyleSheet(f"""
             font-size: 23px;
             font-family: "{FONT_FAMILY["chi"]}";
-            """
-        )
+            """)
         sort_result_reverse_btn.checkedChanged.connect(
             self.place_calculate_result
         )  # 每次改变都会重新布局
@@ -1618,12 +1647,10 @@ class MainWindow(FramelessWindow):
         sort_result_reverse_btn.setOnText("当前:从大到小")
         sort_result_reverse_btn.setChecked(True)  # 默认从大到小
         sort_result_reverse_btn.setStyleSheet(get_switch_button_style())
-        sort_result_reverse_btn.label.setStyleSheet(
-            f"""
+        sort_result_reverse_btn.label.setStyleSheet(f"""
             font-size: 23px;
             font-family: "{FONT_FAMILY["chi"]}";
-            """
-        )
+            """)
         sort_result_reverse_btn.checkedChanged.connect(
             self.place_record
         )  # 每次改变都会重新布局
@@ -1841,7 +1868,7 @@ class MainWindow(FramelessWindow):
             匹配的集合
         """
         infolog("开始从给定的序号中筛选出符合条件的序号并返回")
-        (attribution, limit, limit_val) = condition
+        attribution, limit, limit_val = condition
         result = set()
         if attribution in ("曲名", "曲师", "谱师", "画师", "分组", "简评", "俗称"):
             limit_val = limit_val.replace(" ", "").lower()
@@ -2387,7 +2414,9 @@ class MainWindow(FramelessWindow):
         group_ccb.set_selected_items(selected_group)
 
         # 同步俗称编辑区的控件状态
-        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"]["nickname_ccb"]
+        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"][
+            "nickname_ccb"
+        ]
         selected_nicknames = info_card_copy.nickname_list
         nickname_ccb.set_selected_items(selected_nicknames)
 
@@ -2449,7 +2478,9 @@ class MainWindow(FramelessWindow):
 
     def create_new_nickname(self):
         infolog("开始新建俗称")
-        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"]["nickname_ccb"]
+        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"][
+            "nickname_ccb"
+        ]
         user_input = nickname_ccb.text()
         infolog(f"新俗称为:{user_input}")
         if user_input:
@@ -2487,7 +2518,9 @@ class MainWindow(FramelessWindow):
         # print(f"new group={new_group}")
         new_comment = self.widgets["edit_info_page"]["comment_label"].get_plain_text()
         # 读取新俗称值
-        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"]["nickname_ccb"]
+        nickname_ccb: multi_check_combobox = self.widgets["edit_info_page"][
+            "nickname_ccb"
+        ]
         new_nicknames = nickname_ccb.get_selected_items()
         model = self.song_list_widget.model
         item: SongItem = model.get_item(f"{now_card.combine_name}.{now_card.diff}")
@@ -2506,7 +2539,7 @@ class MainWindow(FramelessWindow):
             ):
                 model.items[i] = item
                 break
-        
+
         # 同步更新同一歌曲其他难度的 nickname_list
         for i in range(model.rowCount()):
             if (
@@ -2634,8 +2667,12 @@ class MainWindow(FramelessWindow):
         if self.user_data.token:  # 有token
             infolog(f"你的背景名称是{self.user_data.background_name}")
             # self.user_data.background_name = "Stasis.Maozon" # 调试用
-            self.user_data.background_name = self.transform_bakcground_name(self.user_data.background_name)
-            widget = bg_widget(self.illustration_cache[self.user_data.background_name], 10)
+            self.user_data.background_name = self.transform_bakcground_name(
+                self.user_data.background_name
+            )
+            widget = bg_widget(
+                self.illustration_cache[self.user_data.background_name], 10
+            )
             self.widgets["account_page"]["widget"] = widget
         else:  # 没token 暂时用一下无背景的吧
             widget = QWidget()
@@ -2904,7 +2941,9 @@ class MainWindow(FramelessWindow):
             self.widgets["account_page"]["login_confirm_btn"].hide()
 
             # self.user_data.background_name = "Stasis.Maozon"
-            self.user_data.background_name = self.transform_bakcground_name(self.user_data.background_name)
+            self.user_data.background_name = self.transform_bakcground_name(
+                self.user_data.background_name
+            )
             widget = bg_widget(self.illustration_cache[self.user_data.background_name])
             self.widgets["account_page"]["widget"] = widget
             self.account_page = widget
@@ -3019,12 +3058,10 @@ class MainWindow(FramelessWindow):
             lambda checked: setattr(self, "always_update", checked)
         )
         always_update_sbtn.setStyleSheet(get_switch_button_style())
-        always_update_sbtn.label.setStyleSheet(
-            f"""
+        always_update_sbtn.label.setStyleSheet(f"""
             font-size: 23px;
             font-family: "{FONT_FAMILY["chi"]}";
-            """
-        )
+            """)
         main_setting_layout.addWidget(always_update_sbtn)
 
         # 设置默认启动页面
@@ -3120,12 +3157,10 @@ class MainWindow(FramelessWindow):
         clear_after_search_sbtn.setStyleSheet(
             get_switch_button_style(**clear_after_search_style)
         )
-        clear_after_search_sbtn.label.setStyleSheet(
-            f"""
+        clear_after_search_sbtn.label.setStyleSheet(f"""
             font-size: 23px;
             font-family: "{FONT_FAMILY["chi"]}";
-            """
-        )
+            """)
         search_setting_layout.addWidget(clear_after_search_sbtn)
 
         search_setting_layout.addStretch(1)
